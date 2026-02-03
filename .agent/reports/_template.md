@@ -1,0 +1,19 @@
+# Report: <TITLE>
+
+Date: YYYY-MM-DD
+Role: <ROLE>
+Spec/Plan: <LINK>
+
+## Summary
+- ...
+
+## Changes
+- Created: ...
+- Modified: ...
+- Deleted: ...
+
+## Risks / Notes
+- ...
+
+## Next Steps
+- ...

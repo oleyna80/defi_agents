@@ -1,0 +1,10 @@
+[Unit]
+Description=Run DeFi Sentinel Bot every 15 minutes
+
+[Timer]
+OnBootSec=1min
+OnUnitInactiveSec=15m
+Unit=defi-sentinel.service
+
+[Install]
+WantedBy=timers.target

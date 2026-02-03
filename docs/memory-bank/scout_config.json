@@ -1,0 +1,17 @@
+{
+  "scout_settings": {
+    "target_chains": [],
+    "min_tvl_usd": 1000000,
+    "min_apy": 8.0,
+    "global_search": true,
+    "risk_filters": {
+      "min_bridge_liquidity": 5000000,
+      "max_chain_risk_score": 7
+    },
+    "gas_efficiency": {
+      "budget_pct": 2.0,
+      "min_monthly_net_profit_usd": 10.0,
+      "deposit_usd": 1000
+    }
+  }
+}

@@ -1,0 +1,16 @@
+# Secrets
+.env
+.env.prod
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Sentinel data artifacts
+history.csv
+docs/memory-bank/cache/
+.cache/
+scout.log
+

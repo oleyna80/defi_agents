@@ -1,0 +1,19 @@
+---
+description: Manage Tasks and Progress Updates
+globs:
+---
+
+# Task Master Rule
+
+## Trigger
+This rule applies when a task from a plan or checklist is completed.
+
+## Actions
+1. Mark as done:
+   - Update the relevant checklist in `docs/specs/` or `docs/plans/`.
+
+2. Update Memory Bank:
+   - `docs/memory-bank/activeContext.md`: add to Recent Changes and set next Active Task.
+   - `docs/memory-bank/progress.md`: update status for the feature or milestone.
+
+3. Suggest a commit message referencing the spec or task ID.

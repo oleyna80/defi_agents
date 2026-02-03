@@ -1,0 +1,85 @@
+# Progress
+
+## Milestones
+- [ ] Initial setup
+- [ ] Concept spec approved (Universal DeFi Agent)
+- [ ] Universal Observer v1 spec approved
+- [x] Security module spec approved (GoPlus primary) (2026-02-01)
+- [x] Security module Stage B + audit tiers validated (DoD) (2026-02-01)
+- [ ] Scout module spec approved
+- [x] Scout module Step 5-6 completed (dedupe + tests) (2026-02-01)
+- [x] L3 AI-Analyst v1.3 integration (mock provider + deterministic policy + cache) (2026-02-02)
+- [x] L3 AI-Analyst v3.1 production hardening (SSRF-safe extractor + DeepSeek provider + mandatory security tests) (2026-02-02)
+- [x] Reproducible runtime setup + live DeepSeek smoke test completed (2026-02-02)
+- [x] DevEx + deployment bootstrap (Makefile + GitHub Actions + systemd templates) (2026-02-02)
+- [x] Pre-flight VPS hardening v3.2 (fail-fast + atomic cache + notifier retries + user-mode systemd) (2026-02-03)
+- [x] VPS subdomain cutover pack prepared (env/nginx/preflight templates) (2026-02-03)
+
+## In Progress
+- Project bootstrap
+- Spec 000 (Concept & architecture)
+- Spec 001 (Monitoring module: Observer v1)
+- Spec 002 (Security module: Auditor v1)
+- Spec 003 (Business process: automated scouting)
+- Spec 004 (Business process: reliability scoring / auditor)
+- Spec 005 (Business process: universal monitoring / observer)
+- Spec 006 (Scout module: Discovery v1.0)
+- Plan 008 (L3 AI-Analyst): production hardening and real provider integration
+
+## Completed
+- Security module Step 3 completed (tests green, aggregation logic) — 2026-02-01
+- Scout module Step 5-6 completed — 2026-02-01
+- Scout->Auditor identifier mapping fix (address + chain id normalization) — 2026-02-02
+- L3 AI-Analyst module integrated with mock flow + cache + policy matrix — 2026-02-02
+- L3 AI-Analyst v3.1 implemented with enterprise SSRF controls and dual-cache orchestration — 2026-02-02
+- Live L3 smoke test validated against real docs and DeepSeek response path — 2026-02-02
+- Automation/deploy scaffolding prepared for 4-hour production cadence — 2026-02-02
+- Pre-flight hardening complete: strict mock fallback policy + atomic cache persistence + notifier retries — 2026-02-03
+- VPS migration pack prepared with subdomain runbook and templates — 2026-02-03
+
+## Changelog
+- 2026-02-01: Template initialized
+- 2026-02-01: Added Universal DeFi Sentinel product context
+- 2026-02-01: Drafted spec 000 (Universal DeFi Agent concept)
+- 2026-02-01: Drafted spec 001 (Monitoring module: Observer v1)
+- 2026-02-01: Drafted spec 002 (Security module: Auditor v1, GoPlus primary)
+- 2026-02-01: Drafted spec 003 (Business process: Step 1 scouting)
+- 2026-02-01: Drafted spec 004 (Business process: Step 2 reliability scoring / auditor)
+- 2026-02-01: Drafted spec 005 (Business process: Step 3 universal monitoring / observer)
+- 2026-02-01: Implemented AssetClassifier + whitelist loader (security module)
+- 2026-02-01: Implemented WhitelistProvider + GoPlus client + SecurityAuditor wiring
+- 2026-02-01: Implemented DeFiClient + protocol slug cache (Stage B prep)
+- 2026-02-01: Implemented Stage B aggregation (De.Fi reputation -> SecurityResult)
+- 2026-02-01: DoD met for Security Step 3 (tests green, Tier A/B/Certik, amnesty)
+- 2026-02-01: Drafted spec 006 (Scout module) + plan 004
+- 2026-02-01: Implemented Scout models + DeFiLlama client (Step 1-2)
+- 2026-02-01: Implemented Scout heuristics + Security gate (Step 3-4)
+- 2026-02-01: Implemented Scout dedupe + tests (Step 5-6)
+- 2026-02-01: Added orchestrator main.py + global scout config + notifier
+- 2026-02-01: First global run completed (no crash); output: no matched opportunities
+- 2026-02-02: Fixed DeFiLlama candidate mapping to auditor inputs (target address + chain id)
+- 2026-02-02: Added L3 models (`L3Result`, `FinalTag`, `ReasonCode`, metadata/evidence)
+- 2026-02-02: Added `L3AnalysisManager` and `MockAIService` with strict confidence policy
+- 2026-02-02: Added file-backed `CacheController` and integrated L3 cache key strategy
+- 2026-02-02: Integrated L3 stage in `main.py`, expanded `history.csv` columns, updated notifier output
+- 2026-02-02: Added `tests/test_l3_manager.py`; full test suite passed (14 tests)
+- 2026-02-02: Added SSOT config constants for extractor/policy versioning
+- 2026-02-02: Implemented `ai/extractor.py` with redirect-aware SSRF checks, byte limits, and sanitization
+- 2026-02-02: Implemented `ai/provider.py` with DeepSeek (`/v1`), validation-retry loop, and structured telemetry
+- 2026-02-02: Reworked `l3_manager.py` for L1 content cache + L2 analysis cache and error mapping table
+- 2026-02-02: Added `tests/test_extractor_security.py` (mandatory SSRF suite) and updated L3 tests
+- 2026-02-02: Full suite green (20 passed) + dry run `python3 main.py` successful
+- 2026-02-02: Added `requirements.txt` with pinned major ranges for runtime/testing
+- 2026-02-02: Added `debug_l3_live.py` and validated real provider flow (`WARN`, `SOLID_RISK`, confidence `0.70`)
+- 2026-02-02: Set up local `.venv`; installation + tests + dry run green under venv
+- 2026-02-02: Added `Makefile` with standardized commands (`setup`, `test`, `run`, `live-l3`, `lint`, `clean`)
+- 2026-02-02: Added GitHub Actions workflow (`sentinel-cycle.yml`) with 4-hour schedule and history artifact upload
+- 2026-02-02: Added `deploy/systemd` service+timer templates and usage README
+- 2026-02-02: Verified `make test`, `make run`, `make live-l3` end-to-end
+- 2026-02-03: Added `should_allow_mock_fallback()` and enforced fail-fast startup when DeepSeek init fails
+- 2026-02-03: Removed silent L3 manager fallback to Mock unless explicitly enabled by env
+- 2026-02-03: Hardened `TelegramNotifier` with async retries/backoff and status-code handling
+- 2026-02-03: Switched cache writes to atomic temp-file replacement and fail-loud exception behavior
+- 2026-02-03: Added root `.gitignore` for `.env`, caches, logs, and runtime artifacts
+- 2026-02-03: Updated systemd templates/README to user-mode deployment with timer-driven oneshot execution
+- 2026-02-03: Added `deploy/vps/` pack with `env.vps.example`, `nginx` subdomain template, and executable `preflight.sh`

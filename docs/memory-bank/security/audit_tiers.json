@@ -1,0 +1,21 @@
+{
+  "tier_a": [
+    "OpenZeppelin",
+    "Trail of Bits",
+    "Spearbit",
+    "Zellic"
+  ],
+  "tier_b": [
+    "Consensys Diligence",
+    "Sigma Prime",
+    "Nethermind",
+    "ChainSecurity"
+  ],
+  "low_reputation": [
+    "CertiK"
+  ],
+  "excluded_as_sufficient": [
+    "Quantstamp",
+    "Halborn"
+  ]
+}

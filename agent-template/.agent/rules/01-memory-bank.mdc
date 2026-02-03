@@ -1,0 +1,23 @@
+---
+description: Automatically load context from Memory Bank at the start of a session
+globs:
+---
+
+# Memory Bank Loading Rule
+
+## Trigger
+This rule applies when the user starts a new conversation or asks "What to do next?".
+
+## Actions
+1. Read immediately before answering:
+   - `docs/memory-bank/productContext.md`
+   - `docs/memory-bank/activeContext.md`
+   - `docs/memory-bank/progress.md`
+
+2. Context usage:
+   - Use `activeContext.md` to understand the current focus and active task.
+   - Do not ask for context already present in these files.
+
+3. Updates:
+   - If new information arrives, update Memory Bank files immediately.
+   - Do not rely on chat history alone for long-term memory.

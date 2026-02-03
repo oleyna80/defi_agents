@@ -1,0 +1,25 @@
+---
+description: Enforce Strict Spec-Driven Development (SDD) Protocol
+globs:
+---
+
+# SDD Enforcement Rule
+
+## Trigger
+This rule applies whenever the user requests code generation or a new feature.
+
+## Protocol
+1. Check for spec:
+   - Before writing any code, search `docs/specs/`.
+   - If a spec exists, confirm it is approved and referenced in Memory Bank.
+
+2. Missing spec:
+   - If no spec exists or it is not approved, stop.
+   - Offer to draft a spec using `docs/sdd_templates/SPEC_TEMPLATE.md`.
+
+3. Missing plan:
+   - If a spec exists but no plan, stop and offer to create one using `docs/sdd_templates/PLAN_TEMPLATE.md`.
+
+4. Execution adherence:
+   - Implement strictly according to approved spec and plan.
+   - If changes are needed, ask user to update the spec first.

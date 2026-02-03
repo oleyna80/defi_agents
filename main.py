@@ -1,0 +1,121 @@
+import asyncio
+import logging
+import os
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
+
+from defi_agents.scout.config import ScoutConfig
+from defi_agents.scout.defillama_client import DeFiLlamaClient
+from defi_agents.scout.scout import YieldScout
+from defi_agents.ai.provider import DeepSeekProvider, MockAIService
+from defi_agents.l3_manager import L3AnalysisManager
+from defi_agents.config import should_allow_mock_fallback
+from defi_agents.security.auditor import SecurityAuditor
+from defi_agents.security.defi_client import DeFiClient
+from defi_agents.security.goplus_client import GoPlusClient
+from defi_agents.security.whitelist import WhitelistProvider
+from defi_agents.notifier import TelegramNotifier
+from defi_agents.history import save_to_history
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger("Sentinel")
+
+
+def _load_env_file(path: str = ".env") -> None:
+    env_path = ROOT / path
+    if not env_path.exists():
+        return
+    for raw_line in env_path.read_text().splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        # Standard KEY=VALUE
+        if "=" in line and not line.startswith("#"):
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+            continue
+        # Fallback for non-standard "<value> #KEY_NAME"
+        if "#" in line and "=" not in line:
+            value, maybe_key = line.split("#", 1)
+            key = maybe_key.strip()
+            value = value.strip()
+            if key and value and key not in os.environ:
+                os.environ[key] = value
+
+
+def _is_excluded_by_l3(tag) -> bool:  # noqa: ANN001
+    if tag is None:
+        return False
+    value = getattr(tag, "value", str(tag))
+    return value in {"AI_REJECT", "PENDING"}
+
+
+async def run_sentinel_cycle() -> None:
+    _load_env_file()
+    config = ScoutConfig.from_file("docs/memory-bank/scout_config.json")
+
+    sem = asyncio.Semaphore(3)
+    whitelist = WhitelistProvider()
+    goplus = GoPlusClient(semaphore=sem)
+    defi = DeFiClient(semaphore=sem)
+    auditor = SecurityAuditor(whitelist, goplus, defi)
+
+    client = DeFiLlamaClient(config)
+    scout = YieldScout(config, client, auditor)
+    try:
+        provider = DeepSeekProvider()
+        logger.info("DeepSeek provider initialized.")
+    except Exception as exc:  # noqa: BLE001
+        if should_allow_mock_fallback():
+            logger.warning("AI init failed: %s. Falling back to MockAI (dev mode).", exc)
+            provider = MockAIService()
+        else:
+            logger.critical("AI init failed and fallback disabled. Stopping startup.")
+            raise RuntimeError("Production AI Init Failure") from exc
+    l3_manager = L3AnalysisManager(config=config, provider=provider)
+    notifier = TelegramNotifier()
+
+    logger.info("Starting Global Scout Cycle (chains: ALL).")
+
+    try:
+        opportunities = await scout.analyze()
+        opportunities = await l3_manager.process_batch(opportunities)
+
+        # Save to history (post hard filters + security gate)
+        save_to_history(opportunities)
+
+        final_picks = [
+            opt
+            for opt in opportunities
+            if (
+                not _is_excluded_by_l3(opt.candidate.l3_status)
+                and opt.score >= config.min_final_score
+                and opt.net_profit_usd >= config.gas_efficiency.min_monthly_net_profit_usd
+            )
+        ]
+
+        if final_picks:
+            await notifier.send_alpha_report(final_picks)
+            logger.info("Found %s quality opportunities.", len(final_picks))
+        else:
+            logger.info("Match not found. High security standards met.")
+
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Sentinel cycle failed: %s", exc)
+        await notifier.send_error(f"Sentinel System Error: {exc}")
+
+
+if __name__ == "__main__":
+    asyncio.run(run_sentinel_cycle())
