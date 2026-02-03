@@ -2,8 +2,6 @@ name: Sentinel Cycle
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 */4 * * *"
 
 concurrency:
   group: sentinel-cycle

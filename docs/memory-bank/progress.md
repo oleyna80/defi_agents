@@ -14,6 +14,7 @@
 - [x] DevEx + deployment bootstrap (Makefile + GitHub Actions + systemd templates) (2026-02-02)
 - [x] Pre-flight VPS hardening v3.2 (fail-fast + atomic cache + notifier retries + user-mode systemd) (2026-02-03)
 - [x] VPS subdomain cutover pack prepared (env/nginx/preflight templates) (2026-02-03)
+- [ ] Phase 1 hardening v3.6 in progress (fail-fast propagation + strict preflight + user-mode activation; pending privileged system-unit cleanup) (2026-02-03)
 
 ## In Progress
 - Project bootstrap
@@ -36,6 +37,11 @@
 - Automation/deploy scaffolding prepared for 4-hour production cadence — 2026-02-02
 - Pre-flight hardening complete: strict mock fallback policy + atomic cache persistence + notifier retries — 2026-02-03
 - VPS migration pack prepared with subdomain runbook and templates — 2026-02-03
+- Patched `main.py` to re-raise cycle exceptions and exit non-zero at process level — 2026-02-03
+- Hardened `deploy/vps/preflight.sh` to hard-fail on `ALLOW_MOCK_FALLBACK=true` using POSIX-safe regex — 2026-02-03
+- Disabled GitHub Actions scheduled trigger to avoid duplicate runtime with VPS timer (manual dispatch only) — 2026-02-03
+- Applied `.env` strict mode on host (`ALLOW_MOCK_FALLBACK=false`, permissions `600`) and validated preflight pass — 2026-02-03
+- User-mode timer enabled and smoke test passed (`status=0/SUCCESS`), but system-level timer cleanup is blocked by sudo auth in non-interactive session — 2026-02-03
 
 ## Changelog
 - 2026-02-01: Template initialized

@@ -141,6 +141,21 @@
   - Runtime remains timer-driven bot by default; subdomain is optional until webhook/API endpoints are enabled.
   - Rationale: consistent cutover process with minimal downtime and fewer configuration mistakes.
 
+- 2026-02-03: Fail-fast cycle propagation pattern:
+  - `run_sentinel_cycle()` must re-raise on fatal cycle exceptions after best-effort Telegram error alert.
+  - `__main__` must treat unhandled cycle exceptions as process-fatal and exit non-zero.
+  - Rationale: prevent silent-success (`status=0`) in systemd when cycle logic fails.
+
+- 2026-02-03: Production policy guardrail for mock fallback:
+  - `deploy/vps/preflight.sh` enforces strict mode with a POSIX-safe regex check for
+    `ALLOW_MOCK_FALLBACK=true` and hard-fails deployment.
+  - Rationale: avoid accidental mock operation in production.
+
+- 2026-02-03: Single-scheduler runtime policy:
+  - When VPS timer is primary runtime, GitHub workflow trigger remains manual-only (`workflow_dispatch`);
+    periodic `schedule` is disabled to avoid duplicate cycles.
+  - Rationale: prevent overlapping executions, duplicate alerts, and external API rate-limit pressure.
+
 ## Conventions
 - Naming:
 - Testing:

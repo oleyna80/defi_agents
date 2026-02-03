@@ -20,11 +20,10 @@ for key in "${required[@]}"; do
     fi
 done
 
-if grep -Eq '^ALLOW_MOCK_FALLBACK=true' .env; then
-    status_warn "ALLOW_MOCK_FALLBACK=true (dev mode). For production use false."
-else
-    status_ok "ALLOW_MOCK_FALLBACK is production-safe"
+if grep -iE "^[[:space:]]*ALLOW_MOCK_FALLBACK[[:space:]]*=[[:space:]]*['\"]?true['\"]?([[:space:]]*$|[[:space:]]+#)" .env >/dev/null; then
+    status_fail "ALLOW_MOCK_FALLBACK is TRUE. Production must be strict (false)."
 fi
+status_ok "ALLOW_MOCK_FALLBACK is production-safe"
 
 [[ -f requirements.txt ]] && status_ok "requirements.txt exists" || status_fail "requirements.txt missing"
 [[ -f main.py ]] && status_ok "main.py exists" || status_fail "main.py missing"

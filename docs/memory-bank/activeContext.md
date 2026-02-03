@@ -3,7 +3,7 @@
 ## Current Session Focus
 Current Spec: docs/specs/006-scout-module.md
 Current Plan: Plan 008 (L3 Real AI integration, v3.1 Production)
-Active Task: Hardened L3 stack completed (extractor SSRF + DeepSeek provider + L1/L2 cache + policy mapping)
+Active Task: Phase 1 post-migration hardening (fail-fast propagation + strict preflight + scheduler normalization)
 
 ## Recent Changes
 - 2026-02-01: Initialized project template
@@ -56,6 +56,11 @@ Active Task: Hardened L3 stack completed (extractor SSRF + DeepSeek provider + L
 - 2026-02-03: Added root `.gitignore` for secrets/runtime artifacts
 - 2026-02-03: Updated systemd templates to user-mode `%h` paths and timer-driven oneshot cycle
 - 2026-02-03: Added VPS subdomain deployment pack (`deploy/vps`) with env template, nginx reverse-proxy template, and preflight script
+- 2026-02-03: Patched `main.py` fail-fast flow (`run_sentinel_cycle` now re-raises after alert; process exits non-zero on unhandled cycle crash)
+- 2026-02-03: Hardened `deploy/vps/preflight.sh` policy check (POSIX regex, hard-fail on `ALLOW_MOCK_FALLBACK=true`)
+- 2026-02-03: Updated GitHub Actions workflow to manual-only trigger (removed 4h cron) to prevent scheduler overlap with VPS
+- 2026-02-03: Applied runtime hardening on host (`ALLOW_MOCK_FALLBACK=false`, `.env` permissions `600`, preflight pass, user timer enabled + smoke run success)
+- 2026-02-03: Migration blocker discovered: system-level `defi-sentinel` timer/service still active because sudo-auth is required in non-interactive session
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits
@@ -67,8 +72,8 @@ Active Task: Hardened L3 stack completed (extractor SSRF + DeepSeek provider + L
   - `docs/memory-bank/security/whitelist.json` (tokens + protocols)
 
 ## Next Steps
-1. Choose primary production runtime on VPS (user systemd timer vs GitHub Actions)
-2. Install user units on VPS and verify `systemctl --user` status/logging
-3. Use `deploy/vps/preflight.sh` before cutover and verify DNS for target subdomain
+1. Complete privileged cleanup: disable/stop/remove `/etc/systemd/system/defi-sentinel.{service,timer}` (currently blocked by sudo password prompt)
+2. Re-verify single scheduler state (`systemctl --user` active/enabled; system-level units not-found)
+3. Use `deploy/vps/preflight.sh` before each rollout and verify DNS for target subdomain
 4. Run L3 with real DeepSeek key in scheduled cycles and monitor rate-limit behavior
 5. Add parser support for PDFs (currently `PDF_UNSUPPORTED` -> INCONCLUSIVE/AUDIT_LAG)

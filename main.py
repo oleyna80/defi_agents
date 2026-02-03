@@ -115,7 +115,14 @@ async def run_sentinel_cycle() -> None:
     except Exception as exc:  # noqa: BLE001
         logger.exception("Sentinel cycle failed: %s", exc)
         await notifier.send_error(f"Sentinel System Error: {exc}")
+        raise
 
 
 if __name__ == "__main__":
-    asyncio.run(run_sentinel_cycle())
+    try:
+        asyncio.run(run_sentinel_cycle())
+    except KeyboardInterrupt:
+        pass
+    except Exception as exc:  # noqa: BLE001
+        logger.critical("FATAL: Process crashed: %s", exc, exc_info=True)
+        sys.exit(1)
