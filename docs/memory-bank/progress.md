@@ -78,6 +78,8 @@
 - 2026-02-04: Added direct API integration research document to repo (`docs/research/2026-02-dex-lending-direct-api-research.md`) — 2026-02-04
 - 2026-02-04: Implemented Spec 010 Phase B MVP: `FreshnessManager` + `UniswapSubgraphAdapter` (Ethereum endpoint map, timeout budget, explicit fallback) wired before freshness policy — 2026-02-04
 - 2026-02-04: Added adapter/manager tests and revalidated suite (`39 passed`) — 2026-02-04
+- 2026-02-04: Expanded Spec 010 to non-Ethereum chains via Graph subgraph-ID registry (`GRAPH_API_KEY`-aware) and added `AerodromeSubgraphAdapter` scaffold for Base-focused pools — 2026-02-04
+- 2026-02-04: Updated deployment/config templates for Graph gateway auth and revalidated full suite (`42 passed`) — 2026-02-04
 
 ## Changelog
 - 2026-02-01: Template initialized
@@ -136,3 +138,4 @@
 - 2026-02-04: Planned Phase 2 freshness hardening track (spec 010 / plan 010, DoD and rollout sequence) — 2026-02-04
 - 2026-02-04: Phase A freshness foundation completed; Phase B adapter implementation queued next — 2026-02-04
 - 2026-02-04: Phase B freshness adapter MVP completed (feature-flagged rollout) — 2026-02-04
+- 2026-02-04: Phase C kickoff completed for freshness: multi-chain Graph source registry + Aerodrome adapter scaffold, with Aave re-check moved to next iteration due deprecated v2 endpoint — 2026-02-04

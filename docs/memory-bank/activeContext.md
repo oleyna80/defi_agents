@@ -3,7 +3,7 @@
 ## Current Session Focus
 Current Spec: docs/specs/010-freshness-recheck-v1.md
 Current Plan: docs/plans/010-freshness-recheck-v1-plan.md
-Active Task: Phase 2 freshness hardening (two-step re-check + freshness/divergence gating before Telegram)
+Active Task: Phase 2 freshness Phase C (multi-chain source registry + non-Ethereum adapter coverage)
 
 ## Recent Changes
 - 2026-02-01: Initialized project template
@@ -97,6 +97,9 @@ Active Task: Phase 2 freshness hardening (two-step re-check + freshness/divergen
 - 2026-02-04: Added research artifact to repository: `docs/research/2026-02-dex-lending-direct-api-research.md`
 - 2026-02-04: Completed Phase B (spec 010) MVP adapter: added `FreshnessManager` + `UniswapSubgraphAdapter` (chain-aware endpoints, timeout, safe fallback), wired into pre-alert stage
 - 2026-02-04: Added adapter/manager tests (`tests/test_uniswap_adapter.py`, `tests/test_freshness_manager.py`); full suite green (`39 passed`)
+- 2026-02-04: Expanded freshness source registry to non-Ethereum chains using Graph subgraph IDs (`Ethereum`, `Arbitrum`, `Base`, `BSC/Binance`, `Avalanche`) and optional `GRAPH_API_KEY` env wiring
+- 2026-02-04: Added `AerodromeSubgraphAdapter` scaffold (project-keyword routing for `aerodrome/slipstream/velodrome`) with explicit safe fallback to `UNVERIFIED` when endpoint/key is missing
+- 2026-02-04: Revalidated full suite after Phase C changes (`42 passed`)
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits
@@ -109,8 +112,9 @@ Active Task: Phase 2 freshness hardening (two-step re-check + freshness/divergen
 
 ## Next Steps
 1. Rotate Telegram bot token on VPS (old token appeared in historical logs before hardening) and restart user service
-2. Start Phase C: add `Aave API` re-check adapter and extend source registry coverage beyond Uniswap
-3. Enable and calibrate strict freshness gating on VPS (`recheck_enabled=true`, then `enforce_freshness_for_actionable=true`) after telemetry baseline
-4. Finalize Lindy `age` source (pool age vs contract-age proxy) and document the chosen source in spec/policy matrix
-5. Implement explicit Non-EVM unsupported reporting path (per-chain counters/tags, not only missing-chain totals)
-6. Add heartbeat (daily "no opportunities" message) for healthy-but-silent cycles
+2. Populate VPS `.env` with `GRAPH_API_KEY` and configure `aerodrome_subgraph_{endpoints|ids}` for Base, then run freshness smoke checks
+3. Implement lending Phase C+ adapter: replace deprecated `aave-api-v2` path with current Aave source contract (official API/subgraph)
+4. Enable and calibrate strict freshness gating on VPS (`recheck_enabled=true`, then `enforce_freshness_for_actionable=true`) after telemetry baseline
+5. Finalize Lindy `age` source (pool age vs contract-age proxy) and document the chosen source in spec/policy matrix
+6. Implement explicit Non-EVM unsupported reporting path (per-chain counters/tags, not only missing-chain totals)
+7. Add heartbeat (daily "no opportunities" message) for healthy-but-silent cycles

@@ -48,9 +48,18 @@
       "max_age_minutes": 90,
       "max_apy_divergence_pct": 25.0,
       "max_tvl_divergence_pct": 20.0,
-      "uniswap_subgraph_endpoints": {
-        "Ethereum": "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3"
-      }
+      "graph_api_key_env": "GRAPH_API_KEY",
+      "uniswap_subgraph_endpoints": {},
+      "uniswap_subgraph_ids": {
+        "Ethereum": "5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV",
+        "Arbitrum": "C2KJVEU6fA9Bqf8QwK4MAnuS8xPYYn9N6HqFA7gKjsXo",
+        "Base": "3hCPRGfHk8NAxU1wR8UWQ2N8isf2Xn7u6xQ5q4VYqW3G",
+        "BSC": "6zfiRjwudV3wRMMWfDh29k14bP4fXp6q6qJZNk9b8f6R",
+        "Binance": "6zfiRjwudV3wRMMWfDh29k14bP4fXp6q6qJZNk9b8f6R",
+        "Avalanche": "4iA7jQX3U7zFfD6J2Wf6ByfQX7Qd8L1nY3mA6P7Y5b5M"
+      },
+      "aerodrome_subgraph_endpoints": {},
+      "aerodrome_subgraph_ids": {}
     },
     "min_warn_score": 2.0
   }

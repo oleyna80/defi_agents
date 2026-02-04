@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import logging
+import os
+from typing import Iterable
 
 import httpx
 
@@ -14,13 +16,27 @@ logger = logging.getLogger(__name__)
 class UniswapSubgraphAdapter:
     name = "uniswap_subgraph"
 
-    def __init__(self, endpoints: dict[str, str], timeout_seconds: int = 8) -> None:
+    def __init__(
+        self,
+        endpoints: dict[str, str] | None,
+        timeout_seconds: int = 8,
+        *,
+        subgraph_ids: dict[str, str] | None = None,
+        graph_api_key_env: str = "GRAPH_API_KEY",
+        project_keywords: Iterable[str] = ("uniswap",),
+        adapter_name: str | None = None,
+    ) -> None:
         self.endpoints = dict(endpoints or {})
+        self.subgraph_ids = dict(subgraph_ids or {})
         self.timeout_seconds = max(1, int(timeout_seconds))
+        self.graph_api_key_env = graph_api_key_env
+        self.project_keywords = tuple(k.strip().lower() for k in project_keywords if k and k.strip())
+        if adapter_name:
+            self.name = adapter_name
 
     def supports(self, result: ScoutResult) -> bool:
         project = (result.candidate.project or "").lower()
-        if "uniswap" not in project:
+        if not any(keyword in project for keyword in self.project_keywords):
             return False
         if not (result.candidate.address and result.candidate.chain):
             return False
@@ -40,13 +56,36 @@ class UniswapSubgraphAdapter:
         return await self._fetch_daily(endpoint, pool_addr)
 
     def _endpoint_for_chain(self, chain: str) -> str | None:
-        if chain in self.endpoints:
-            return self.endpoints[chain]
-        chain_lower = chain.lower()
-        for key, value in self.endpoints.items():
-            if key.lower() == chain_lower:
+        endpoint = self._lookup_case_insensitive(self.endpoints, chain)
+        if endpoint:
+            return self._resolve_endpoint(endpoint)
+        subgraph_id = self._lookup_case_insensitive(self.subgraph_ids, chain)
+        if subgraph_id:
+            if subgraph_id.startswith(("http://", "https://")):
+                return self._resolve_endpoint(subgraph_id)
+            graph_key = os.getenv(self.graph_api_key_env, "").strip()
+            if not graph_key:
+                return None
+            return f"https://gateway.thegraph.com/api/{graph_key}/subgraphs/id/{subgraph_id}"
+        return None
+
+    @staticmethod
+    def _lookup_case_insensitive(mapping: dict[str, str], key: str) -> str | None:
+        if key in mapping:
+            return mapping[key]
+        key_lower = key.lower()
+        for candidate_key, value in mapping.items():
+            if candidate_key.lower() == key_lower:
                 return value
         return None
+
+    def _resolve_endpoint(self, endpoint: str) -> str | None:
+        if "{GRAPH_API_KEY}" not in endpoint:
+            return endpoint
+        graph_key = os.getenv(self.graph_api_key_env, "").strip()
+        if not graph_key:
+            return None
+        return endpoint.replace("{GRAPH_API_KEY}", graph_key)
 
     async def _fetch_hourly(self, endpoint: str, pool_addr: str) -> FreshnessSnapshot | None:
         query = """
@@ -146,6 +185,27 @@ class UniswapSubgraphAdapter:
             return None
         data = body.get("data")
         return data if isinstance(data, dict) else None
+
+
+class AerodromeSubgraphAdapter(UniswapSubgraphAdapter):
+    name = "aerodrome_subgraph"
+
+    def __init__(
+        self,
+        endpoints: dict[str, str] | None,
+        timeout_seconds: int = 8,
+        *,
+        subgraph_ids: dict[str, str] | None = None,
+        graph_api_key_env: str = "GRAPH_API_KEY",
+    ) -> None:
+        super().__init__(
+            endpoints=endpoints,
+            timeout_seconds=timeout_seconds,
+            subgraph_ids=subgraph_ids,
+            graph_api_key_env=graph_api_key_env,
+            project_keywords=("aerodrome", "slipstream", "velodrome"),
+            adapter_name=self.name,
+        )
 
 
 def _to_float(value: object) -> float | None:

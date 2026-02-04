@@ -297,6 +297,13 @@
   - Failure behavior is explicit and safe: adapter errors/timeouts do not crash cycle; candidate remains `UNVERIFIED`.
   - Rationale: incremental source integration with bounded operational risk.
 
+- 2026-02-04: Graph gateway migration + non-Ethereum freshness coverage pattern (Phase C):
+  - Replaced deprecated hosted-service assumption (`api.thegraph.com/subgraphs/name/*`) with Graph gateway-ready source registry.
+  - Added support for chain-to-subgraph-ID mapping and runtime API-key injection via env (`GRAPH_API_KEY`).
+  - Kept optional explicit endpoint override for self-hosted/managed GraphQL backends.
+  - Added protocol-scoped adapter routing (`AerodromeSubgraphAdapter`) reusing the same V3 snapshot logic.
+  - Rationale: expand freshness coverage to reward-heavy non-Ethereum chains without weakening fail-safe `UNVERIFIED` behavior when credentials/endpoints are missing.
+
 ## Conventions
 - Naming:
 - Testing:

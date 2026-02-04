@@ -4,7 +4,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from defi_agents.freshness.adapters import UniswapSubgraphAdapter
+from defi_agents.freshness.adapters import AerodromeSubgraphAdapter, UniswapSubgraphAdapter
 from defi_agents.scout.models import PriorityTier, ScoutCandidate, ScoutResult
 from defi_agents.security.models import SecurityResult, SecurityStatus
 
@@ -45,3 +45,29 @@ def test_uniswap_adapter_supports_only_uniswap_project_with_chain_endpoint():
 def test_uniswap_adapter_requires_endpoint_for_chain():
     adapter = UniswapSubgraphAdapter({"Ethereum": "https://example.com/graphql"})
     assert adapter.supports(_result("uniswap-v3", "Arbitrum")) is False
+
+
+def test_uniswap_adapter_supports_subgraph_ids_when_graph_key_present(monkeypatch):
+    monkeypatch.setenv("GRAPH_API_KEY", "test-key")
+    adapter = UniswapSubgraphAdapter(
+        endpoints={},
+        subgraph_ids={"Arbitrum": "subgraph-id-1"},
+        graph_api_key_env="GRAPH_API_KEY",
+    )
+    assert adapter.supports(_result("uniswap-v3", "Arbitrum")) is True
+
+
+def test_uniswap_adapter_subgraph_ids_require_graph_key(monkeypatch):
+    monkeypatch.delenv("GRAPH_API_KEY", raising=False)
+    adapter = UniswapSubgraphAdapter(
+        endpoints={},
+        subgraph_ids={"Arbitrum": "subgraph-id-1"},
+        graph_api_key_env="GRAPH_API_KEY",
+    )
+    assert adapter.supports(_result("uniswap-v3", "Arbitrum")) is False
+
+
+def test_aerodrome_adapter_supports_non_ethereum_project():
+    adapter = AerodromeSubgraphAdapter({"Base": "https://example.com/graphql"})
+    assert adapter.supports(_result("aerodrome-slipstream", "Base")) is True
+    assert adapter.supports(_result("uniswap-v3", "Base")) is False

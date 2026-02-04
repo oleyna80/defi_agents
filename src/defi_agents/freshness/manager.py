@@ -6,7 +6,7 @@ from typing import Iterable, List
 
 from ..scout.config import FreshnessConfig
 from ..scout.models import ScoutResult
-from .adapters import FreshnessAdapter, UniswapSubgraphAdapter
+from .adapters import AerodromeSubgraphAdapter, FreshnessAdapter, UniswapSubgraphAdapter
 from .types import FreshnessSnapshot
 
 
@@ -71,8 +71,16 @@ class FreshnessManager:
         return [
             UniswapSubgraphAdapter(
                 endpoints=config.uniswap_subgraph_endpoints,
+                subgraph_ids=config.uniswap_subgraph_ids,
+                graph_api_key_env=config.graph_api_key_env,
                 timeout_seconds=config.recheck_timeout_seconds,
-            )
+            ),
+            AerodromeSubgraphAdapter(
+                endpoints=config.aerodrome_subgraph_endpoints,
+                subgraph_ids=config.aerodrome_subgraph_ids,
+                graph_api_key_env=config.graph_api_key_env,
+                timeout_seconds=config.recheck_timeout_seconds,
+            ),
         ]
 
 

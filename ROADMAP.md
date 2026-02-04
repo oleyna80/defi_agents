@@ -61,7 +61,8 @@
     - Progress:
       - [x] Phase A: schema + policy wiring (`freshness` config, metadata fields, downgrade policy, counters, report tags).
       - [x] Phase B: first re-check adapter MVP (`Uniswap Subgraph` for Ethereum, timeout budget, metadata/delta wiring; feature-flagged by default).
-      - [ ] Phase C: add Aave API re-check + divergence counters in Telegram/ops logs.
+      - [x] Phase C: расширение на non-Ethereum DEX (multi-chain source registry via Graph subgraph IDs + `Aerodrome` adapter scaffold, feature-flagged).
+      - [ ] Phase C+: Aave direct re-check (обновить endpoint strategy: `aave-api-v2` deprecated, нужен актуальный source contract).
       - [ ] Phase D: add Morpho API and calibrate thresholds on VPS telemetry.
 - [ ] **Non‑EVM стратегия (явно):**
     - Solana / Sui / Aptos: либо добавить отдельные адаптеры, либо пометить как `UNSUPPORTED` (но не “молча отбрасывать”).

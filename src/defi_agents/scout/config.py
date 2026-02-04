@@ -90,10 +90,25 @@ class FreshnessConfig(BaseModel):
     max_age_minutes: int = 90
     max_apy_divergence_pct: float = 25.0
     max_tvl_divergence_pct: float = 20.0
+    graph_api_key_env: str = "GRAPH_API_KEY"
     uniswap_subgraph_endpoints: dict[str, str] = Field(
+        default_factory=dict
+    )
+    uniswap_subgraph_ids: dict[str, str] = Field(
         default_factory=lambda: {
-            "Ethereum": "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3",
+            "Ethereum": "5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV",
+            "Arbitrum": "C2KJVEU6fA9Bqf8QwK4MAnuS8xPYYn9N6HqFA7gKjsXo",
+            "Base": "3hCPRGfHk8NAxU1wR8UWQ2N8isf2Xn7u6xQ5q4VYqW3G",
+            "BSC": "6zfiRjwudV3wRMMWfDh29k14bP4fXp6q6qJZNk9b8f6R",
+            "Binance": "6zfiRjwudV3wRMMWfDh29k14bP4fXp6q6qJZNk9b8f6R",
+            "Avalanche": "4iA7jQX3U7zFfD6J2Wf6ByfQX7Qd8L1nY3mA6P7Y5b5M",
         }
+    )
+    aerodrome_subgraph_endpoints: dict[str, str] = Field(
+        default_factory=dict
+    )
+    aerodrome_subgraph_ids: dict[str, str] = Field(
+        default_factory=dict
     )
 
 
