@@ -168,6 +168,15 @@
   - Each cycle emits stage counters and top rejection reasons to explain "why 0 candidates".
   - Rationale: tuning must be data-driven; reduces operator guesswork and prevents unsafe over-relaxation.
 
+- 2026-02-04: Stage B reputation availability semantics:
+  - If reputation enrichment fails due to upstream/API error, treat as `WARN` with reason `REPUTATION_UNAVAILABLE`.
+  - Do not hard-block discovery purely because the reputation provider is down/unreachable.
+  - Rationale: avoid "everything BLOCK" failure mode; keep hard-blocks reserved for technical scam flags.
+
+- 2026-02-04: Persistent anti-spam dedupe for oneshot schedulers:
+  - Deduper state is persisted under `docs/memory-bank/cache/` so timer-driven oneshot runs can suppress repeats across processes.
+  - Rationale: prevent Telegram spam; in-memory dedupe is ineffective under oneshot systemd timers.
+
 ## Conventions
 - Naming:
 - Testing:

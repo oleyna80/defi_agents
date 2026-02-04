@@ -65,6 +65,8 @@ Active Task: Phase 2 pipeline relaxation v1 (funnel observability + stable-first
 - 2026-02-04: Updated `ROADMAP.md` with measurable DoD/metrics, Phase 2 funnel observability, explicit non-EVM strategy, Traffic-Light “fast lane”, and ops/hygiene items
 - 2026-02-04: Approved Phase 2 policy direction: Lindy v1 thresholds (`TVL >= $100M`, `age >= 180d`), soften-only (audit/reputation), and 2-bucket output (`SAFE` vs `LINDY/WARN`)
 - 2026-02-04: Drafted and approved spec+plan for Pipeline Relaxation v1 (`docs/specs/007-*`, `docs/plans/007-*`)
+- 2026-02-04: Implemented Phase 2 v1 groundwork: stable-first + addressable-first audit selection, funnel metrics logging, expanded EVM chain-id mapping, and file-backed dedupe cache
+- 2026-02-04: Fixed "everything BLOCK" root cause: De.Fi reputation adapter failures are now treated as `WARN` (reputation unavailable) instead of hard-blocking discovery
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits

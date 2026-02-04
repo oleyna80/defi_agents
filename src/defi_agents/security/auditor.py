@@ -91,14 +91,19 @@ class SecurityAuditor:
         try:
             reputation = await self.defi.get_reputation(address)
         except Exception:  # noqa: BLE001
-            # Fail open into reputation penalty path instead of crashing the whole cycle.
+            # Reputation adapter failure should not hard-block production discovery.
             from .models import SecurityReputation
 
-            reputation = SecurityReputation.unidentified_penalty(None)
+            reputation = SecurityReputation.unavailable()
         tech_res.aggregate_reputation(reputation)
 
         # Fail-safe: if protocol unresolved and not Tier1, block
-        if not self._is_tier1(address, chain_id) and reputation.protocol_slug is None and reputation.protocol_name is None:
+        if (
+            reputation.data_available is True
+            and not self._is_tier1(address, chain_id)
+            and reputation.protocol_slug is None
+            and reputation.protocol_name is None
+        ):
             tech_res.status = SecurityStatus.BLOCK
 
         self._set_cached(address, chain_id, tech_res)

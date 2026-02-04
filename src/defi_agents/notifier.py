@@ -56,9 +56,11 @@ class TelegramNotifier:
             chain = r.candidate.chain
             score = f"{r.score:.2f}"
             apy = f"{r.candidate.apy:.2f}%"
+            profit = f"{r.net_profit_usd:.2f}"
+            bucket = r.metadata.get("bucket", "N/A")
             l3_tag = getattr(r.candidate.l3_status, "value", r.candidate.l3_status) or "N/A"
             lines.append(
-                f"- `{chain}` {sym} | APY {apy} | Score {score} | "
-                f"{r.security.status.value.upper()} | L3 {l3_tag}"
+                f"- `{chain}` {sym} | Bucket {bucket} | APY {apy} | Score {score} | "
+                f"Net ${profit}/mo | {r.security.status.value.upper()} | L3 {l3_tag}"
             )
         return "\n".join(lines)

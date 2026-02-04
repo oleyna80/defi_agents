@@ -96,19 +96,44 @@ async def run_sentinel_cycle() -> None:
         # Save to history (post hard filters + security gate)
         save_to_history(opportunities)
 
-        final_picks = [
+        eligible = [
             opt
             for opt in opportunities
-            if (
-                not _is_excluded_by_l3(opt.candidate.l3_status)
-                and opt.score >= config.min_final_score
-                and opt.net_profit_usd >= config.gas_efficiency.min_monthly_net_profit_usd
-            )
+            if (not _is_excluded_by_l3(opt.candidate.l3_status) and opt.score >= config.min_final_score)
         ]
 
-        if final_picks:
-            await notifier.send_alpha_report(final_picks)
-            logger.info("Found %s quality opportunities.", len(final_picks))
+        min_profit = config.gas_efficiency.min_monthly_net_profit_usd
+        profit_ok = [opt for opt in eligible if opt.net_profit_usd >= min_profit]
+
+        def _sec_status_value(opt) -> str | None:  # noqa: ANN001
+            sec = getattr(opt, "security", None)
+            status = getattr(sec, "status", None)
+            if status is None:
+                return None
+            return getattr(status, "value", str(status))
+
+        safe_picks = [opt for opt in eligible if _sec_status_value(opt) in {"trusted", "pass"}]
+        warn_picks = [opt for opt in eligible if _sec_status_value(opt) == "warn"]
+        for opt in safe_picks:
+            opt.metadata["bucket"] = "SAFE"
+        for opt in warn_picks:
+            opt.metadata["bucket"] = "WARN"
+
+        logger.info(
+            "Final filters: eligible=%s profit_ok=%s safe=%s warn=%s min_final_score=%.2f min_monthly_profit_usd=%.2f",
+            len(eligible),
+            len(profit_ok),
+            len(safe_picks),
+            len(warn_picks),
+            config.min_final_score,
+            min_profit,
+        )
+
+        # Report candidates even if profit is below threshold; include net profit in message.
+        report_picks = safe_picks + warn_picks
+        if report_picks:
+            await notifier.send_alpha_report(report_picks)
+            logger.info("Reported %s opportunities (safe=%s warn=%s).", len(report_picks), len(safe_picks), len(warn_picks))
         else:
             logger.info("Match not found. High security standards met.")
 

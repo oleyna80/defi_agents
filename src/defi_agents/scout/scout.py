@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import List
 
 from .config import ScoutConfig
@@ -7,7 +8,9 @@ from .defillama_client import DeFiLlamaClient
 from .cache import ScoutDeduper
 from .models import PriorityTier, ScoutCandidate, ScoutResult
 from ..security.auditor import SecurityAuditor
-from ..security.models import SecurityStatus
+from ..security.models import SecurityReason, SecuritySeverity, SecuritySource, SecurityStatus
+
+logger = logging.getLogger(__name__)
 
 
 class YieldScout:
@@ -25,18 +28,41 @@ class YieldScout:
 
     async def analyze(self) -> List[ScoutResult]:
         pools = await self.client.get_pools()
+        raw_count = len(pools)
         filtered = self._apply_heuristics(pools)
+        heuristics_count = len(filtered)
 
-        # Limit audit volume
-        filtered = filtered[: self.config.max_audit_candidates]
+        # Prioritize and select *addressable* candidates for security checks.
+        # This avoids wasting the audit budget on items without chain_id/address.
+        missing_address = 0
+        missing_chain_id = 0
+        addressable_candidates: List[ScoutCandidate] = []
+        for pool in self._prioritize(filtered):
+            if not pool.address:
+                missing_address += 1
+            if pool.chain_id is None:
+                missing_chain_id += 1
+            if pool.address and pool.chain_id is not None:
+                addressable_candidates.append(pool)
+            if len(addressable_candidates) >= self.config.max_audit_candidates:
+                break
 
         results: List[ScoutResult] = []
-        for pool in filtered:
-            if not pool.address or pool.chain_id is None:
-                continue
+        security_counts = {s.value: 0 for s in SecurityStatus}
+        lindy_softened = 0
+
+        for pool in addressable_candidates:
+            # address + chain_id are guaranteed by selection above
+            assert pool.address and pool.chain_id is not None
 
             target_type = pool.address_source or "TOKEN"
             sec = await self.auditor.evaluate(pool.address, str(pool.chain_id))
+            if self._maybe_apply_lindy(pool, sec):
+                lindy_softened += 1
+
+            if sec.status.value in security_counts:
+                security_counts[sec.status.value] += 1
+
             if sec.status in {SecurityStatus.TRUSTED, SecurityStatus.PASS, SecurityStatus.WARN}:
                 net_apy = self._calculate_net_apy(pool)
                 net_profit = self._estimate_monthly_profit_usd(net_apy)
@@ -53,13 +79,105 @@ class YieldScout:
                             "target_address": pool.address,
                             "target_type": target_type,
                             "chain_id": str(pool.chain_id),
+                            "lindy_softened": "true" if self._is_lindy_softened(sec) else "false",
                         },
                         flags=self._flags(pool),
                     )
                 )
 
         deduped = self._deduplicate(results)
+        logger.info(
+            "Funnel metrics: raw=%s heuristics=%s addressable_selected=%s missing_address=%s missing_chain_id=%s "
+            "security_counts=%s lindy_softened=%s results=%s deduped=%s",
+            raw_count,
+            heuristics_count,
+            len(addressable_candidates),
+            missing_address,
+            missing_chain_id,
+            security_counts,
+            lindy_softened,
+            len(results),
+            len(deduped),
+        )
         return sorted(deduped, key=lambda x: x.score, reverse=True)
+
+    def _prioritize(self, pools: List[ScoutCandidate]) -> List[ScoutCandidate]:
+        """Stable-first + addressable-first sorting to use limited audit budget efficiently."""
+
+        def _priority_rank(pool: ScoutCandidate) -> int:
+            tier = self._classify_priority(pool)
+            return {
+                PriorityTier.LOW_VOLATILITY: 0,
+                PriorityTier.COIN_STABLE: 1,
+                PriorityTier.COIN_COIN: 2,
+            }.get(tier, 9)
+
+        def _is_addressable(pool: ScoutCandidate) -> int:
+            return 1 if (pool.address and pool.chain_id is not None) else 0
+
+        def _prelim(pool: ScoutCandidate) -> float:
+            return (pool.yield_quality * (pool.apy or 0.0)) if pool.apy is not None else 0.0
+
+        return sorted(
+            pools,
+            key=lambda p: (
+                _priority_rank(p),
+                -_is_addressable(p),
+                -(p.tvl_usd or 0.0),
+                -_prelim(p),
+            ),
+        )
+
+    def _is_lindy_softened(self, security) -> bool:  # noqa: ANN001
+        return any(getattr(r, "code", "") == "LINDY_SOFTENED" for r in getattr(security, "reasons", []) or [])
+
+    def _maybe_apply_lindy(self, pool: ScoutCandidate, security) -> bool:  # noqa: ANN001
+        """Softens missing-audit/reputation blocks into WARN for high-lindy pools.
+
+        This must never override critical technical red flags.
+        """
+        if not getattr(self.config, "enable_lindy", True):
+            return False
+        if getattr(pool, "tvl_usd", 0.0) < getattr(self.config, "lindy_min_tvl_usd", 100_000_000):
+            return False
+        age_days = getattr(pool, "contract_age_days", None)
+        if age_days is None or age_days < getattr(self.config, "lindy_min_age_days", 180):
+            return False
+        if getattr(security, "status", None) != SecurityStatus.BLOCK:
+            return False
+
+        # Never soften critical tech flags.
+        for reason in getattr(security, "reasons", []) or []:
+            code = getattr(reason, "code", "")
+            severity = getattr(reason, "severity", None)
+            if code in {"HONEYPOT_DETECTED", "HIGH_TAX", "HIDDEN_OWNER"}:
+                return False
+            if severity == SecuritySeverity.CRITICAL:
+                return False
+
+        # Only soften blocks that are driven by missing-audit / missing-reputation signals.
+        soft_reason_codes = {
+            "NO_AUDITS_FOUND",
+            "NO_TOP_TIER_AUDIT",
+            "UNIDENTIFIED_PROTOCOL",
+            "DATA_UNAVAILABLE",
+        }
+        codes = {getattr(r, "code", "") for r in getattr(security, "reasons", []) or []}
+        if not (codes & soft_reason_codes):
+            return False
+
+        security.status = SecurityStatus.WARN
+        security.score = max(int(getattr(security, "score", 0) or 0), 60)
+        security.reasons.append(
+            SecurityReason(
+                code="LINDY_SOFTENED",
+                label=f"Lindy v1: softened missing-audit/reputation block (tvl={pool.tvl_usd}, age_days={age_days})",
+                severity=SecuritySeverity.MEDIUM,
+                source=SecuritySource.AGGREGATED,
+                data={"tvl_usd": float(pool.tvl_usd), "age_days": int(age_days)},
+            )
+        )
+        return True
 
     def _apply_heuristics(self, pools: List[ScoutCandidate]) -> List[ScoutCandidate]:
         candidates: List[ScoutCandidate] = []

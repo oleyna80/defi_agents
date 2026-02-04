@@ -53,6 +53,9 @@ class SecuritySourceRecord(BaseModel):
 
 
 class SecurityReputation(BaseModel):
+    # Whether reputation data was successfully fetched from upstream provider.
+    # When false, caller must treat reputation as unavailable (not as "no audits found").
+    data_available: bool = True
     protocol_score: Optional[int] = None
     is_audited: Optional[bool] = None
     has_top_tier_audit: Optional[bool] = None
@@ -69,12 +72,25 @@ class SecurityReputation(BaseModel):
     @staticmethod
     def unidentified_penalty(name: Optional[str]) -> "SecurityReputation":
         return SecurityReputation(
+            data_available=True,
             protocol_score=None,
             is_audited=False,
             has_top_tier_audit=False,
             rekt_history=None,
             protocol_slug=None,
             protocol_name=name,
+        )
+
+    @staticmethod
+    def unavailable() -> "SecurityReputation":
+        return SecurityReputation(
+            data_available=False,
+            protocol_score=None,
+            is_audited=None,
+            has_top_tier_audit=None,
+            rekt_history=None,
+            protocol_slug=None,
+            protocol_name=None,
         )
 
 
@@ -206,6 +222,18 @@ class SecurityResult(BaseModel):
     def aggregate_reputation(self, reputation: SecurityReputation) -> None:
         """Enrich result with Stage B reputation data and adjust status."""
         self.reputation = reputation
+
+        # If reputation is unavailable due to upstream/API failure, do not treat this as "no audits".
+        if reputation.data_available is False:
+            if self.status == SecurityStatus.PASS:
+                self.status = SecurityStatus.WARN
+            self.add_reason(
+                code="REPUTATION_UNAVAILABLE",
+                label="Reputation provider unavailable (Stage B skipped)",
+                severity=SecuritySeverity.MEDIUM,
+                source=SecuritySource.DEFI_REPUTATION,
+            )
+            return
 
         if reputation.rekt_history:
             # Amnesty rule: if incident > 24 months ago AND top-tier audit after incident => WARN, else BLOCK

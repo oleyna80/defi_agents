@@ -1,30 +1,26 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from time import time
-from typing import Dict, Optional
+from typing import Optional
 
-
-@dataclass
-class _Entry:
-    ts: float
-    score: float
+from ..cache import CacheController
 
 
 class ScoutDeduper:
     def __init__(self, ttl_seconds: int = 86400) -> None:
         self._ttl = ttl_seconds
-        self._cache: Dict[str, _Entry] = {}
+        # Persist across oneshot systemd runs to avoid Telegram spam.
+        self._cache = CacheController(namespace="scout_dedupe")
 
     def seen_recently(self, key: str, score: float) -> bool:
-        now = time()
-        entry = self._cache.get(key)
-        if not entry:
+        previous = self._cache.get(key)
+        if previous is None:
             return False
-        if now - entry.ts > self._ttl:
+        try:
+            previous_score = float(previous)
+        except (TypeError, ValueError):
             return False
         # if score unchanged, treat as duplicate
-        return abs(entry.score - score) < 1e-6
+        return abs(previous_score - float(score)) < 1e-6
 
     def update(self, key: str, score: float) -> None:
-        self._cache[key] = _Entry(ts=time(), score=score)
+        self._cache.set(key, float(score), ttl_seconds=self._ttl)

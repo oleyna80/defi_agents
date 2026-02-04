@@ -48,8 +48,27 @@ class ScoutConfig(BaseModel):
             "Arbitrum": 42161,
             "Avalanche": 43114,
             "Optimism": 10,
+            # Common EVM networks (Phase 2 intake expansion)
+            "Polygon": 137,
+            "BSC": 56,
+            "Binance": 56,
+            "Fantom": 250,
+            "Gnosis": 100,
+            "Celo": 42220,
+            "Moonbeam": 1284,
+            "Moonriver": 1285,
+            "Linea": 59144,
+            "Scroll": 534352,
+            "zkSync": 324,
+            "ZkSync": 324,
+            "Blast": 81457,
+            "Mantle": 5000,
         }
     )
+    # Lindy v1 (soften-only) thresholds
+    enable_lindy: bool = True
+    lindy_min_tvl_usd: float = 100_000_000
+    lindy_min_age_days: int = 180
     l3_max_audits_per_cycle: int = 3
     l3_timeout_seconds: int = 45
     l3_cache_ttl_hours: int = 72

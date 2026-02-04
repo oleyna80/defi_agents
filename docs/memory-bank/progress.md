@@ -93,3 +93,4 @@
 - 2026-02-03: Updated systemd templates/README to user-mode deployment with timer-driven oneshot execution
 - 2026-02-03: Added `deploy/vps/` pack with `env.vps.example`, `nginx` subdomain template, and executable `preflight.sh`
 - 2026-02-04: Approved Phase 2 direction and drafted spec+plan for Pipeline Relaxation v1 (`docs/specs/007-*`, `docs/plans/007-*`)
+- 2026-02-04: Phase 2 groundwork started: stable-first + addressable-first audit selection, expanded EVM chain mapping, file-backed dedupe, and Stage B reputation failures downgraded to WARN (no longer hard-block) — 2026-02-04
