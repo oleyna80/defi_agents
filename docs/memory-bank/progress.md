@@ -51,6 +51,8 @@
 - 2026-02-04: Implemented Stage B degradation semantics (`REPUTATION_UNAVAILABLE` => WARN, not hard BLOCK) — 2026-02-04
 - 2026-02-04: Implemented persistent dedupe cache for oneshot timers and bucketed WARN reporting path — 2026-02-04
 - 2026-02-04: Added new tests (`test_reputation_unavailable`, Lindy behavior in `test_scout.py`); suite green (`24 passed`) — 2026-02-04
+- 2026-02-04: Reworked gas/profit model for 10k portfolio operation (position sizing + amortized USD round-trip gas + holding period); report now shows positive monthly net for top WARN candidates — 2026-02-04
+- 2026-02-04: Added `min_warn_score` floor and kept strict SAFE threshold; suite green (`25 passed`) and runtime report path validated — 2026-02-04
 
 ## Changelog
 - 2026-02-01: Template initialized

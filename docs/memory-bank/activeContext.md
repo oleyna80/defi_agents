@@ -70,6 +70,8 @@ Active Task: Phase 2 pipeline relaxation v1 (funnel observability + stable-first
 - 2026-02-04: Added Policy Matrix SSOT (`docs/memory-bank/security/policy_matrix_v1.md`) and linked it from spec/roadmap
 - 2026-02-04: Phase 2 execution update: Scout now emits top rejection reasons, warns are reportable in Telegram buckets, and dedupe persists across oneshot systemd runs
 - 2026-02-04: Runtime validation after Phase 2 changes: funnel now yields addressable warn candidates (`results=15`, `deduped=13`) and no longer stuck at hard-zero
+- 2026-02-04: Updated gas/profit model for portfolio-scale ops (10k portfolio / 2.5k position): switched from `% deposit` gas cost to amortized round-trip USD gas with holding period
+- 2026-02-04: Added dual score floors (`min_final_score` for SAFE, `min_warn_score` for WARN) and validated report output with positive monthly net values on top WARN candidates
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits
@@ -83,5 +85,5 @@ Active Task: Phase 2 pipeline relaxation v1 (funnel observability + stable-first
 ## Next Steps
 1. Finalize Lindy `age` source (pool age vs contract-age proxy) and document the chosen source in spec/policy matrix
 2. Implement explicit Non-EVM unsupported reporting path (per-chain counters/tags, not only missing-chain totals)
-3. Calibrate profitability model/thresholds (current gas model makes most opportunities net-negative at $1k deposit)
-4. Add heartbeat (daily "no opportunities" message) for healthy-but-silent cycles
+3. Add heartbeat (daily "no opportunities" message) for healthy-but-silent cycles
+4. Implement per-chain gas profiles (instead of global round-trip gas) to improve net-profit realism

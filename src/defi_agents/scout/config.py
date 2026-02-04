@@ -15,9 +15,38 @@ class RiskFilters(BaseModel):
 
 
 class GasEfficiency(BaseModel):
-    budget_pct: float = 2.0
-    min_monthly_net_profit_usd: float = 10.0
-    deposit_usd: float = 1000.0
+    # Portfolio-level capital target (informational for strategy sizing).
+    portfolio_total_usd: float = 10_000.0
+    # Per-opportunity position sizing used for monthly net-profit estimation.
+    position_size_usd: float = 2_500.0
+    # Absolute minimum monthly profit target (can be auto-raised by relative floor).
+    min_monthly_net_profit_usd: float = 50.0
+    # Round-trip cost for opening + closing position.
+    estimated_roundtrip_gas_usd: float = 8.0
+    # Expected holding horizon for amortizing round-trip gas cost.
+    holding_period_days: int = 45
+    # Legacy fields kept for backward compatibility with old config files.
+    budget_pct: float | None = None
+    deposit_usd: float | None = None
+
+    @property
+    def effective_position_size_usd(self) -> float:
+        if self.position_size_usd > 0:
+            return float(self.position_size_usd)
+        if self.deposit_usd is not None and self.deposit_usd > 0:
+            return float(self.deposit_usd)
+        return 1_000.0
+
+    @property
+    def monthly_gas_cost_usd(self) -> float:
+        days = max(1, int(self.holding_period_days))
+        return float(self.estimated_roundtrip_gas_usd) * (30.0 / float(days))
+
+    @property
+    def effective_min_monthly_profit_usd(self) -> float:
+        # Relative floor: at least 0.5% of position size per month.
+        relative_floor = self.effective_position_size_usd * 0.005
+        return max(float(self.min_monthly_net_profit_usd), relative_floor)
 
 
 class ScoutConfig(BaseModel):

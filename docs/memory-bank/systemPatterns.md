@@ -195,6 +195,14 @@
   - `WARN` shortlist uses a lower floor (`min_warn_score`) and explicit bucket tagging.
   - Rationale: avoid "silent zero" while preserving conservative SAFE criteria.
 
+- 2026-02-04: Portfolio-scale profitability model:
+  - Replaced `% of deposit` gas model with:
+    - per-candidate `position_size_usd`,
+    - `estimated_roundtrip_gas_usd`,
+    - amortization by `holding_period_days`.
+  - Added relative monthly profit floor concept (`>= 0.5%` of position) as config-side guardrail.
+  - Rationale: realistic screening for multi-position portfolios (e.g., 10k total capital) and less distorted net-profit math.
+
 ## Conventions
 - Naming:
 - Testing:

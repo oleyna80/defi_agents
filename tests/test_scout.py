@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
@@ -143,6 +145,24 @@ def test_lindy_does_not_override_hidden_owner_block():
     scout = _scout(cfg, [pool], status_map)
     results = _run(scout.analyze())
     assert len(results) == 0
+
+
+def test_net_profit_uses_position_size_and_amortized_gas():
+    cfg = ScoutConfig(
+        min_tvl_usd=1,
+        gas_efficiency={
+            "position_size_usd": 2500,
+            "estimated_roundtrip_gas_usd": 8,
+            "holding_period_days": 45,
+        },
+    )
+    pool = _candidate("pool1", "Base", "USDC-USDT", 12, 10, 10_000_000)
+    status_map = {pool.address: SecurityResult.pass_as_tier1()}
+    scout = _scout(cfg, [pool], status_map)
+    results = _run(scout.analyze())
+    assert len(results) == 1
+    # Gross: 2500 * 12% / 12 = 25.0, Gas amortized: 8 * (30/45) = 5.333...
+    assert results[0].net_profit_usd == pytest.approx(19.6666, rel=1e-3)
 
 
 def _run(coro):

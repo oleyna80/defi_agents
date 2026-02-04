@@ -104,7 +104,7 @@ async def run_sentinel_cycle() -> None:
 
         safe_min_score = config.min_final_score
         warn_min_score = getattr(config, "min_warn_score", 2.0)
-        min_profit = config.gas_efficiency.min_monthly_net_profit_usd
+        min_profit = config.gas_efficiency.effective_min_monthly_profit_usd
         profit_ok = [opt for opt in eligible if opt.net_profit_usd >= min_profit]
 
         def _sec_status_value(opt) -> str | None:  # noqa: ANN001

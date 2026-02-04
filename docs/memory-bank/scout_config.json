@@ -9,9 +9,11 @@
       "max_chain_risk_score": 7
     },
     "gas_efficiency": {
-      "budget_pct": 2.0,
-      "min_monthly_net_profit_usd": 10.0,
-      "deposit_usd": 1000
+      "portfolio_total_usd": 10000,
+      "position_size_usd": 2500,
+      "min_monthly_net_profit_usd": 50.0,
+      "estimated_roundtrip_gas_usd": 8.0,
+      "holding_period_days": 45
     }
   }
 }

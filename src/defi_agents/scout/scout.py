@@ -236,11 +236,11 @@ class YieldScout:
         return base * sec_factor
 
     def _estimate_monthly_profit_usd(self, net_apy: float) -> float:
-        # net_apy is annual percentage; estimate monthly profit on deposit_usd
-        deposit = self.config.gas_efficiency.deposit_usd
-        gross_monthly = deposit * (net_apy / 100.0) / 12.0
-        # assume gas budget as % of deposit (entry+exit)
-        gas_cost = deposit * (self.config.gas_efficiency.budget_pct / 100.0)
+        # net_apy is annual percentage; estimate monthly profit on position size,
+        # then subtract amortized round-trip gas.
+        position_size = self.config.gas_efficiency.effective_position_size_usd
+        gross_monthly = position_size * (net_apy / 100.0) / 12.0
+        gas_cost = self.config.gas_efficiency.monthly_gas_cost_usd
         return gross_monthly - gas_cost
 
     def _flags(self, pool: ScoutCandidate) -> List[str]:
