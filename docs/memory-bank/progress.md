@@ -16,6 +16,7 @@
 - [x] VPS subdomain cutover pack prepared (env/nginx/preflight templates) (2026-02-03)
 - [x] Phase 1 hardening v3.6 (fail-fast + strict preflight + user-mode migration + single scheduler) (2026-02-04)
 - [ ] Phase 2 pipeline relaxation v1 (funnel observability + stable-first intake + Lindy WARN bucket) (2026-02-04)
+- [ ] Phase 2 freshness re-check v1 (two-step validation + freshness/divergence gating) (2026-02-04)
 - [x] Phase 2.5 investor profiles & allocation engine v1 (micro/standard/whale + sleeves + DCA-aware filtering) (2026-02-04)
 
 ## In Progress
@@ -68,6 +69,7 @@
 - 2026-02-04: Added Telegram report chunking to prevent 400 errors on oversized Markdown messages after wider intake/report payloads — 2026-02-04
 - 2026-02-04: Extended notifier tests for chunking behavior; full suite green (`32 passed`) — 2026-02-04
 - 2026-02-04: Added clickable DefiLlama pool links in Telegram report output for each candidate row — 2026-02-04
+- 2026-02-04: Drafted and approved Spec/Plan 010 for freshness re-check before Telegram output — 2026-02-04
 
 ## Changelog
 - 2026-02-01: Template initialized
@@ -123,3 +125,4 @@
 - 2026-02-04: Shifted report presentation from operator-centric to public decision-centric view (universal metric + sorting + risk colors) — 2026-02-04
 - 2026-02-04: Implemented Phase 2 fast-intake tuning (bigger audit budget + exploration slots) to reduce missed high-APR candidates outside top TVL ranks — 2026-02-04
 - 2026-02-04: Hardened Telegram delivery path for long reports (auto-chunking under API message-size limits) — 2026-02-04
+- 2026-02-04: Planned Phase 2 freshness hardening track (spec 010 / plan 010, DoD and rollout sequence) — 2026-02-04

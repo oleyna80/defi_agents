@@ -1,9 +1,9 @@
 # Active Context
 
 ## Current Session Focus
-Current Spec: docs/specs/009-investor-profiles-allocation.md
-Current Plan: docs/plans/009-investor-profiles-allocation-plan.md
-Active Task: Phase 2.5 profile-aware selection (sleeves + capacity guards + benchmark tagging)
+Current Spec: docs/specs/010-freshness-recheck-v1.md
+Current Plan: docs/plans/010-freshness-recheck-v1-plan.md
+Active Task: Phase 2 freshness hardening (two-step re-check + freshness/divergence gating before Telegram)
 
 ## Recent Changes
 - 2026-02-01: Initialized project template
@@ -87,6 +87,8 @@ Active Task: Phase 2.5 profile-aware selection (sleeves + capacity guards + benc
 - 2026-02-04: Fixed Telegram delivery reliability after report expansion: added safe message chunking for long Markdown reports to stay under Telegram size limits
 - 2026-02-04: Revalidated full test suite after intake/report updates (`32 passed`) and smoke-run without runtime failures
 - 2026-02-04: Added direct DefiLlama pool hyperlinks in Telegram report rows (`[Pool](https://defillama.com/yields/pool/<pool_id>)`) for faster decision workflow
+- 2026-02-04: Drafted and approved Spec/Plan 010 for freshness re-check v1 (`docs/specs/010-*`, `docs/plans/010-*`)
+- 2026-02-04: Updated roadmap/indexes to include Phase 2 freshness workstream (decision-grade actionable gating)
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits
@@ -99,8 +101,8 @@ Active Task: Phase 2.5 profile-aware selection (sleeves + capacity guards + benc
 
 ## Next Steps
 1. Rotate Telegram bot token on VPS (old token appeared in historical logs before hardening) and restart user service
-2. Validate expanded audit intake on VPS (watch API cost/latency and signal quality after `max_audit_candidates=40`)
-3. Investigate/decide secondary pool-data source for low-latency DEX fee pools (Phase 2 follow-up to DeFiLlama lag concerns)
+2. Implement Phase A of spec 010: freshness config + metadata + downgrade policy (`FRESH` only in actionable)
+3. Implement re-check adapter MVP and cycle counters (`rechecked/fresh/stale/unverified/diverged`)
 4. Finalize Lindy `age` source (pool age vs contract-age proxy) and document the chosen source in spec/policy matrix
 5. Implement explicit Non-EVM unsupported reporting path (per-chain counters/tags, not only missing-chain totals)
 6. Add heartbeat (daily "no opportunities" message) for healthy-but-silent cycles

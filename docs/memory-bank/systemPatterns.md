@@ -260,6 +260,13 @@
     - `https://defillama.com/yields/pool/<pool_id>`
   - Rationale: reduce friction from alert -> manual verification -> decision.
 
+- 2026-02-04: Freshness re-check gating pattern (spec 010):
+  - Keep broad intake from DeFiLlama, then re-check shortlist candidates before Telegram publication.
+  - Attach freshness metadata (`FRESH/STALE/UNVERIFIED`, age, staleness score, divergence deltas).
+  - Enforce policy: only `FRESH` candidates are eligible for actionable output.
+  - Downgrade stale/unverified/divergent rows into watchlist with explicit reason codes.
+  - Rationale: preserve opportunity coverage while reducing decision risk from stale aggregator snapshots.
+
 ## Conventions
 - Naming:
 - Testing:

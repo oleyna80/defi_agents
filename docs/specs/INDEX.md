@@ -10,4 +10,5 @@
 - 006-scout-module.md
 - 007-pipeline-relaxation-v1.md
 - 009-investor-profiles-allocation.md
+- 010-freshness-recheck-v1.md
 - (add specs here)

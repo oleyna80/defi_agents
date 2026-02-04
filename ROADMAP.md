@@ -49,6 +49,11 @@
     - Увеличен бюджет аудита кандидатов (`max_audit_candidates`: 15 -> 40).
     - Добавлена exploration-квота (`exploration_slots`) для high-APR stable-focused пулов вне top-TVL.
     - Цель: снизить missed-opportunity из-за ранжирования только по TVL.
+- [ ] **Freshness Re-check v1 (Decision-Grade):**
+    - Two-step проверка перед Telegram для shortlist-кандидатов (re-check по ближайшему источнику).
+    - Freshness/divergence теги: `FRESH/STALE/UNVERIFIED`, `STALE_DATA`, `DIVERGENCE_HIGH`.
+    - Только `FRESH` кандидаты попадают в публичный actionable; остальные уходят в watchlist.
+    - Цель: снизить риск принятия решений на устаревших данных.
 - [ ] **Non‑EVM стратегия (явно):**
     - Solana / Sui / Aptos: либо добавить отдельные адаптеры, либо пометить как `UNSUPPORTED` (но не “молча отбрасывать”).
     - Цель: понимать реальный missed-opportunity, а не терять его в нулевой статистике.
