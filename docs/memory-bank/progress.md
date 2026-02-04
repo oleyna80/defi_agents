@@ -61,6 +61,8 @@
 - 2026-02-04: Applied runtime log hardening for secret safety (`httpx/httpcore` WARNING + notifier status-only retry logs without URL/token leakage) — 2026-02-04
 - 2026-02-04: Improved report explainability: Telegram output now splits `ACTIONABLE` vs `WATCHLIST` and includes top WARN reason codes per candidate — 2026-02-04
 - 2026-02-04: Added notifier report-format tests (`tests/test_notifier.py`); full suite green (`30 passed`) — 2026-02-04
+- 2026-02-04: Updated Telegram report to universal decision format with color badges and pair-type sorting; output now prioritizes chain/pair/project/APY/TVL/risk fields — 2026-02-04
+- 2026-02-04: Replaced user-specific displayed net-profit figure with normalized `Net@1k` metric for cross-user comparability — 2026-02-04
 
 ## Changelog
 - 2026-02-01: Template initialized
@@ -113,3 +115,4 @@
 - 2026-02-04: Completed spec/plan 009 implementation (profile config, sleeves, capacity guards, benchmark-aware tagging + tests) — 2026-02-04
 - 2026-02-04: Hardened operational logging path to avoid secret exposure in HTTP logs (Telegram token safety) — 2026-02-04
 - 2026-02-04: Added report-stage classification and reason visibility to reduce manual triage time in Telegram channel — 2026-02-04
+- 2026-02-04: Shifted report presentation from operator-centric to public decision-centric view (universal metric + sorting + risk colors) — 2026-02-04

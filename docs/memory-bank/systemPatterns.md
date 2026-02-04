@@ -233,6 +233,16 @@
     - `LINDY/WARN` when Lindy soften rule is applied.
   - Rationale: reduce operator ambiguity and speed up manual decision-making without weakening hard-block logic.
 
+- 2026-02-04: Universal decision-report pattern:
+  - Report prioritizes user-agnostic fields for decision intake: `chain`, `pair`, `project`, `APY`, `TVL`, `risk`.
+  - Displayed profitability metric is normalized to a fixed notional: `Net@1k` per month.
+  - Output is sorted by pair class for quick scanning:
+    1) `stable/stable`
+    2) `token/stable`
+    3) `token/token`
+  - Risk is color-coded with badges (`🟢 SAFE`, `🟡 reputation/lindy warnings`, `🟠 security warnings`).
+  - Rationale: make reports comparable across users with different capital sizes and improve fast triage quality.
+
 ## Conventions
 - Naming:
 - Testing:

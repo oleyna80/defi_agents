@@ -80,6 +80,8 @@ Active Task: Phase 2.5 profile-aware selection (sleeves + capacity guards + benc
 - 2026-02-04: Applied logging hardening to prevent secret leakage in runtime logs: raised `httpx/httpcore` to WARNING and removed raw HTTP exception/URL logging in Telegram notifier
 - 2026-02-04: Added report clarity tuning: split Telegram output into `ACTIONABLE` vs `WATCHLIST`, added explicit WARN reason codes, and tightened bucket labels (`WARN/REPUTATION`, `WARN/SECURITY`)
 - 2026-02-04: Added notifier formatting tests (`tests/test_notifier.py`) and validated full suite (`30 passed`)
+- 2026-02-04: Reworked Telegram report into universal "Decision View": focus on chain/pair/project/APY/TVL/risk, color badges, pair-type sorting (`stable/stable`, `token/stable`, `token/token`)
+- 2026-02-04: Added standardized comparability metric `Net@1k` (instead of user-specific position size) in report metadata/output
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits
@@ -92,7 +94,7 @@ Active Task: Phase 2.5 profile-aware selection (sleeves + capacity guards + benc
 
 ## Next Steps
 1. Rotate Telegram bot token on VPS (old token appeared in historical logs before hardening) and restart user service
-2. Validate the new report split (`ACTIONABLE`/`WATCHLIST`) on VPS timer cycles and calibrate `min_monthly_net_profit_usd` for desired signal volume
+2. Validate the new universal report format on VPS timer cycles and tune risk bucket phrasing for channel audience
 3. Finalize Lindy `age` source (pool age vs contract-age proxy) and document the chosen source in spec/policy matrix
 4. Implement explicit Non-EVM unsupported reporting path (per-chain counters/tags, not only missing-chain totals)
 5. Add heartbeat (daily "no opportunities" message) for healthy-but-silent cycles

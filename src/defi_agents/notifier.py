@@ -7,7 +7,7 @@ from typing import List
 
 import httpx
 
-from .scout.models import ScoutResult
+from .scout.models import PriorityTier, ScoutResult
 
 
 class TelegramNotifier:
@@ -60,34 +60,56 @@ class TelegramNotifier:
         return False
 
     def _format_report(self, results: List[ScoutResult]) -> str:
-        lines = ["*Scout Report*", ""]
-        actionable = [r for r in results if r.metadata.get("report_group") == "ACTIONABLE"]
-        watchlist = [r for r in results if r.metadata.get("report_group") != "ACTIONABLE"]
-
-        def _append_section(title: str, section_results: List[ScoutResult]) -> None:
+        lines = [
+            "*Scout Report — Decision View*",
+            "Legend: 🟢 `SAFE` | 🟡 `WARN/REPUTATION`/`LINDY/WARN` | 🟠 `WARN/SECURITY`",
+            "",
+        ]
+        sections = [
+            (PriorityTier.LOW_VOLATILITY, "1) Stable/Stable"),
+            (PriorityTier.COIN_STABLE, "2) Token/Stable"),
+            (PriorityTier.COIN_COIN, "3) Token/Token"),
+        ]
+        for priority, title in sections:
+            section_results = [r for r in results if r.priority == priority]
             if not section_results:
-                return
+                continue
+            section_results = sorted(
+                section_results,
+                key=lambda r: (r.candidate.apy or 0.0, r.candidate.tvl_usd or 0.0),
+                reverse=True,
+            )
             lines.append(f"*{title}*")
             for r in section_results:
-                sym = r.candidate.symbol
+                badge = self._risk_badge(r.metadata.get("bucket", "N/A"))
                 chain = r.candidate.chain
-                score = f"{r.score:.2f}"
+                sym = r.candidate.symbol
+                project = r.candidate.project
                 apy = f"{r.candidate.apy:.2f}%"
-                profit = f"{r.net_profit_usd:.2f}"
+                tvl = self._format_tvl(r.candidate.tvl_usd)
                 bucket = r.metadata.get("bucket", "N/A")
                 sleeve = r.metadata.get("sleeve", "n/a")
-                bench = "ABOVE_BENCH" if r.metadata.get("above_benchmark") == "true" else "BELOW_BENCH"
-                bench_delta = r.metadata.get("benchmark_delta_apy", "0.00")
-                l3_tag = getattr(r.candidate.l3_status, "value", r.candidate.l3_status) or "N/A"
-                reason_codes = r.metadata.get("warn_reasons", "")
-                reasons_tail = f" | Reasons `{reason_codes}`" if reason_codes else ""
+                reason_codes = r.metadata.get("warn_reasons", "-") or "-"
+                net_1k = r.metadata.get("net_profit_1k_usd", "n/a")
                 lines.append(
-                    f"- `{chain}` `{sym}` | Bucket `{bucket}` | Sleeve `{sleeve}` | APY {apy} | Score {score} | "
-                    f"Net ${profit}/mo | `{bench}` ({bench_delta}%) | {r.security.status.value.upper()} | "
-                    f"L3 `{l3_tag}`{reasons_tail}"
+                    f"- {badge} `{chain}` `{sym}` | `{project}` | APY {apy} | TVL {tvl} | "
+                    f"Risk `{bucket}` | Sleeve `{sleeve}` | Reasons `{reason_codes}` | Net@1k ${net_1k}/mo"
                 )
             lines.append("")
-
-        _append_section("Actionable (Net >= Min Profit)", actionable)
-        _append_section("Watchlist (Manual Review)", watchlist)
         return "\n".join(lines)
+
+    def _risk_badge(self, bucket: str) -> str:
+        if bucket == "SAFE":
+            return "🟢"
+        if bucket in {"WARN/REPUTATION", "LINDY/WARN"}:
+            return "🟡"
+        return "🟠"
+
+    def _format_tvl(self, value: float) -> str:
+        if value >= 1_000_000_000:
+            return f"${value / 1_000_000_000:.2f}B"
+        if value >= 1_000_000:
+            return f"${value / 1_000_000:.2f}M"
+        if value >= 1_000:
+            return f"${value / 1_000:.1f}K"
+        return f"${value:.0f}"

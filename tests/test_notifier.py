@@ -5,56 +5,77 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from defi_agents.notifier import TelegramNotifier
-from defi_agents.scout.models import ScoutCandidate, ScoutResult
+from defi_agents.scout.models import PriorityTier, ScoutCandidate, ScoutResult
 from defi_agents.security.models import SecurityResult, SecurityStatus
 
 
-def _result(*, group: str, reasons: str = "") -> ScoutResult:
+def _result(
+    *,
+    priority: PriorityTier,
+    bucket: str,
+    reasons: str = "",
+    symbol: str = "USDC-USDT",
+    chain: str = "Ethereum",
+    apy: float = 10.0,
+) -> ScoutResult:
     candidate = ScoutCandidate.model_validate(
         {
             "pool": "pool1",
             "project": "demo",
-            "chain": "Ethereum",
-            "symbol": "USDC-USDT",
+            "chain": chain,
+            "symbol": symbol,
             "address": "0x1111111111111111111111111111111111111111",
             "chain_id": 1,
             "tvlUsd": 10_000_000,
-            "apy": 10.0,
-            "apyBase": 10.0,
+            "apy": apy,
+            "apyBase": apy,
             "apyReward": 0.0,
         }
     )
     return ScoutResult(
         candidate=candidate,
         security=SecurityResult(status=SecurityStatus.WARN, score=70),
-        net_apy=10.0,
+        net_apy=apy,
         score=5.0,
         net_profit_usd=15.0,
-        priority="COIN_STABLE",
+        priority=priority,
         metadata={
-            "bucket": "WARN/REPUTATION",
+            "bucket": bucket,
             "sleeve": "yield_plus",
-            "above_benchmark": "true",
-            "benchmark_delta_apy": "4.00",
-            "report_group": group,
+            "net_profit_1k_usd": "7.50",
             "warn_reasons": reasons,
         },
         flags=[],
     )
 
 
-def test_report_splits_actionable_and_watchlist_sections():
+def test_report_sorts_by_pair_categories():
     notifier = TelegramNotifier()
     message = notifier._format_report(
-        [_result(group="ACTIONABLE"), _result(group="WATCHLIST")]
+        [
+            _result(priority=PriorityTier.COIN_COIN, bucket="WARN/SECURITY", symbol="WETH-WBTC"),
+            _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol="ETH-USDC"),
+            _result(priority=PriorityTier.LOW_VOLATILITY, bucket="SAFE", symbol="USDC-USDT"),
+        ]
     )
-    assert "Actionable (Net >= Min Profit)" in message
-    assert "Watchlist (Manual Review)" in message
+    assert message.find("1) Stable/Stable") < message.find("2) Token/Stable") < message.find("3) Token/Token")
 
 
-def test_report_includes_warn_reason_codes():
+def test_report_includes_decision_fields_and_colors():
     notifier = TelegramNotifier()
     message = notifier._format_report(
-        [_result(group="WATCHLIST", reasons="REPUTATION_UNAVAILABLE,HIDDEN_OWNER")]
+        [
+            _result(
+                priority=PriorityTier.COIN_STABLE,
+                bucket="WARN/REPUTATION",
+                reasons="REPUTATION_UNAVAILABLE",
+                apy=12.34,
+            )
+        ]
     )
-    assert "Reasons `REPUTATION_UNAVAILABLE,HIDDEN_OWNER`" in message
+    assert "🟡" in message
+    assert "APY 12.34%" in message
+    assert "TVL $10.00M" in message
+    assert "Risk `WARN/REPUTATION`" in message
+    assert "Net@1k $7.50/mo" in message
+    assert "Reasons `REPUTATION_UNAVAILABLE`" in message

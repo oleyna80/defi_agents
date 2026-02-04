@@ -139,6 +139,8 @@ async def run_sentinel_cycle() -> None:
             opt.metadata["report_group"] = (
                 "ACTIONABLE" if opt.net_profit_usd >= min_profit else "WATCHLIST"
             )
+            net_profit_1k = (1000.0 * (opt.net_apy / 100.0) / 12.0) - config.gas_efficiency.monthly_gas_cost_usd
+            opt.metadata["net_profit_1k_usd"] = f"{net_profit_1k:.2f}"
 
         logger.info(
             "Final filters: eligible=%s profit_ok=%s safe=%s warn=%s safe_min_score=%.2f warn_min_score=%.2f min_monthly_profit_usd=%.2f",
