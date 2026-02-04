@@ -94,6 +94,7 @@ Active Task: Phase 2 freshness hardening (two-step re-check + freshness/divergen
 - 2026-02-04: Applied output-volume tuning preset: `exploration_slots=15`, `exploration_stable_only=false`, and configurable dedupe TTL (`dedupe_ttl_seconds=14400`) to reduce over-pruning
 - 2026-02-04: Cleared persisted scout dedupe cache and validated broader report mix in dry run (`LOW_VOLATILITY`, `COIN_STABLE`, `COIN_COIN`)
 - 2026-02-04: Ingested external research findings into roadmap for freshness Phase B/C/D: source shortlist (`Uniswap`, `Aave`, `Morpho`) and rollout sequence with explicit threshold baselines
+- 2026-02-04: Added research artifact to repository: `docs/research/docs/research/2026-02-dex-lending-direct-api-research.md`
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits
