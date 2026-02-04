@@ -1,9 +1,9 @@
 # Active Context
 
 ## Current Session Focus
-Current Spec: docs/specs/006-scout-module.md
-Current Plan: Plan 008 (L3 Real AI integration, v3.1 Production)
-Active Task: Phase 1 post-migration hardening (fail-fast propagation + strict preflight + scheduler normalization)
+Current Spec: docs/specs/007-pipeline-relaxation-v1.md
+Current Plan: docs/plans/007-pipeline-relaxation-v1-plan.md
+Active Task: Phase 2 pipeline relaxation v1 (funnel observability + stable-first intake + Lindy WARN bucket)
 
 ## Recent Changes
 - 2026-02-01: Initialized project template
@@ -61,7 +61,10 @@ Active Task: Phase 1 post-migration hardening (fail-fast propagation + strict pr
 - 2026-02-03: Updated GitHub Actions workflow to manual-only trigger (removed 4h cron) to prevent scheduler overlap with VPS
 - 2026-02-03: Applied runtime hardening on host (`ALLOW_MOCK_FALLBACK=false`, `.env` permissions `600`, preflight pass, user timer enabled + smoke run success)
 - 2026-02-03: Migration blocker discovered: system-level `defi-sentinel` timer/service still active because sudo-auth is required in non-interactive session
+- 2026-02-04: Completed systemd cleanup: system-level `defi-sentinel` units removed; user-mode timer is the single scheduler
 - 2026-02-04: Updated `ROADMAP.md` with measurable DoD/metrics, Phase 2 funnel observability, explicit non-EVM strategy, Traffic-Light “fast lane”, and ops/hygiene items
+- 2026-02-04: Approved Phase 2 policy direction: Lindy v1 thresholds (`TVL >= $100M`, `age >= 180d`), soften-only (audit/reputation), and 2-bucket output (`SAFE` vs `LINDY/WARN`)
+- 2026-02-04: Drafted and approved spec+plan for Pipeline Relaxation v1 (`docs/specs/007-*`, `docs/plans/007-*`)
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits
@@ -73,8 +76,7 @@ Active Task: Phase 1 post-migration hardening (fail-fast propagation + strict pr
   - `docs/memory-bank/security/whitelist.json` (tokens + protocols)
 
 ## Next Steps
-1. Complete privileged cleanup: disable/stop/remove `/etc/systemd/system/defi-sentinel.{service,timer}` (currently blocked by sudo password prompt)
-2. Re-verify single scheduler state (`systemctl --user` active/enabled; system-level units not-found)
-3. Use `deploy/vps/preflight.sh` before each rollout and verify DNS for target subdomain
-4. Run L3 with real DeepSeek key in scheduled cycles and monitor rate-limit behavior
-5. Add parser support for PDFs (currently `PDF_UNSUPPORTED` -> INCONCLUSIVE/AUDIT_LAG)
+1. Implement Funnel Observability (stage counters + top rejection reasons)
+2. Expand EVM chain mapping and improve stable-first + addressable-first prioritization before security
+3. Implement Lindy v1 soften-only rule and bucketed output (`SAFE` / `LINDY-WARN`)
+4. Add heartbeat (daily "no opportunities" message) if Telegram remains silent in healthy state

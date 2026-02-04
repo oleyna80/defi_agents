@@ -156,6 +156,18 @@
     periodic `schedule` is disabled to avoid duplicate cycles.
   - Rationale: prevent overlapping executions, duplicate alerts, and external API rate-limit pressure.
 
+- 2026-02-04: Pipeline relaxation v1 (Lindy soften-only + bucketed output):
+  - Lindy v1 thresholds: `TVL >= $100M` and `age >= 180d`.
+  - Lindy applies only to missing-audit / missing-reputation signals (downgrade to `WARN`), never to critical technical red flags.
+  - Output is explicitly split into two buckets:
+    - `SAFE` (strict shortlist)
+    - `LINDY/WARN` (manual review shortlist; risk-tagged)
+  - Rationale: increase actionable signal while keeping hard anti-scam invariants.
+
+- 2026-02-04: Funnel observability pattern:
+  - Each cycle emits stage counters and top rejection reasons to explain "why 0 candidates".
+  - Rationale: tuning must be data-driven; reduces operator guesswork and prevents unsafe over-relaxation.
+
 ## Conventions
 - Naming:
 - Testing:

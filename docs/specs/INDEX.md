@@ -8,4 +8,5 @@
 - 004-business-process-auditor.md
 - 005-business-process-observer.md
 - 006-scout-module.md
+- 007-pipeline-relaxation-v1.md
 - (add specs here)

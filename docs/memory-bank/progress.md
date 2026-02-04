@@ -14,7 +14,8 @@
 - [x] DevEx + deployment bootstrap (Makefile + GitHub Actions + systemd templates) (2026-02-02)
 - [x] Pre-flight VPS hardening v3.2 (fail-fast + atomic cache + notifier retries + user-mode systemd) (2026-02-03)
 - [x] VPS subdomain cutover pack prepared (env/nginx/preflight templates) (2026-02-03)
-- [ ] Phase 1 hardening v3.6 in progress (fail-fast propagation + strict preflight + user-mode activation; pending privileged system-unit cleanup) (2026-02-03)
+- [x] Phase 1 hardening v3.6 (fail-fast + strict preflight + user-mode migration + single scheduler) (2026-02-04)
+- [ ] Phase 2 pipeline relaxation v1 (funnel observability + stable-first intake + Lindy WARN bucket) (2026-02-04)
 
 ## In Progress
 - Project bootstrap
@@ -42,6 +43,7 @@
 - Disabled GitHub Actions scheduled trigger to avoid duplicate runtime with VPS timer (manual dispatch only) — 2026-02-03
 - Applied `.env` strict mode on host (`ALLOW_MOCK_FALLBACK=false`, permissions `600`) and validated preflight pass — 2026-02-03
 - User-mode timer enabled and smoke test passed (`status=0/SUCCESS`), but system-level timer cleanup is blocked by sudo auth in non-interactive session — 2026-02-03
+- Completed systemd normalization: system-level units removed, user-mode timer is single scheduler — 2026-02-04
 - 2026-02-04: Updated `ROADMAP.md` to include measurable DoD/metrics and clarified Phase 2/3 execution priorities (funnel observability, non-EVM strategy, traffic-light fast lane, ops invariants) — 2026-02-04
 
 ## Changelog
@@ -90,3 +92,4 @@
 - 2026-02-03: Added root `.gitignore` for `.env`, caches, logs, and runtime artifacts
 - 2026-02-03: Updated systemd templates/README to user-mode deployment with timer-driven oneshot execution
 - 2026-02-03: Added `deploy/vps/` pack with `env.vps.example`, `nginx` subdomain template, and executable `preflight.sh`
+- 2026-02-04: Approved Phase 2 direction and drafted spec+plan for Pipeline Relaxation v1 (`docs/specs/007-*`, `docs/plans/007-*`)

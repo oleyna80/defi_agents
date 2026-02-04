@@ -31,9 +31,12 @@
 
 ---
 
-## 🟡 Phase 2: Pipeline Relaxation (Приоритет: High)
+## 🟡 Phase 2: Pipeline Relaxation (Приоритет: High, IN PROGRESS)
 *Проблема: Бот работает стабильно, но находит 0 кандидатов из-за слишком строгих фильтров.*
 
+- [x] **Policy v1 agreed (Lindy + output buckets):**
+    - Lindy v1: `TVL >= $100M` и `age >= 180d` смягчают только audit/reputation сигналы (до `WARN`), но не обходят критические tech-флаги.
+    - Выдача в 2 корзины: `SAFE` и `LINDY/WARN` (manual review).
 - [ ] **Funnel Observability (обязательно):**
     - Логировать/сохранять метрики воронки: `raw_pools → heuristics_pass → has_address+chain_id → security_pass/warn/block/unknown → l3_eligible → final_picks`.
     - Логировать топ‑причины `BLOCK/WARN` (по кодам причин), чтобы быстро понимать “почему 0”.
@@ -45,7 +48,8 @@
     - Цель: понимать реальный missed-opportunity, а не терять его в нулевой статистике.
 - [ ] **Смягчение Security Policy:**
     - Внедрить правило "Lindy Effect" как *смягчение audit/reputation сигналов*, но НЕ как обход критических tech-флагов.
-    - Пример: если `TVL > $50M` и `age > 180d`, то отсутствие top-tier аудита переводить в `WARN`, но не в `PASS/TRUSTED`.
+    - v1 пороги: `TVL >= $100M` и `age >= 180d` (при необходимости позже смягчить до `50M` по метрикам).
+    - Эффект: отсутствие top-tier аудита переводить в `WARN`, но не в `PASS/TRUSTED`.
     - Разрешить `unknown` аудиты для “Blue Chip” протоколов (Aave, Uniswap, Curve) через реестр/whitelist, а не через хардкод.
 - [ ] **Fix "Silent Mode":**
     - Настроить отправку уведомления "No opportunities found" раз в сутки (Heartbeat), чтобы подтверждать работоспособность.
