@@ -67,6 +67,9 @@ Active Task: Phase 2 pipeline relaxation v1 (funnel observability + stable-first
 - 2026-02-04: Drafted and approved spec+plan for Pipeline Relaxation v1 (`docs/specs/007-*`, `docs/plans/007-*`)
 - 2026-02-04: Implemented Phase 2 v1 groundwork: stable-first + addressable-first audit selection, funnel metrics logging, expanded EVM chain-id mapping, and file-backed dedupe cache
 - 2026-02-04: Fixed "everything BLOCK" root cause: De.Fi reputation adapter failures are now treated as `WARN` (reputation unavailable) instead of hard-blocking discovery
+- 2026-02-04: Added Policy Matrix SSOT (`docs/memory-bank/security/policy_matrix_v1.md`) and linked it from spec/roadmap
+- 2026-02-04: Phase 2 execution update: Scout now emits top rejection reasons, warns are reportable in Telegram buckets, and dedupe persists across oneshot systemd runs
+- 2026-02-04: Runtime validation after Phase 2 changes: funnel now yields addressable warn candidates (`results=15`, `deduped=13`) and no longer stuck at hard-zero
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits
@@ -78,7 +81,7 @@ Active Task: Phase 2 pipeline relaxation v1 (funnel observability + stable-first
   - `docs/memory-bank/security/whitelist.json` (tokens + protocols)
 
 ## Next Steps
-1. Implement Funnel Observability (stage counters + top rejection reasons)
-2. Expand EVM chain mapping and improve stable-first + addressable-first prioritization before security
-3. Implement Lindy v1 soften-only rule and bucketed output (`SAFE` / `LINDY-WARN`)
-4. Add heartbeat (daily "no opportunities" message) if Telegram remains silent in healthy state
+1. Finalize Lindy `age` source (pool age vs contract-age proxy) and document the chosen source in spec/policy matrix
+2. Implement explicit Non-EVM unsupported reporting path (per-chain counters/tags, not only missing-chain totals)
+3. Calibrate profitability model/thresholds (current gas model makes most opportunities net-negative at $1k deposit)
+4. Add heartbeat (daily "no opportunities" message) for healthy-but-silent cycles

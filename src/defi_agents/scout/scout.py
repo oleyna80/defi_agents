@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 import logging
 from typing import List
 
@@ -36,6 +37,7 @@ class YieldScout:
         # This avoids wasting the audit budget on items without chain_id/address.
         missing_address = 0
         missing_chain_id = 0
+        addressable_total = 0
         addressable_candidates: List[ScoutCandidate] = []
         for pool in self._prioritize(filtered):
             if not pool.address:
@@ -43,13 +45,14 @@ class YieldScout:
             if pool.chain_id is None:
                 missing_chain_id += 1
             if pool.address and pool.chain_id is not None:
-                addressable_candidates.append(pool)
-            if len(addressable_candidates) >= self.config.max_audit_candidates:
-                break
+                addressable_total += 1
+                if len(addressable_candidates) < self.config.max_audit_candidates:
+                    addressable_candidates.append(pool)
 
         results: List[ScoutResult] = []
         security_counts = {s.value: 0 for s in SecurityStatus}
         lindy_softened = 0
+        reason_counts: Counter[str] = Counter()
 
         for pool in addressable_candidates:
             # address + chain_id are guaranteed by selection above
@@ -62,6 +65,9 @@ class YieldScout:
 
             if sec.status.value in security_counts:
                 security_counts[sec.status.value] += 1
+            if sec.status in {SecurityStatus.WARN, SecurityStatus.BLOCK, SecurityStatus.UNKNOWN}:
+                for reason in sec.reasons:
+                    reason_counts[reason.code] += 1
 
             if sec.status in {SecurityStatus.TRUSTED, SecurityStatus.PASS, SecurityStatus.WARN}:
                 net_apy = self._calculate_net_apy(pool)
@@ -88,13 +94,15 @@ class YieldScout:
         deduped = self._deduplicate(results)
         logger.info(
             "Funnel metrics: raw=%s heuristics=%s addressable_selected=%s missing_address=%s missing_chain_id=%s "
-            "security_counts=%s lindy_softened=%s results=%s deduped=%s",
+            "addressable_total=%s security_counts=%s top_reasons=%s lindy_softened=%s results=%s deduped=%s",
             raw_count,
             heuristics_count,
             len(addressable_candidates),
             missing_address,
             missing_chain_id,
+            addressable_total,
             security_counts,
+            reason_counts.most_common(5),
             lindy_softened,
             len(results),
             len(deduped),

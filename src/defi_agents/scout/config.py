@@ -78,6 +78,7 @@ class ScoutConfig(BaseModel):
     l3_warn_confidence_threshold: float = CONFIDENCE_WARN
     l3_high_risk_confidence_threshold: float = CONFIDENCE_REJECT
     min_final_score: float = 10.0
+    min_warn_score: float = 2.0
 
     @classmethod
     def from_file(cls, path: str | Path) -> "ScoutConfig":

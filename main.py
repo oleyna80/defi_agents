@@ -99,9 +99,11 @@ async def run_sentinel_cycle() -> None:
         eligible = [
             opt
             for opt in opportunities
-            if (not _is_excluded_by_l3(opt.candidate.l3_status) and opt.score >= config.min_final_score)
+            if not _is_excluded_by_l3(opt.candidate.l3_status)
         ]
 
+        safe_min_score = config.min_final_score
+        warn_min_score = getattr(config, "min_warn_score", 2.0)
         min_profit = config.gas_efficiency.min_monthly_net_profit_usd
         profit_ok = [opt for opt in eligible if opt.net_profit_usd >= min_profit]
 
@@ -112,20 +114,25 @@ async def run_sentinel_cycle() -> None:
                 return None
             return getattr(status, "value", str(status))
 
-        safe_picks = [opt for opt in eligible if _sec_status_value(opt) in {"trusted", "pass"}]
-        warn_picks = [opt for opt in eligible if _sec_status_value(opt) == "warn"]
+        safe_picks = [
+            opt for opt in eligible if (_sec_status_value(opt) in {"trusted", "pass"} and opt.score >= safe_min_score)
+        ]
+        warn_picks = [
+            opt for opt in eligible if (_sec_status_value(opt) == "warn" and opt.score >= warn_min_score)
+        ]
         for opt in safe_picks:
             opt.metadata["bucket"] = "SAFE"
         for opt in warn_picks:
-            opt.metadata["bucket"] = "WARN"
+            opt.metadata["bucket"] = "LINDY/WARN" if opt.metadata.get("lindy_softened") == "true" else "WARN"
 
         logger.info(
-            "Final filters: eligible=%s profit_ok=%s safe=%s warn=%s min_final_score=%.2f min_monthly_profit_usd=%.2f",
+            "Final filters: eligible=%s profit_ok=%s safe=%s warn=%s safe_min_score=%.2f warn_min_score=%.2f min_monthly_profit_usd=%.2f",
             len(eligible),
             len(profit_ok),
             len(safe_picks),
             len(warn_picks),
-            config.min_final_score,
+            safe_min_score,
+            warn_min_score,
             min_profit,
         )
 

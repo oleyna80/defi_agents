@@ -182,6 +182,19 @@
   - Deduper state is persisted under `docs/memory-bank/cache/` so timer-driven oneshot runs can suppress repeats across processes.
   - Rationale: prevent Telegram spam; in-memory dedupe is ineffective under oneshot systemd timers.
 
+- 2026-02-04: Stable-first + addressable-first audit budget allocation:
+  - Scout prioritization order for audit budget:
+    1) stable tier (`LOW_VOLATILITY` -> `COIN_STABLE` -> `COIN_COIN`)
+    2) addressable candidates (`address + chain_id`)
+    3) higher TVL
+    4) preliminary yield score
+  - Rationale: maximize useful security checks under limited API budget.
+
+- 2026-02-04: Dual-threshold reporting pattern:
+  - `SAFE` shortlist remains strict (`min_final_score`).
+  - `WARN` shortlist uses a lower floor (`min_warn_score`) and explicit bucket tagging.
+  - Rationale: avoid "silent zero" while preserving conservative SAFE criteria.
+
 ## Conventions
 - Naming:
 - Testing:

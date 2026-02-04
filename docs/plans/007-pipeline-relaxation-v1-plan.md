@@ -58,9 +58,8 @@ New: FunnelMetrics (data class/pydantic) or dict emitted in logs and persisted
 
 ## 5. Implementation Checklist
 - [ ] Decide `age` source for Lindy v1 (pool timestamp vs contract age proxy) and document it.
-- [ ] Add funnel metrics capture + end-of-cycle summary.
-- [ ] Add stable-first + addressable-first prioritization before security calls.
-- [ ] Expand EVM `chain_id_map` and add "unsupported non-EVM" counters.
-- [ ] Implement Lindy v1 soften-only rule and bucketed output (`SAFE` vs `LINDY/WARN`).
-- [ ] Add/adjust tests and run full suite.
-
+- [x] Add funnel metrics capture + end-of-cycle summary.
+- [x] Add stable-first + addressable-first prioritization before security calls.
+- [x] Expand EVM `chain_id_map` and add "unsupported non-EVM" counters (v1 counters via missing-address/chain metrics).
+- [x] Implement Lindy v1 soften-only rule and bucketed output (`SAFE` vs `LINDY/WARN`) (initial version).
+- [x] Add/adjust tests and run full suite.

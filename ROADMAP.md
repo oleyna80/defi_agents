@@ -39,16 +39,16 @@
     - Выдача в 2 корзины: `SAFE` и `LINDY/WARN` (manual review).
 - [x] **Policy Matrix SSOT:**
     - Зафиксировано в `docs/memory-bank/security/policy_matrix_v1.md` (единая таблица правил для SAFE/WARN/BLOCK/UNSUPPORTED).
-- [ ] **Funnel Observability (обязательно):**
+- [x] **Funnel Observability (обязательно):**
     - Логировать/сохранять метрики воронки: `raw_pools → heuristics_pass → has_address+chain_id → security_pass/warn/block/unknown → l3_eligible → final_picks`.
     - Логировать топ‑причины `BLOCK/WARN` (по кодам причин), чтобы быстро понимать “почему 0”.
-- [ ] **Расширение Chain Mapping (EVM):**
+- [x] **Расширение Chain Mapping (EVM):**
     - Добавить маппинг для популярных EVM сетей (например: Polygon, BSC, Fantom, Linea и т.п.).
     - Цель: уменьшить долю кандидатов без `chain_id` и не терять хорошие EVM пулы.
 - [ ] **Non‑EVM стратегия (явно):**
     - Solana / Sui / Aptos: либо добавить отдельные адаптеры, либо пометить как `UNSUPPORTED` (но не “молча отбрасывать”).
     - Цель: понимать реальный missed-opportunity, а не терять его в нулевой статистике.
-- [ ] **Смягчение Security Policy:**
+- [x] **Смягчение Security Policy (v1 baseline):**
     - Внедрить правило "Lindy Effect" как *смягчение audit/reputation сигналов*, но НЕ как обход критических tech-флагов.
     - v1 пороги: `TVL >= $100M` и `age >= 180d` (при необходимости позже смягчить до `50M` по метрикам).
     - Эффект: отсутствие top-tier аудита переводить в `WARN`, но не в `PASS/TRUSTED`.

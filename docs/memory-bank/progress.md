@@ -45,6 +45,12 @@
 - User-mode timer enabled and smoke test passed (`status=0/SUCCESS`), but system-level timer cleanup is blocked by sudo auth in non-interactive session — 2026-02-03
 - Completed systemd normalization: system-level units removed, user-mode timer is single scheduler — 2026-02-04
 - 2026-02-04: Updated `ROADMAP.md` to include measurable DoD/metrics and clarified Phase 2/3 execution priorities (funnel observability, non-EVM strategy, traffic-light fast lane, ops invariants) — 2026-02-04
+- 2026-02-04: Added Security Policy Matrix SSOT (`docs/memory-bank/security/policy_matrix_v1.md`) and linked from spec/roadmap — 2026-02-04
+- 2026-02-04: Implemented Scout funnel observability v1 (stage counters + top rejection reasons in runtime logs) — 2026-02-04
+- 2026-02-04: Implemented stable-first + addressable-first audit selection and expanded EVM chain mapping — 2026-02-04
+- 2026-02-04: Implemented Stage B degradation semantics (`REPUTATION_UNAVAILABLE` => WARN, not hard BLOCK) — 2026-02-04
+- 2026-02-04: Implemented persistent dedupe cache for oneshot timers and bucketed WARN reporting path — 2026-02-04
+- 2026-02-04: Added new tests (`test_reputation_unavailable`, Lindy behavior in `test_scout.py`); suite green (`24 passed`) — 2026-02-04
 
 ## Changelog
 - 2026-02-01: Template initialized

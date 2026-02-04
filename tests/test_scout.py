@@ -5,9 +5,16 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from defi_agents.scout.config import ScoutConfig
+from defi_agents.scout.cache import ScoutDeduper
 from defi_agents.scout.models import ScoutCandidate
 from defi_agents.scout.scout import YieldScout
-from defi_agents.security.models import SecurityResult, SecurityStatus
+from defi_agents.security.models import (
+    SecurityReason,
+    SecurityResult,
+    SecuritySeverity,
+    SecuritySource,
+    SecurityStatus,
+)
 
 
 class _MockClient:
@@ -26,9 +33,9 @@ class _MockAuditor:
         return self._status_map[address]
 
 
-def _candidate(pool, chain, symbol, apy, apy_mean_30d, tvl):
+def _candidate(pool, chain, symbol, apy, apy_mean_30d, tvl, age_days=None):
     suffix = pool[-1] if pool and pool[-1].isdigit() else "1"
-    return ScoutCandidate.model_validate(
+    candidate = ScoutCandidate.model_validate(
         {
             "pool": pool,
             "project": "dex",
@@ -43,6 +50,12 @@ def _candidate(pool, chain, symbol, apy, apy_mean_30d, tvl):
             "apyMean30d": apy_mean_30d,
         }
     )
+    candidate.contract_age_days = age_days
+    return candidate
+
+
+def _scout(cfg, pools, status_map):
+    return YieldScout(cfg, _MockClient(pools), _MockAuditor(status_map), deduper=ScoutDeduper(ttl_seconds=0))
 
 
 def test_aggregator_dedup():
@@ -55,7 +68,7 @@ def test_aggregator_dedup():
         pools[0].address: SecurityResult.pass_as_tier1(),
         pools[1].address: SecurityResult.pass_as_tier1(),
     }
-    scout = YieldScout(cfg, _MockClient(pools), _MockAuditor(status_map))
+    scout = _scout(cfg, pools, status_map)
     results = _run(scout.analyze())
     assert len(results) == 1
 
@@ -66,7 +79,7 @@ def test_volatility_trap_filtered():
         _candidate("pool1", "Base", "USDC-USDT", 100, 5, 10_000_000),
     ]
     status_map = {pools[0].address: SecurityResult.pass_as_tier1()}
-    scout = YieldScout(cfg, _MockClient(pools), _MockAuditor(status_map))
+    scout = _scout(cfg, pools, status_map)
     results = _run(scout.analyze())
     assert len(results) == 0
 
@@ -79,7 +92,55 @@ def test_security_block_excluded():
     status_map = {
         pools[0].address: SecurityResult(status=SecurityStatus.BLOCK, score=0, reasons=[], sources=[])
     }
-    scout = YieldScout(cfg, _MockClient(pools), _MockAuditor(status_map))
+    scout = _scout(cfg, pools, status_map)
+    results = _run(scout.analyze())
+    assert len(results) == 0
+
+
+def test_lindy_softens_missing_audit_block():
+    cfg = ScoutConfig(min_tvl_usd=1, lindy_min_tvl_usd=100_000_000, lindy_min_age_days=180)
+    pool = _candidate("pool1", "Base", "USDC-USDT", 20, 18, 150_000_000, age_days=365)
+    status_map = {
+        pool.address: SecurityResult(
+            status=SecurityStatus.BLOCK,
+            score=10,
+            reasons=[
+                SecurityReason(
+                    code="NO_TOP_TIER_AUDIT",
+                    label="No top tier audit",
+                    severity=SecuritySeverity.MEDIUM,
+                    source=SecuritySource.DEFI_REPUTATION,
+                )
+            ],
+            sources=[],
+        )
+    }
+    scout = _scout(cfg, [pool], status_map)
+    results = _run(scout.analyze())
+    assert len(results) == 1
+    assert results[0].security.status == SecurityStatus.WARN
+    assert results[0].metadata.get("lindy_softened") == "true"
+
+
+def test_lindy_does_not_override_hidden_owner_block():
+    cfg = ScoutConfig(min_tvl_usd=1, lindy_min_tvl_usd=100_000_000, lindy_min_age_days=180)
+    pool = _candidate("pool1", "Base", "USDC-USDT", 20, 18, 150_000_000, age_days=365)
+    status_map = {
+        pool.address: SecurityResult(
+            status=SecurityStatus.BLOCK,
+            score=10,
+            reasons=[
+                SecurityReason(
+                    code="HIDDEN_OWNER",
+                    label="Owner hidden",
+                    severity=SecuritySeverity.HIGH,
+                    source=SecuritySource.GOPLUS,
+                )
+            ],
+            sources=[],
+        )
+    }
+    scout = _scout(cfg, [pool], status_map)
     results = _run(scout.analyze())
     assert len(results) == 0
 
