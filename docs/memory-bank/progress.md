@@ -42,6 +42,7 @@
 - Disabled GitHub Actions scheduled trigger to avoid duplicate runtime with VPS timer (manual dispatch only) — 2026-02-03
 - Applied `.env` strict mode on host (`ALLOW_MOCK_FALLBACK=false`, permissions `600`) and validated preflight pass — 2026-02-03
 - User-mode timer enabled and smoke test passed (`status=0/SUCCESS`), but system-level timer cleanup is blocked by sudo auth in non-interactive session — 2026-02-03
+- 2026-02-04: Updated `ROADMAP.md` to include measurable DoD/metrics and clarified Phase 2/3 execution priorities (funnel observability, non-EVM strategy, traffic-light fast lane, ops invariants) — 2026-02-04
 
 ## Changelog
 - 2026-02-01: Template initialized

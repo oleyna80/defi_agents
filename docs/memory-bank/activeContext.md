@@ -61,6 +61,7 @@ Active Task: Phase 1 post-migration hardening (fail-fast propagation + strict pr
 - 2026-02-03: Updated GitHub Actions workflow to manual-only trigger (removed 4h cron) to prevent scheduler overlap with VPS
 - 2026-02-03: Applied runtime hardening on host (`ALLOW_MOCK_FALLBACK=false`, `.env` permissions `600`, preflight pass, user timer enabled + smoke run success)
 - 2026-02-03: Migration blocker discovered: system-level `defi-sentinel` timer/service still active because sudo-auth is required in non-interactive session
+- 2026-02-04: Updated `ROADMAP.md` with measurable DoD/metrics, Phase 2 funnel observability, explicit non-EVM strategy, Traffic-Light “fast lane”, and ops/hygiene items
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits
