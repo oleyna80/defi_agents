@@ -9,4 +9,5 @@
 - 005-business-process-observer.md
 - 006-scout-module.md
 - 007-pipeline-relaxation-v1.md
+- 009-investor-profiles-allocation.md
 - (add specs here)

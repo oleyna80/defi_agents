@@ -16,6 +16,7 @@
 - [x] VPS subdomain cutover pack prepared (env/nginx/preflight templates) (2026-02-03)
 - [x] Phase 1 hardening v3.6 (fail-fast + strict preflight + user-mode migration + single scheduler) (2026-02-04)
 - [ ] Phase 2 pipeline relaxation v1 (funnel observability + stable-first intake + Lindy WARN bucket) (2026-02-04)
+- [ ] Phase 2.5 investor profiles & allocation engine v1 (micro/standard/whale + sleeves + DCA-aware filtering) (2026-02-04)
 
 ## In Progress
 - Project bootstrap
@@ -53,6 +54,7 @@
 - 2026-02-04: Added new tests (`test_reputation_unavailable`, Lindy behavior in `test_scout.py`); suite green (`24 passed`) — 2026-02-04
 - 2026-02-04: Reworked gas/profit model for 10k portfolio operation (position sizing + amortized USD round-trip gas + holding period); report now shows positive monthly net for top WARN candidates — 2026-02-04
 - 2026-02-04: Added `min_warn_score` floor and kept strict SAFE threshold; suite green (`25 passed`) and runtime report path validated — 2026-02-04
+- 2026-02-04: Added roadmap phase for investor profile-aware selection and drafted spec+plan (`docs/specs/009-*`, `docs/plans/009-*`) — 2026-02-04
 
 ## Changelog
 - 2026-02-01: Template initialized

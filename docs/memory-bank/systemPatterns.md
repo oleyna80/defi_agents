@@ -203,6 +203,12 @@
   - Added relative monthly profit floor concept (`>= 0.5%` of position) as config-side guardrail.
   - Rationale: realistic screening for multi-position portfolios (e.g., 10k total capital) and less distorted net-profit math.
 
+- 2026-02-04: Profile-aware allocation roadmap pattern (Phase 2.5):
+  - Introduce investor profile schema (`initial_capital`, `monthly_contribution`, `risk_profile`, `benchmark_apy`, horizon).
+  - Route candidates into configurable sleeves (`core_safe`, `yield_plus`, `tactical_high_apy`) with explicit risk budgets.
+  - Add capacity guards (`position as % TVL`, per-chain/protocol caps) for large-capital scenarios.
+  - Rationale: one pipeline should adapt to micro DCA users and whale portfolios without weakening anti-scam invariants.
+
 ## Conventions
 - Naming:
 - Testing:

@@ -58,6 +58,29 @@
 
 ---
 
+## 🟨 Phase 2.5: Investor Profiles & Allocation Engine (Новый приоритет: High)
+*Цель: делать релевантный отбор для разных размеров капитала и стратегий (от DCA до tactical high-APY).*
+
+- [ ] **Investor Profile Schema:**
+    - Добавить профиль инвестора: `initial_capital`, `monthly_contribution`, `risk_profile`, `horizon_days`, `benchmark_apy`.
+    - Поддержать типовые профили: `micro`, `standard`, `whale`.
+- [ ] **Allocation Sleeves (Risk Budgets):**
+    - `core_safe` (консервативные стейбл-пулы),
+    - `yield_plus` (умеренный риск),
+    - `tactical_high_apy` (высокорискованные APY 100%+, малой долей и коротким сроком).
+- [ ] **Capacity Guardrails (особенно для крупного капитала):**
+    - Лимит позиции как `% TVL` (пример: 0.1–0.5%),
+    - Лимиты по протоколу/цепочке,
+    - Базовый slippage/capacity sanity-check.
+- [ ] **DCA-aware Logic (для малых/растущих портфелей):**
+    - Поддержка сценария `initial + monthly contribution` (например, 1000 + 500/мес),
+    - Порог входа с учетом фиксированных издержек, чтобы газ не "съедал" доход.
+- [ ] **Benchmark Mode ("better than bank"):**
+    - Оценка не только в `$ net/month`, но и в `net_apy` против `benchmark_apy + buffer`.
+    - Отдельная маркировка "Above Benchmark" в Telegram-отчётах.
+
+---
+
 ## 🔵 Phase 3: Reputation System (Traffic Light)
 *Оптимизация расходов на AI и защита от скама на раннем этапе.*
 
