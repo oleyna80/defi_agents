@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Literal
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
@@ -49,6 +50,38 @@ class GasEfficiency(BaseModel):
         return max(float(self.min_monthly_net_profit_usd), relative_floor)
 
 
+class InvestorProfile(BaseModel):
+    initial_capital_usd: float = 10_000.0
+    monthly_contribution_usd: float = 0.0
+    risk_profile: Literal["micro", "standard", "whale"] = "standard"
+    horizon_days: int = 45
+    benchmark_apy: float = 5.0
+    benchmark_buffer_apy: float = 1.0
+
+    @property
+    def deployable_capital_usd(self) -> float:
+        months = max(0.0, float(self.horizon_days) / 30.0)
+        return max(0.0, self.initial_capital_usd + (self.monthly_contribution_usd * months))
+
+    @property
+    def benchmark_threshold_apy(self) -> float:
+        return float(self.benchmark_apy + self.benchmark_buffer_apy)
+
+
+class SleevesConfig(BaseModel):
+    core_safe_pct: float = 0.70
+    yield_plus_pct: float = 0.25
+    tactical_high_apy_pct: float = 0.05
+    tactical_enabled: bool = False
+    tactical_min_apy: float = 100.0
+
+
+class CapacityGuards(BaseModel):
+    max_position_pct_of_tvl: float = 0.005  # 0.5%
+    max_protocol_allocation_pct: float = 0.40
+    max_chain_allocation_pct: float = 0.50
+
+
 class ScoutConfig(BaseModel):
     min_tvl_usd: float = 1_000_000
     min_apy: float = 0.0
@@ -56,6 +89,9 @@ class ScoutConfig(BaseModel):
     global_search: bool = True
     risk_filters: RiskFilters = Field(default_factory=RiskFilters)
     gas_efficiency: GasEfficiency = Field(default_factory=GasEfficiency)
+    investor_profile: InvestorProfile = Field(default_factory=InvestorProfile)
+    sleeves: SleevesConfig = Field(default_factory=SleevesConfig)
+    capacity_guards: CapacityGuards = Field(default_factory=CapacityGuards)
     stable_symbols: List[str] = Field(
         default_factory=lambda: [
             "USDC",

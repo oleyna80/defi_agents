@@ -16,7 +16,7 @@
 - [x] VPS subdomain cutover pack prepared (env/nginx/preflight templates) (2026-02-03)
 - [x] Phase 1 hardening v3.6 (fail-fast + strict preflight + user-mode migration + single scheduler) (2026-02-04)
 - [ ] Phase 2 pipeline relaxation v1 (funnel observability + stable-first intake + Lindy WARN bucket) (2026-02-04)
-- [ ] Phase 2.5 investor profiles & allocation engine v1 (micro/standard/whale + sleeves + DCA-aware filtering) (2026-02-04)
+- [x] Phase 2.5 investor profiles & allocation engine v1 (micro/standard/whale + sleeves + DCA-aware filtering) (2026-02-04)
 
 ## In Progress
 - Project bootstrap
@@ -55,6 +55,9 @@
 - 2026-02-04: Reworked gas/profit model for 10k portfolio operation (position sizing + amortized USD round-trip gas + holding period); report now shows positive monthly net for top WARN candidates — 2026-02-04
 - 2026-02-04: Added `min_warn_score` floor and kept strict SAFE threshold; suite green (`25 passed`) and runtime report path validated — 2026-02-04
 - 2026-02-04: Added roadmap phase for investor profile-aware selection and drafted spec+plan (`docs/specs/009-*`, `docs/plans/009-*`) — 2026-02-04
+- 2026-02-04: Implemented profile-aware selection v1 in Scout (risk-profile sizing, sleeve routing, tactical gating, capacity guards, benchmark tags) — 2026-02-04
+- 2026-02-04: Updated report output with sleeve/benchmark metadata and synced `docs/memory-bank/scout_config.json` with profile/sleeve/capacity defaults — 2026-02-04
+- 2026-02-04: Added/updated tests for profile behavior (`micro` vs `whale`), tactical enable flag, and benchmark tagging; full suite green (`28 passed`) — 2026-02-04
 
 ## Changelog
 - 2026-02-01: Template initialized
@@ -104,3 +107,4 @@
 - 2026-02-03: Added `deploy/vps/` pack with `env.vps.example`, `nginx` subdomain template, and executable `preflight.sh`
 - 2026-02-04: Approved Phase 2 direction and drafted spec+plan for Pipeline Relaxation v1 (`docs/specs/007-*`, `docs/plans/007-*`)
 - 2026-02-04: Phase 2 groundwork started: stable-first + addressable-first audit selection, expanded EVM chain mapping, file-backed dedupe, and Stage B reputation failures downgraded to WARN (no longer hard-block) — 2026-02-04
+- 2026-02-04: Completed spec/plan 009 implementation (profile config, sleeves, capacity guards, benchmark-aware tagging + tests) — 2026-02-04

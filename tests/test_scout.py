@@ -165,6 +165,81 @@ def test_net_profit_uses_position_size_and_amortized_gas():
     assert results[0].net_profit_usd == pytest.approx(19.6666, rel=1e-3)
 
 
+def test_profile_capacity_micro_passes_while_whale_filtered():
+    pool = _candidate("pool1", "Base", "USDC-USDT", 12, 10, 1_000_000)
+    status_map = {pool.address: SecurityResult.pass_as_tier1()}
+
+    micro_cfg = ScoutConfig(
+        min_tvl_usd=1,
+        gas_efficiency={
+            "estimated_roundtrip_gas_usd": 1.0,
+            "holding_period_days": 60,
+        },
+        investor_profile={
+            "initial_capital_usd": 1_000,
+            "risk_profile": "micro",
+            "horizon_days": 30,
+        },
+    )
+    whale_cfg = ScoutConfig(
+        min_tvl_usd=1,
+        gas_efficiency={
+            "estimated_roundtrip_gas_usd": 1.0,
+            "holding_period_days": 60,
+        },
+        investor_profile={
+            "initial_capital_usd": 1_000_000,
+            "risk_profile": "whale",
+            "horizon_days": 30,
+        },
+    )
+
+    micro_results = _run(_scout(micro_cfg, [pool], status_map).analyze())
+    whale_results = _run(_scout(whale_cfg, [pool], status_map).analyze())
+
+    assert len(micro_results) == 1
+    assert len(whale_results) == 0
+
+
+def test_benchmark_tag_is_added_to_metadata():
+    cfg = ScoutConfig(
+        min_tvl_usd=1,
+        investor_profile={
+            "benchmark_apy": 5.0,
+            "benchmark_buffer_apy": 1.0,
+        },
+    )
+    pool = _candidate("pool1", "Base", "USDC-USDT", 9, 8, 10_000_000)
+    status_map = {pool.address: SecurityResult.pass_as_tier1()}
+    results = _run(_scout(cfg, [pool], status_map).analyze())
+
+    assert len(results) == 1
+    assert results[0].metadata["above_benchmark"] == "true"
+    assert float(results[0].metadata["benchmark_delta_apy"]) == pytest.approx(3.0, rel=1e-2)
+
+
+def test_tactical_sleeve_requires_explicit_enable():
+    pool = _candidate("pool1", "Base", "USDC-USDT", 150, 100, 1_000_000)
+    status_map = {pool.address: SecurityResult.pass_as_tier1()}
+
+    disabled_cfg = ScoutConfig(min_tvl_usd=1)
+    enabled_cfg = ScoutConfig(
+        min_tvl_usd=1,
+        sleeves={
+            "tactical_enabled": True,
+            "tactical_min_apy": 100.0,
+            "tactical_high_apy_pct": 0.05,
+        },
+    )
+
+    disabled_results = _run(_scout(disabled_cfg, [pool], status_map).analyze())
+    enabled_results = _run(_scout(enabled_cfg, [pool], status_map).analyze())
+
+    assert len(disabled_results) == 0
+    assert len(enabled_results) == 1
+    assert enabled_results[0].metadata["sleeve"] == "tactical_high_apy"
+
+
 def _run(coro):
     import asyncio
 

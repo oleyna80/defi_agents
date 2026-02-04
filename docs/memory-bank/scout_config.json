@@ -14,6 +14,27 @@
       "min_monthly_net_profit_usd": 50.0,
       "estimated_roundtrip_gas_usd": 8.0,
       "holding_period_days": 45
-    }
+    },
+    "investor_profile": {
+      "initial_capital_usd": 10000,
+      "monthly_contribution_usd": 0,
+      "risk_profile": "standard",
+      "horizon_days": 45,
+      "benchmark_apy": 5.0,
+      "benchmark_buffer_apy": 1.0
+    },
+    "sleeves": {
+      "core_safe_pct": 0.7,
+      "yield_plus_pct": 0.25,
+      "tactical_high_apy_pct": 0.05,
+      "tactical_enabled": false,
+      "tactical_min_apy": 100.0
+    },
+    "capacity_guards": {
+      "max_position_pct_of_tvl": 0.005,
+      "max_protocol_allocation_pct": 0.4,
+      "max_chain_allocation_pct": 0.5
+    },
+    "min_warn_score": 2.0
   }
 }

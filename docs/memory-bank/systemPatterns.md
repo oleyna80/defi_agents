@@ -209,6 +209,16 @@
   - Add capacity guards (`position as % TVL`, per-chain/protocol caps) for large-capital scenarios.
   - Rationale: one pipeline should adapt to micro DCA users and whale portfolios without weakening anti-scam invariants.
 
+- 2026-02-04: Profile-aware selection implementation pattern (Phase 2.5 v1):
+  - Sleeve routing is deterministic:
+    - `tactical_high_apy` only when `apy >= tactical_min_apy` and `tactical_enabled=true`;
+    - otherwise `core_safe` for trusted/pass stable pairs, else `yield_plus`.
+  - Position sizing is profile-driven (`micro`/`standard`/`whale`) and then clamped by sleeve budget.
+  - Capacity guards are enforced before output (`position % TVL`, protocol/chain caps, sleeve budget cap).
+  - Cost-dominated opportunities are filtered (`net_profit_usd <= 0`) to protect DCA/small-ticket users from gas drag.
+  - Benchmark metadata is attached (`above_benchmark`, `benchmark_delta_apy`, threshold) and reflected in Telegram reports.
+  - Rationale: make one shortlist engine adapt to different capital scales without relaxing scam-critical security blocks.
+
 ## Conventions
 - Naming:
 - Testing:

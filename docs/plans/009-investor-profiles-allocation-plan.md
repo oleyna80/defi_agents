@@ -44,9 +44,8 @@ AllocationDecision { sleeve, reason_codes, benchmark_delta, capacity_ok }
   - verify Telegram output includes sleeve + benchmark tag
 
 ## 5. Implementation Checklist
-- [ ] Add profile/sleeve schema to config and defaults.
-- [ ] Implement capacity guards in candidate evaluation.
-- [ ] Add benchmark comparison and report tags.
-- [ ] Implement tactical sleeve gating + limits.
-- [ ] Add tests and update docs/memory-bank.
-
+- [x] Add profile/sleeve schema to config and defaults.
+- [x] Implement capacity guards in candidate evaluation.
+- [x] Add benchmark comparison and report tags.
+- [x] Implement tactical sleeve gating + limits.
+- [x] Add tests and update docs/memory-bank.

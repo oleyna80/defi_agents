@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 import logging
-from typing import List
+from typing import List, Tuple
 
 from .config import ScoutConfig
 from .defillama_client import DeFiLlamaClient
@@ -53,6 +53,9 @@ class YieldScout:
         security_counts = {s.value: 0 for s in SecurityStatus}
         lindy_softened = 0
         reason_counts: Counter[str] = Counter()
+        tactical_filtered = 0
+        capacity_filtered = 0
+        cost_filtered = 0
 
         for pool in addressable_candidates:
             # address + chain_id are guaranteed by selection above
@@ -71,8 +74,32 @@ class YieldScout:
 
             if sec.status in {SecurityStatus.TRUSTED, SecurityStatus.PASS, SecurityStatus.WARN}:
                 net_apy = self._calculate_net_apy(pool)
-                net_profit = self._estimate_monthly_profit_usd(net_apy)
-                score = self._calculate_score(pool, sec)
+                sleeve, sleeve_reason = self._assign_sleeve(pool, sec.status)
+                if not sleeve:
+                    tactical_filtered += 1
+                    reason_counts[sleeve_reason or "SLEEVE_REJECTED"] += 1
+                    continue
+
+                position_size = self._position_size_usd(sleeve)
+                capacity_ok, cap_reasons, position_pct_tvl, allocation_pct = self._passes_capacity_guards(
+                    pool,
+                    position_size,
+                    sleeve,
+                )
+                if not capacity_ok:
+                    capacity_filtered += 1
+                    for code in cap_reasons:
+                        reason_counts[code] += 1
+                    continue
+
+                net_profit = self._estimate_monthly_profit_usd(net_apy, position_size)
+                if net_profit <= 0:
+                    cost_filtered += 1
+                    reason_counts["COST_DOMINATED"] += 1
+                    continue
+
+                above_benchmark, benchmark_delta, benchmark_threshold = self._benchmark_status(net_apy)
+                score = self._calculate_score(pool, sec, position_pct_tvl, above_benchmark)
                 results.append(
                     ScoutResult(
                         candidate=pool,
@@ -86,6 +113,13 @@ class YieldScout:
                             "target_type": target_type,
                             "chain_id": str(pool.chain_id),
                             "lindy_softened": "true" if self._is_lindy_softened(sec) else "false",
+                            "sleeve": sleeve,
+                            "position_size_usd": f"{position_size:.2f}",
+                            "position_pct_tvl": f"{position_pct_tvl:.6f}",
+                            "allocation_pct": f"{allocation_pct:.4f}",
+                            "above_benchmark": "true" if above_benchmark else "false",
+                            "benchmark_delta_apy": f"{benchmark_delta:.2f}",
+                            "benchmark_threshold_apy": f"{benchmark_threshold:.2f}",
                         },
                         flags=self._flags(pool),
                     )
@@ -94,7 +128,8 @@ class YieldScout:
         deduped = self._deduplicate(results)
         logger.info(
             "Funnel metrics: raw=%s heuristics=%s addressable_selected=%s missing_address=%s missing_chain_id=%s "
-            "addressable_total=%s security_counts=%s top_reasons=%s lindy_softened=%s results=%s deduped=%s",
+            "addressable_total=%s security_counts=%s top_reasons=%s lindy_softened=%s tactical_filtered=%s "
+            "capacity_filtered=%s cost_filtered=%s results=%s deduped=%s",
             raw_count,
             heuristics_count,
             len(addressable_candidates),
@@ -104,6 +139,9 @@ class YieldScout:
             security_counts,
             reason_counts.most_common(5),
             lindy_softened,
+            tactical_filtered,
+            capacity_filtered,
+            cost_filtered,
             len(results),
             len(deduped),
         )
@@ -223,7 +261,13 @@ class YieldScout:
         # Placeholder: net APY discounts reward-heavy yields
         return (pool.apy_base or 0.0) + (pool.apy_reward or 0.0) * 0.5
 
-    def _calculate_score(self, pool: ScoutCandidate, security) -> float:
+    def _calculate_score(
+        self,
+        pool: ScoutCandidate,
+        security,  # noqa: ANN001
+        position_pct_tvl: float,
+        above_benchmark: bool,
+    ) -> float:
         # Combine yield quality and security status
         base = (pool.apy or 0.0) * pool.yield_quality
         sec_factor = 1.0
@@ -233,15 +277,98 @@ class YieldScout:
             sec_factor = 0.9
         elif security.status == SecurityStatus.WARN:
             sec_factor = 0.6
-        return base * sec_factor
+        max_pct_tvl = max(self.config.capacity_guards.max_position_pct_of_tvl, 1e-9)
+        utilization = min(1.0, position_pct_tvl / max_pct_tvl)
+        capacity_factor = 1.0 - (0.2 * utilization)
+        benchmark_factor = 1.05 if above_benchmark else 0.9
+        return base * sec_factor * capacity_factor * benchmark_factor
 
-    def _estimate_monthly_profit_usd(self, net_apy: float) -> float:
+    def _estimate_monthly_profit_usd(self, net_apy: float, position_size: float) -> float:
         # net_apy is annual percentage; estimate monthly profit on position size,
         # then subtract amortized round-trip gas.
-        position_size = self.config.gas_efficiency.effective_position_size_usd
         gross_monthly = position_size * (net_apy / 100.0) / 12.0
         gas_cost = self.config.gas_efficiency.monthly_gas_cost_usd
         return gross_monthly - gas_cost
+
+    def _assign_sleeve(
+        self,
+        pool: ScoutCandidate,
+        security_status: SecurityStatus,
+    ) -> Tuple[str | None, str | None]:
+        sleeves = self.config.sleeves
+        if (pool.apy or 0.0) >= sleeves.tactical_min_apy:
+            if not sleeves.tactical_enabled:
+                return None, "TACTICAL_DISABLED"
+            return "tactical_high_apy", None
+
+        tier = self._classify_priority(pool)
+        if security_status in {SecurityStatus.TRUSTED, SecurityStatus.PASS} and tier in {
+            PriorityTier.LOW_VOLATILITY,
+            PriorityTier.COIN_STABLE,
+        }:
+            return "core_safe", None
+        return "yield_plus", None
+
+    def _position_size_usd(self, sleeve: str) -> float:
+        profile = self.config.investor_profile
+        deployable_capital = max(0.0, float(profile.deployable_capital_usd))
+        base_position = float(self.config.gas_efficiency.effective_position_size_usd)
+
+        if profile.risk_profile == "micro":
+            base_position = min(base_position, max(50.0, deployable_capital * 0.20))
+        elif profile.risk_profile == "standard":
+            base_position = min(base_position, max(250.0, deployable_capital * 0.30))
+        else:  # whale
+            base_position = max(base_position, deployable_capital * 0.10)
+
+        sleeve_limit_pct = {
+            "core_safe": self.config.sleeves.core_safe_pct,
+            "yield_plus": self.config.sleeves.yield_plus_pct,
+            "tactical_high_apy": self.config.sleeves.tactical_high_apy_pct,
+        }.get(sleeve, 1.0)
+        if deployable_capital > 0:
+            base_position = min(base_position, deployable_capital * sleeve_limit_pct)
+
+        return max(50.0, base_position)
+
+    def _passes_capacity_guards(
+        self,
+        pool: ScoutCandidate,
+        position_size: float,
+        sleeve: str,
+    ) -> Tuple[bool, List[str], float, float]:
+        reasons: List[str] = []
+        tvl = max(0.0, float(pool.tvl_usd or 0.0))
+        if tvl <= 0:
+            return False, ["MISSING_TVL"], 1.0, 1.0
+
+        profile = self.config.investor_profile
+        deployable_capital = max(float(profile.deployable_capital_usd), position_size, 1.0)
+        position_pct_tvl = position_size / tvl
+        allocation_pct = position_size / deployable_capital
+        guards = self.config.capacity_guards
+
+        if position_pct_tvl > guards.max_position_pct_of_tvl:
+            reasons.append("CAPACITY_TVL_EXCEEDED")
+        if allocation_pct > guards.max_protocol_allocation_pct:
+            reasons.append("PROTOCOL_CAP_EXCEEDED")
+        if allocation_pct > guards.max_chain_allocation_pct:
+            reasons.append("CHAIN_CAP_EXCEEDED")
+
+        sleeve_pct = {
+            "core_safe": self.config.sleeves.core_safe_pct,
+            "yield_plus": self.config.sleeves.yield_plus_pct,
+            "tactical_high_apy": self.config.sleeves.tactical_high_apy_pct,
+        }.get(sleeve, 1.0)
+        if allocation_pct > sleeve_pct:
+            reasons.append("SLEEVE_BUDGET_EXCEEDED")
+
+        return len(reasons) == 0, reasons, position_pct_tvl, allocation_pct
+
+    def _benchmark_status(self, net_apy: float) -> Tuple[bool, float, float]:
+        threshold = float(self.config.investor_profile.benchmark_threshold_apy)
+        delta = float(net_apy - threshold)
+        return delta >= 0.0, delta, threshold
 
     def _flags(self, pool: ScoutCandidate) -> List[str]:
         flags: List[str] = []

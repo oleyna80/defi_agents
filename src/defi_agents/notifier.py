@@ -58,9 +58,12 @@ class TelegramNotifier:
             apy = f"{r.candidate.apy:.2f}%"
             profit = f"{r.net_profit_usd:.2f}"
             bucket = r.metadata.get("bucket", "N/A")
+            sleeve = r.metadata.get("sleeve", "n/a")
+            bench = "ABOVE_BENCH" if r.metadata.get("above_benchmark") == "true" else "BELOW_BENCH"
+            bench_delta = r.metadata.get("benchmark_delta_apy", "0.00")
             l3_tag = getattr(r.candidate.l3_status, "value", r.candidate.l3_status) or "N/A"
             lines.append(
-                f"- `{chain}` {sym} | Bucket {bucket} | APY {apy} | Score {score} | "
-                f"Net ${profit}/mo | {r.security.status.value.upper()} | L3 {l3_tag}"
+                f"- `{chain}` {sym} | Bucket {bucket} | Sleeve {sleeve} | APY {apy} | Score {score} | "
+                f"Net ${profit}/mo | {bench} ({bench_delta}%) | {r.security.status.value.upper()} | L3 {l3_tag}"
             )
         return "\n".join(lines)

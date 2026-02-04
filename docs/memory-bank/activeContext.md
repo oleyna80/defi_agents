@@ -1,9 +1,9 @@
 # Active Context
 
 ## Current Session Focus
-Current Spec: docs/specs/007-pipeline-relaxation-v1.md
-Current Plan: docs/plans/007-pipeline-relaxation-v1-plan.md
-Active Task: Phase 2 pipeline relaxation v1 (funnel observability + stable-first intake + Lindy WARN bucket)
+Current Spec: docs/specs/009-investor-profiles-allocation.md
+Current Plan: docs/plans/009-investor-profiles-allocation-plan.md
+Active Task: Phase 2.5 profile-aware selection (sleeves + capacity guards + benchmark tagging)
 
 ## Recent Changes
 - 2026-02-01: Initialized project template
@@ -74,6 +74,9 @@ Active Task: Phase 2 pipeline relaxation v1 (funnel observability + stable-first
 - 2026-02-04: Added dual score floors (`min_final_score` for SAFE, `min_warn_score` for WARN) and validated report output with positive monthly net values on top WARN candidates
 - 2026-02-04: Extended roadmap with new Phase 2.5 (Investor Profiles & Allocation Engine) to support micro/standard/whale strategies and DCA flows
 - 2026-02-04: Drafted and approved Spec/Plan for profile-aware selection (`docs/specs/009-*`, `docs/plans/009-*`)
+- 2026-02-04: Implemented profile/sleeve/capacity schema in Scout config (`investor_profile`, `sleeves`, `capacity_guards`) and synced defaults in `docs/memory-bank/scout_config.json`
+- 2026-02-04: Implemented profile-aware selection in Scout: tactical sleeve gating, position sizing by risk profile, capacity guard filtering, cost-dominated filtering, benchmark tagging/score factor
+- 2026-02-04: Updated Telegram report formatting with sleeve + benchmark tags; added tests for micro-vs-whale capacity behavior, tactical gating, and benchmark metadata (`28 passed`)
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits
@@ -85,7 +88,7 @@ Active Task: Phase 2 pipeline relaxation v1 (funnel observability + stable-first
   - `docs/memory-bank/security/whitelist.json` (tokens + protocols)
 
 ## Next Steps
-1. Finalize Lindy `age` source (pool age vs contract-age proxy) and document the chosen source in spec/policy matrix
-2. Implement explicit Non-EVM unsupported reporting path (per-chain counters/tags, not only missing-chain totals)
-3. Start Phase 2.5 implementation: profile schema + sleeves + capacity guards (`spec 009`)
+1. Validate profile-aware behavior on VPS runtime data and calibrate sleeve/capacity thresholds against real funnel metrics
+2. Finalize Lindy `age` source (pool age vs contract-age proxy) and document the chosen source in spec/policy matrix
+3. Implement explicit Non-EVM unsupported reporting path (per-chain counters/tags, not only missing-chain totals)
 4. Add heartbeat (daily "no opportunities" message) for healthy-but-silent cycles
