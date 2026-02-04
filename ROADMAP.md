@@ -54,7 +54,7 @@
     - Freshness/divergence теги: `FRESH/STALE/UNVERIFIED`, `STALE_DATA`, `DIVERGENCE_HIGH`.
     - Только `FRESH` кандидаты попадают в публичный actionable; остальные уходят в watchlist.
     - Цель: снизить риск принятия решений на устаревших данных.
-    - Research baseline (см. `docs/research/docs/research/2026-02-dex-lending-direct-api-research.md`):
+    - Research baseline (см. `docs/research/2026-02-dex-lending-direct-api-research.md`):
       - MVP sources: `Uniswap Subgraph`, `Aave API v2`, `Morpho API`.
       - Expansion sources: `Aerodrome Subgraph`, `Curve API`.
       - Стартовые пороги (для калибровки): `max_age_minutes=90`, `max_apy_divergence_pct=25`, `max_tvl_divergence_pct=20`.

@@ -75,7 +75,7 @@
 - 2026-02-04: Tuned candidate diversity/volume: exploration lane now includes non-stable pairs (`exploration_stable_only=false`) with wider quota (`exploration_slots=15`) — 2026-02-04
 - 2026-02-04: Made dedupe TTL configurable (`dedupe_ttl_seconds`) and reduced default to 4h; cleared old dedupe cache to avoid stale suppression artifacts — 2026-02-04
 - 2026-02-04: Updated roadmap with research-backed freshness rollout (MVP source shortlist + staged Phase B/C/D execution path) — 2026-02-04
-- 2026-02-04: Added direct API integration research document to repo (`docs/research/docs/research/2026-02-dex-lending-direct-api-research.md`) — 2026-02-04
+- 2026-02-04: Added direct API integration research document to repo (`docs/research/2026-02-dex-lending-direct-api-research.md`) — 2026-02-04
 
 ## Changelog
 - 2026-02-01: Template initialized
