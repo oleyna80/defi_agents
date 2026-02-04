@@ -100,6 +100,7 @@ class YieldScout:
 
                 above_benchmark, benchmark_delta, benchmark_threshold = self._benchmark_status(net_apy)
                 score = self._calculate_score(pool, sec, position_pct_tvl, above_benchmark)
+                reason_codes = self._reason_codes(sec)
                 results.append(
                     ScoutResult(
                         candidate=pool,
@@ -120,6 +121,7 @@ class YieldScout:
                             "above_benchmark": "true" if above_benchmark else "false",
                             "benchmark_delta_apy": f"{benchmark_delta:.2f}",
                             "benchmark_threshold_apy": f"{benchmark_threshold:.2f}",
+                            "warn_reasons": ",".join(reason_codes[:3]),
                         },
                         flags=self._flags(pool),
                     )
@@ -369,6 +371,17 @@ class YieldScout:
         threshold = float(self.config.investor_profile.benchmark_threshold_apy)
         delta = float(net_apy - threshold)
         return delta >= 0.0, delta, threshold
+
+    def _reason_codes(self, security) -> List[str]:  # noqa: ANN001
+        out: List[str] = []
+        seen: set[str] = set()
+        for reason in getattr(security, "reasons", []) or []:
+            code = str(getattr(reason, "code", "") or "").strip()
+            if not code or code in seen:
+                continue
+            seen.add(code)
+            out.append(code)
+        return out
 
     def _flags(self, pool: ScoutCandidate) -> List[str]:
         flags: List[str] = []

@@ -61,19 +61,33 @@ class TelegramNotifier:
 
     def _format_report(self, results: List[ScoutResult]) -> str:
         lines = ["*Scout Report*", ""]
-        for r in results:
-            sym = r.candidate.symbol
-            chain = r.candidate.chain
-            score = f"{r.score:.2f}"
-            apy = f"{r.candidate.apy:.2f}%"
-            profit = f"{r.net_profit_usd:.2f}"
-            bucket = r.metadata.get("bucket", "N/A")
-            sleeve = r.metadata.get("sleeve", "n/a")
-            bench = "ABOVE_BENCH" if r.metadata.get("above_benchmark") == "true" else "BELOW_BENCH"
-            bench_delta = r.metadata.get("benchmark_delta_apy", "0.00")
-            l3_tag = getattr(r.candidate.l3_status, "value", r.candidate.l3_status) or "N/A"
-            lines.append(
-                f"- `{chain}` {sym} | Bucket {bucket} | Sleeve {sleeve} | APY {apy} | Score {score} | "
-                f"Net ${profit}/mo | {bench} ({bench_delta}%) | {r.security.status.value.upper()} | L3 {l3_tag}"
-            )
+        actionable = [r for r in results if r.metadata.get("report_group") == "ACTIONABLE"]
+        watchlist = [r for r in results if r.metadata.get("report_group") != "ACTIONABLE"]
+
+        def _append_section(title: str, section_results: List[ScoutResult]) -> None:
+            if not section_results:
+                return
+            lines.append(f"*{title}*")
+            for r in section_results:
+                sym = r.candidate.symbol
+                chain = r.candidate.chain
+                score = f"{r.score:.2f}"
+                apy = f"{r.candidate.apy:.2f}%"
+                profit = f"{r.net_profit_usd:.2f}"
+                bucket = r.metadata.get("bucket", "N/A")
+                sleeve = r.metadata.get("sleeve", "n/a")
+                bench = "ABOVE_BENCH" if r.metadata.get("above_benchmark") == "true" else "BELOW_BENCH"
+                bench_delta = r.metadata.get("benchmark_delta_apy", "0.00")
+                l3_tag = getattr(r.candidate.l3_status, "value", r.candidate.l3_status) or "N/A"
+                reason_codes = r.metadata.get("warn_reasons", "")
+                reasons_tail = f" | Reasons `{reason_codes}`" if reason_codes else ""
+                lines.append(
+                    f"- `{chain}` `{sym}` | Bucket `{bucket}` | Sleeve `{sleeve}` | APY {apy} | Score {score} | "
+                    f"Net ${profit}/mo | `{bench}` ({bench_delta}%) | {r.security.status.value.upper()} | "
+                    f"L3 `{l3_tag}`{reasons_tail}"
+                )
+            lines.append("")
+
+        _append_section("Actionable (Net >= Min Profit)", actionable)
+        _append_section("Watchlist (Manual Review)", watchlist)
         return "\n".join(lines)

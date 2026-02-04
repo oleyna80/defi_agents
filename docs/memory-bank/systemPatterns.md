@@ -224,6 +224,15 @@
   - Telegram notifier retry logs include only status code / exception class (no raw exception string with URL path).
   - Rationale: avoid leaking bot tokens and similar secrets via transport-layer logs.
 
+- 2026-02-04: Report explainability and triage pattern:
+  - Classify report rows into `ACTIONABLE` (net profit meets configured floor) and `WATCHLIST` (manual review).
+  - Include compact WARN reason codes (`warn_reasons`) per candidate in report output.
+  - Split WARN bucket semantics:
+    - `WARN/REPUTATION` for reputation-provider unavailability-only cases,
+    - `WARN/SECURITY` for genuine security-signal warnings,
+    - `LINDY/WARN` when Lindy soften rule is applied.
+  - Rationale: reduce operator ambiguity and speed up manual decision-making without weakening hard-block logic.
+
 ## Conventions
 - Naming:
 - Testing:

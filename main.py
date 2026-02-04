@@ -126,7 +126,19 @@ async def run_sentinel_cycle() -> None:
         for opt in safe_picks:
             opt.metadata["bucket"] = "SAFE"
         for opt in warn_picks:
-            opt.metadata["bucket"] = "LINDY/WARN" if opt.metadata.get("lindy_softened") == "true" else "WARN"
+            reasons = {r.strip() for r in opt.metadata.get("warn_reasons", "").split(",") if r.strip()}
+            if opt.metadata.get("lindy_softened") == "true":
+                opt.metadata["bucket"] = "LINDY/WARN"
+            elif reasons and reasons.issubset({"REPUTATION_UNAVAILABLE"}):
+                opt.metadata["bucket"] = "WARN/REPUTATION"
+            else:
+                opt.metadata["bucket"] = "WARN/SECURITY"
+
+        report_picks = safe_picks + warn_picks
+        for opt in report_picks:
+            opt.metadata["report_group"] = (
+                "ACTIONABLE" if opt.net_profit_usd >= min_profit else "WATCHLIST"
+            )
 
         logger.info(
             "Final filters: eligible=%s profit_ok=%s safe=%s warn=%s safe_min_score=%.2f warn_min_score=%.2f min_monthly_profit_usd=%.2f",
@@ -139,11 +151,19 @@ async def run_sentinel_cycle() -> None:
             min_profit,
         )
 
-        # Report candidates even if profit is below threshold; include net profit in message.
-        report_picks = safe_picks + warn_picks
+        actionable_count = sum(1 for pick in report_picks if pick.metadata.get("report_group") == "ACTIONABLE")
+        watchlist_count = sum(1 for pick in report_picks if pick.metadata.get("report_group") == "WATCHLIST")
+        # Report both actionable and watchlist sections with clear labels.
         if report_picks:
             await notifier.send_alpha_report(report_picks)
-            logger.info("Reported %s opportunities (safe=%s warn=%s).", len(report_picks), len(safe_picks), len(warn_picks))
+            logger.info(
+                "Reported %s opportunities (safe=%s warn=%s actionable=%s watchlist=%s).",
+                len(report_picks),
+                len(safe_picks),
+                len(warn_picks),
+                actionable_count,
+                watchlist_count,
+            )
         else:
             logger.info("Match not found. High security standards met.")
 
