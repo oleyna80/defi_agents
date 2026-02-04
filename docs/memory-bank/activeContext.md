@@ -77,6 +77,7 @@ Active Task: Phase 2.5 profile-aware selection (sleeves + capacity guards + benc
 - 2026-02-04: Implemented profile/sleeve/capacity schema in Scout config (`investor_profile`, `sleeves`, `capacity_guards`) and synced defaults in `docs/memory-bank/scout_config.json`
 - 2026-02-04: Implemented profile-aware selection in Scout: tactical sleeve gating, position sizing by risk profile, capacity guard filtering, cost-dominated filtering, benchmark tagging/score factor
 - 2026-02-04: Updated Telegram report formatting with sleeve + benchmark tags; added tests for micro-vs-whale capacity behavior, tactical gating, and benchmark metadata (`28 passed`)
+- 2026-02-04: Applied logging hardening to prevent secret leakage in runtime logs: raised `httpx/httpcore` to WARNING and removed raw HTTP exception/URL logging in Telegram notifier
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits
@@ -88,7 +89,8 @@ Active Task: Phase 2.5 profile-aware selection (sleeves + capacity guards + benc
   - `docs/memory-bank/security/whitelist.json` (tokens + protocols)
 
 ## Next Steps
-1. Validate profile-aware behavior on VPS runtime data and calibrate sleeve/capacity thresholds against real funnel metrics
-2. Finalize Lindy `age` source (pool age vs contract-age proxy) and document the chosen source in spec/policy matrix
-3. Implement explicit Non-EVM unsupported reporting path (per-chain counters/tags, not only missing-chain totals)
-4. Add heartbeat (daily "no opportunities" message) for healthy-but-silent cycles
+1. Rotate Telegram bot token on VPS (old token appeared in historical logs before hardening) and restart user service
+2. Validate profile-aware behavior on VPS runtime data and calibrate sleeve/capacity thresholds against real funnel metrics
+3. Finalize Lindy `age` source (pool age vs contract-age proxy) and document the chosen source in spec/policy matrix
+4. Implement explicit Non-EVM unsupported reporting path (per-chain counters/tags, not only missing-chain totals)
+5. Add heartbeat (daily "no opportunities" message) for healthy-but-silent cycles

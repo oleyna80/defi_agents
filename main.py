@@ -28,6 +28,9 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger("Sentinel")
+# Prevent accidental secret leaks in verbose HTTP request logs (e.g., Telegram bot token in URL path).
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 def _load_env_file(path: str = ".env") -> None:

@@ -219,6 +219,11 @@
   - Benchmark metadata is attached (`above_benchmark`, `benchmark_delta_apy`, threshold) and reflected in Telegram reports.
   - Rationale: make one shortlist engine adapt to different capital scales without relaxing scam-critical security blocks.
 
+- 2026-02-04: Secret-safe operational logging pattern:
+  - Runtime raises `httpx`/`httpcore` logger levels to `WARNING` to suppress verbose request URL logs.
+  - Telegram notifier retry logs include only status code / exception class (no raw exception string with URL path).
+  - Rationale: avoid leaking bot tokens and similar secrets via transport-layer logs.
+
 ## Conventions
 - Naming:
 - Testing:

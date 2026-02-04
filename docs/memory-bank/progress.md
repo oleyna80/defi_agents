@@ -58,6 +58,7 @@
 - 2026-02-04: Implemented profile-aware selection v1 in Scout (risk-profile sizing, sleeve routing, tactical gating, capacity guards, benchmark tags) — 2026-02-04
 - 2026-02-04: Updated report output with sleeve/benchmark metadata and synced `docs/memory-bank/scout_config.json` with profile/sleeve/capacity defaults — 2026-02-04
 - 2026-02-04: Added/updated tests for profile behavior (`micro` vs `whale`), tactical enable flag, and benchmark tagging; full suite green (`28 passed`) — 2026-02-04
+- 2026-02-04: Applied runtime log hardening for secret safety (`httpx/httpcore` WARNING + notifier status-only retry logs without URL/token leakage) — 2026-02-04
 
 ## Changelog
 - 2026-02-01: Template initialized
@@ -108,3 +109,4 @@
 - 2026-02-04: Approved Phase 2 direction and drafted spec+plan for Pipeline Relaxation v1 (`docs/specs/007-*`, `docs/plans/007-*`)
 - 2026-02-04: Phase 2 groundwork started: stable-first + addressable-first audit selection, expanded EVM chain mapping, file-backed dedupe, and Stage B reputation failures downgraded to WARN (no longer hard-block) — 2026-02-04
 - 2026-02-04: Completed spec/plan 009 implementation (profile config, sleeves, capacity guards, benchmark-aware tagging + tests) — 2026-02-04
+- 2026-02-04: Hardened operational logging path to avoid secret exposure in HTTP logs (Telegram token safety) — 2026-02-04

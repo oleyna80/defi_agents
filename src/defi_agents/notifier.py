@@ -33,15 +33,25 @@ class TelegramNotifier:
             for attempt in range(1, retries + 1):
                 try:
                     response = await client.post(url, json=payload)
-                    response.raise_for_status()
-                    return True
-                except httpx.HTTPError as exc:
+                    if response.is_success:
+                        return True
                     wait_seconds = attempt * 2
                     logging.warning(
-                        "Telegram send failed (%s/%s): %s. Retry in %ss.",
+                        "Telegram send failed (%s/%s): status=%s. Retry in %ss.",
                         attempt,
                         retries,
-                        exc,
+                        response.status_code,
+                        wait_seconds,
+                    )
+                    if attempt < retries:
+                        await asyncio.sleep(wait_seconds)
+                except httpx.RequestError as exc:
+                    wait_seconds = attempt * 2
+                    logging.warning(
+                        "Telegram send request error (%s/%s): %s. Retry in %ss.",
+                        attempt,
+                        retries,
+                        exc.__class__.__name__,
                         wait_seconds,
                     )
                     if attempt < retries:
