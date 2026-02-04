@@ -282,6 +282,14 @@
   - Added cycle-level freshness counters to logs for calibration.
   - Rationale: ship safe scaffolding first, then plug concrete adapters without breaking running operations.
 
+- 2026-02-04: Freshness source-priority rollout pattern:
+  - Phase B/C/D execution order is source-prioritized by impact and integration risk:
+    1) `Uniswap Subgraph` (DEX baseline),
+    2) `Aave API v2` (lending baseline),
+    3) `Morpho API` (additional lending coverage),
+    then `Aerodrome Subgraph` / `Curve API` expansion.
+  - Rationale: maximize freshness gain early while limiting blast radius of adapter complexity.
+
 ## Conventions
 - Naming:
 - Testing:

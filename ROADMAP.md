@@ -54,9 +54,15 @@
     - Freshness/divergence теги: `FRESH/STALE/UNVERIFIED`, `STALE_DATA`, `DIVERGENCE_HIGH`.
     - Только `FRESH` кандидаты попадают в публичный actionable; остальные уходят в watchlist.
     - Цель: снизить риск принятия решений на устаревших данных.
+    - Research baseline (см. `docs/research/docs/research/2026-02-dex-lending-direct-api-research.md`):
+      - MVP sources: `Uniswap Subgraph`, `Aave API v2`, `Morpho API`.
+      - Expansion sources: `Aerodrome Subgraph`, `Curve API`.
+      - Стартовые пороги (для калибровки): `max_age_minutes=90`, `max_apy_divergence_pct=25`, `max_tvl_divergence_pct=20`.
     - Progress:
       - [x] Phase A: schema + policy wiring (`freshness` config, metadata fields, downgrade policy, counters, report tags).
-      - [ ] Phase B: first re-check adapter MVP (source coverage + timeout budget).
+      - [ ] Phase B: first re-check adapter MVP (Uniswap Subgraph + timeout budget + strict downgrade).
+      - [ ] Phase C: add Aave API re-check + divergence counters in Telegram/ops logs.
+      - [ ] Phase D: add Morpho API and calibrate thresholds on VPS telemetry.
 - [ ] **Non‑EVM стратегия (явно):**
     - Solana / Sui / Aptos: либо добавить отдельные адаптеры, либо пометить как `UNSUPPORTED` (но не “молча отбрасывать”).
     - Цель: понимать реальный missed-opportunity, а не терять его в нулевой статистике.
