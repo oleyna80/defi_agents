@@ -60,7 +60,7 @@
       - Стартовые пороги (для калибровки): `max_age_minutes=90`, `max_apy_divergence_pct=25`, `max_tvl_divergence_pct=20`.
     - Progress:
       - [x] Phase A: schema + policy wiring (`freshness` config, metadata fields, downgrade policy, counters, report tags).
-      - [ ] Phase B: first re-check adapter MVP (Uniswap Subgraph + timeout budget + strict downgrade).
+      - [x] Phase B: first re-check adapter MVP (`Uniswap Subgraph` for Ethereum, timeout budget, metadata/delta wiring; feature-flagged by default).
       - [ ] Phase C: add Aave API re-check + divergence counters in Telegram/ops logs.
       - [ ] Phase D: add Morpho API and calibrate thresholds on VPS telemetry.
 - [ ] **Non‑EVM стратегия (явно):**

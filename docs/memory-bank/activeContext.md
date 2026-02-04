@@ -95,6 +95,8 @@ Active Task: Phase 2 freshness hardening (two-step re-check + freshness/divergen
 - 2026-02-04: Cleared persisted scout dedupe cache and validated broader report mix in dry run (`LOW_VOLATILITY`, `COIN_STABLE`, `COIN_COIN`)
 - 2026-02-04: Ingested external research findings into roadmap for freshness Phase B/C/D: source shortlist (`Uniswap`, `Aave`, `Morpho`) and rollout sequence with explicit threshold baselines
 - 2026-02-04: Added research artifact to repository: `docs/research/2026-02-dex-lending-direct-api-research.md`
+- 2026-02-04: Completed Phase B (spec 010) MVP adapter: added `FreshnessManager` + `UniswapSubgraphAdapter` (chain-aware endpoints, timeout, safe fallback), wired into pre-alert stage
+- 2026-02-04: Added adapter/manager tests (`tests/test_uniswap_adapter.py`, `tests/test_freshness_manager.py`); full suite green (`39 passed`)
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits
@@ -107,8 +109,8 @@ Active Task: Phase 2 freshness hardening (two-step re-check + freshness/divergen
 
 ## Next Steps
 1. Rotate Telegram bot token on VPS (old token appeared in historical logs before hardening) and restart user service
-2. Implement Phase B of spec 010: first re-check adapter MVP (`recheck_max_candidates`, timeout budget, explicit `UNVERIFIED` fallback)
-3. Add divergence computations (`apy_divergence_pct`, `tvl_divergence_pct`) from adapter snapshots and enforce strict freshness gating on actionable
+2. Start Phase C: add `Aave API` re-check adapter and extend source registry coverage beyond Uniswap
+3. Enable and calibrate strict freshness gating on VPS (`recheck_enabled=true`, then `enforce_freshness_for_actionable=true`) after telemetry baseline
 4. Finalize Lindy `age` source (pool age vs contract-age proxy) and document the chosen source in spec/policy matrix
 5. Implement explicit Non-EVM unsupported reporting path (per-chain counters/tags, not only missing-chain totals)
 6. Add heartbeat (daily "no opportunities" message) for healthy-but-silent cycles

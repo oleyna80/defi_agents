@@ -290,6 +290,13 @@
     then `Aerodrome Subgraph` / `Curve API` expansion.
   - Rationale: maximize freshness gain early while limiting blast radius of adapter complexity.
 
+- 2026-02-04: Freshness adapter MVP pattern (Phase B):
+  - Introduced adapter interface (`supports` + `fetch_snapshot`) and manager orchestration with per-candidate timeout.
+  - First implementation: `UniswapSubgraphAdapter` (chain-aware endpoint map, hourly/daily fallback query).
+  - Snapshot fields mapped into report metadata (`freshness_provider`, `source_timestamp`, `age_minutes`, divergence deltas).
+  - Failure behavior is explicit and safe: adapter errors/timeouts do not crash cycle; candidate remains `UNVERIFIED`.
+  - Rationale: incremental source integration with bounded operational risk.
+
 ## Conventions
 - Naming:
 - Testing:

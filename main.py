@@ -20,7 +20,7 @@ from defi_agents.security.defi_client import DeFiClient
 from defi_agents.security.goplus_client import GoPlusClient
 from defi_agents.security.whitelist import WhitelistProvider
 from defi_agents.notifier import TelegramNotifier
-from defi_agents.freshness import apply_freshness_policy
+from defi_agents.freshness import FreshnessManager, apply_freshness_policy
 from defi_agents.history import save_to_history
 
 logging.basicConfig(
@@ -150,6 +150,10 @@ async def run_sentinel_cycle() -> None:
             opt.metadata.setdefault("staleness_score", "")
             opt.metadata.setdefault("apy_divergence_pct", "")
             opt.metadata.setdefault("tvl_divergence_pct", "")
+
+        if config.freshness.recheck_enabled and report_picks:
+            freshness_manager = FreshnessManager(config.freshness)
+            await freshness_manager.recheck(report_picks)
 
         freshness_counts = apply_freshness_policy(report_picks, config.freshness)
 

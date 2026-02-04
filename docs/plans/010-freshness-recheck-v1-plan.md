@@ -87,7 +87,8 @@ FreshnessDecision {
 ## 6. Implementation Checklist
 - [x] Add freshness config block + defaults.
 - [x] Implement freshness manager and decision policy.
-- [x] Insert pre-alert re-check stage into main cycle (Phase A scaffold; adapter-backed snapshots pending).
+- [x] Insert pre-alert re-check stage into main cycle.
+- [x] Implement first adapter MVP (`Uniswap Subgraph` chain-aware endpoint map + timeout/fallback).
 - [x] Add report tags for freshness/divergence (history persistence pending in Phase B/C).
 - [x] Add freshness counters to cycle logs.
 - [x] Add tests (unit + integration smoke for Phase A scaffold).

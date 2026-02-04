@@ -90,6 +90,11 @@ class FreshnessConfig(BaseModel):
     max_age_minutes: int = 90
     max_apy_divergence_pct: float = 25.0
     max_tvl_divergence_pct: float = 20.0
+    uniswap_subgraph_endpoints: dict[str, str] = Field(
+        default_factory=lambda: {
+            "Ethereum": "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3",
+        }
+    )
 
 
 class ScoutConfig(BaseModel):

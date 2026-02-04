@@ -47,7 +47,10 @@
       "recheck_timeout_seconds": 8,
       "max_age_minutes": 90,
       "max_apy_divergence_pct": 25.0,
-      "max_tvl_divergence_pct": 20.0
+      "max_tvl_divergence_pct": 20.0,
+      "uniswap_subgraph_endpoints": {
+        "Ethereum": "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3"
+      }
     },
     "min_warn_score": 2.0
   }
