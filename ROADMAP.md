@@ -37,6 +37,8 @@
 - [x] **Policy v1 agreed (Lindy + output buckets):**
     - Lindy v1: `TVL >= $100M` и `age >= 180d` смягчают только audit/reputation сигналы (до `WARN`), но не обходят критические tech-флаги.
     - Выдача в 2 корзины: `SAFE` и `LINDY/WARN` (manual review).
+- [x] **Policy Matrix SSOT:**
+    - Зафиксировано в `docs/memory-bank/security/policy_matrix_v1.md` (единая таблица правил для SAFE/WARN/BLOCK/UNSUPPORTED).
 - [ ] **Funnel Observability (обязательно):**
     - Логировать/сохранять метрики воронки: `raw_pools → heuristics_pass → has_address+chain_id → security_pass/warn/block/unknown → l3_eligible → final_picks`.
     - Логировать топ‑причины `BLOCK/WARN` (по кодам причин), чтобы быстро понимать “почему 0”.

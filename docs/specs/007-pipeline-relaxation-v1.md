@@ -53,6 +53,10 @@ The system must produce two explicit output buckets:
 - `SAFE` (strict)
 - `LINDY/WARN` (explicitly risk-tagged; manual review)
 
+### REQ-006: Policy Matrix SSOT
+The decision rules above must be captured as a single source of truth document:
+- `docs/memory-bank/security/policy_matrix_v1.md`
+
 ## 4. Non-Functional Requirements
 - Reliability: no silent fallback in production; failures must surface via systemd non-zero exit (already enforced).
 - Security: SSRF defenses and critical tech flags remain hard blocks; Lindy cannot override them.
@@ -81,4 +85,3 @@ The system must produce two explicit output buckets:
 ## Approvals
 - [x] User Approved (explicit agreement in chat)
 - [x] Architecture Approved
-

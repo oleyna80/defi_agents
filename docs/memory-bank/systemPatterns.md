@@ -168,6 +168,11 @@
   - Each cycle emits stage counters and top rejection reasons to explain "why 0 candidates".
   - Rationale: tuning must be data-driven; reduces operator guesswork and prevents unsafe over-relaxation.
 
+- 2026-02-04: Security policy matrix as SSOT:
+  - Canonical rules for SAFE/WARN/BLOCK/UNSUPPORTED are documented in:
+    - `docs/memory-bank/security/policy_matrix_v1.md`
+  - Rationale: prevents policy drift between Scout/Security/L3 layers and keeps tuning auditable.
+
 - 2026-02-04: Stage B reputation availability semantics:
   - If reputation enrichment fails due to upstream/API error, treat as `WARN` with reason `REPUTATION_UNAVAILABLE`.
   - Do not hard-block discovery purely because the reputation provider is down/unreachable.
