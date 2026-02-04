@@ -240,6 +240,29 @@ def test_tactical_sleeve_requires_explicit_enable():
     assert enabled_results[0].metadata["sleeve"] == "tactical_high_apy"
 
 
+def test_exploration_quota_includes_high_apy_stable_outside_top_tvl():
+    cfg = ScoutConfig(
+        min_tvl_usd=1,
+        max_audit_candidates=4,
+        exploration_slots=1,
+        exploration_min_apy=20.0,
+        exploration_stable_only=True,
+    )
+    pools = [
+        _candidate("pool1", "Base", "USDC-USDT", 10, 12, 20_000_000),
+        _candidate("pool2", "Base", "DAI-USDC", 11, 13, 15_000_000),
+        _candidate("pool3", "Base", "USDC-USDS", 12, 14, 12_000_000),
+        _candidate("pool4", "Base", "FRAX-USDC", 9, 11, 8_000_000),
+        _candidate("pool5", "Base", "EURC-USDC", 30, 35, 2_000_000),
+    ]
+    status_map = {pool.address: SecurityResult.pass_as_tier1() for pool in pools}
+    results = _run(_scout(cfg, pools, status_map).analyze())
+
+    assert len(results) == 4
+    symbols = {res.candidate.symbol for res in results}
+    assert "EURC-USDC" in symbols
+
+
 def _run(coro):
     import asyncio
 

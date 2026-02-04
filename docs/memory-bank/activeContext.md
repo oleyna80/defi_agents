@@ -82,6 +82,10 @@ Active Task: Phase 2.5 profile-aware selection (sleeves + capacity guards + benc
 - 2026-02-04: Added notifier formatting tests (`tests/test_notifier.py`) and validated full suite (`30 passed`)
 - 2026-02-04: Reworked Telegram report into universal "Decision View": focus on chain/pair/project/APY/TVL/risk, color badges, pair-type sorting (`stable/stable`, `token/stable`, `token/token`)
 - 2026-02-04: Added standardized comparability metric `Net@1k` (instead of user-specific position size) in report metadata/output
+- 2026-02-04: Implemented intake expansion for audit stage: increased `max_audit_candidates` to 40 and added configurable exploration quota (`exploration_slots`) for high-APR stable-focused discovery
+- 2026-02-04: Added scout test coverage for exploration quota behavior; full suite green (`31 passed`)
+- 2026-02-04: Fixed Telegram delivery reliability after report expansion: added safe message chunking for long Markdown reports to stay under Telegram size limits
+- 2026-02-04: Revalidated full test suite after intake/report updates (`32 passed`) and smoke-run without runtime failures
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits
@@ -94,7 +98,8 @@ Active Task: Phase 2.5 profile-aware selection (sleeves + capacity guards + benc
 
 ## Next Steps
 1. Rotate Telegram bot token on VPS (old token appeared in historical logs before hardening) and restart user service
-2. Validate the new universal report format on VPS timer cycles and tune risk bucket phrasing for channel audience
-3. Finalize Lindy `age` source (pool age vs contract-age proxy) and document the chosen source in spec/policy matrix
-4. Implement explicit Non-EVM unsupported reporting path (per-chain counters/tags, not only missing-chain totals)
-5. Add heartbeat (daily "no opportunities" message) for healthy-but-silent cycles
+2. Validate expanded audit intake on VPS (watch API cost/latency and signal quality after `max_audit_candidates=40`)
+3. Investigate/decide secondary pool-data source for low-latency DEX fee pools (Phase 2 follow-up to DeFiLlama lag concerns)
+4. Finalize Lindy `age` source (pool age vs contract-age proxy) and document the chosen source in spec/policy matrix
+5. Implement explicit Non-EVM unsupported reporting path (per-chain counters/tags, not only missing-chain totals)
+6. Add heartbeat (daily "no opportunities" message) for healthy-but-silent cycles

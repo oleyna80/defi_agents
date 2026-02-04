@@ -79,3 +79,15 @@ def test_report_includes_decision_fields_and_colors():
     assert "Risk `WARN/REPUTATION`" in message
     assert "Net@1k $7.50/mo" in message
     assert "Reasons `REPUTATION_UNAVAILABLE`" in message
+
+
+def test_report_is_chunked_for_telegram_limits():
+    notifier = TelegramNotifier()
+    many = [
+        _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol=f"T{i}-USDC", apy=10.0 + i)
+        for i in range(80)
+    ]
+    message = notifier._format_report(many)
+    chunks = notifier._chunk_message(message, max_len=700)
+    assert len(chunks) > 1
+    assert all(len(chunk) <= 700 for chunk in chunks)

@@ -35,6 +35,10 @@
       "max_protocol_allocation_pct": 0.4,
       "max_chain_allocation_pct": 0.5
     },
+    "max_audit_candidates": 40,
+    "exploration_slots": 10,
+    "exploration_min_apy": 20.0,
+    "exploration_stable_only": true,
     "min_warn_score": 2.0
   }
 }

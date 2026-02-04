@@ -105,7 +105,11 @@ class ScoutConfig(BaseModel):
     )
     yield_quality_min: float = 0.2
     apy_anomaly_ratio: float = 2.0
-    max_audit_candidates: int = 15
+    max_audit_candidates: int = 40
+    # Reserve part of audit budget for high-APR exploration so low-TVL gems are not starved by TVL sorting.
+    exploration_slots: int = 10
+    exploration_min_apy: float = 20.0
+    exploration_stable_only: bool = True
     chain_id_map: dict[str, int] = Field(
         default_factory=lambda: {
             "Ethereum": 1,

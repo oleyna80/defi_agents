@@ -17,7 +17,8 @@ class TelegramNotifier:
 
     async def send_alpha_report(self, results: List[ScoutResult]) -> None:
         message = self._format_report(results)
-        await self._send(message)
+        for chunk in self._chunk_message(message):
+            await self._send(chunk)
 
     async def send_error(self, text: str) -> None:
         await self._send(f"⚠️ {text}")
@@ -97,6 +98,25 @@ class TelegramNotifier:
                 )
             lines.append("")
         return "\n".join(lines)
+
+    def _chunk_message(self, text: str, max_len: int = 3500) -> List[str]:
+        chunks: List[str] = []
+        current = ""
+        for line in text.splitlines():
+            candidate = f"{current}\n{line}".strip() if current else line
+            if len(candidate) <= max_len:
+                current = candidate
+                continue
+            if current:
+                chunks.append(current)
+                current = line
+            else:
+                # Extremely long line fallback (unlikely for our format)
+                chunks.append(line[:max_len])
+                current = line[max_len:]
+        if current:
+            chunks.append(current)
+        return chunks or [text]
 
     def _risk_badge(self, bucket: str) -> str:
         if bucket == "SAFE":

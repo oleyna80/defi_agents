@@ -243,6 +243,18 @@
   - Risk is color-coded with badges (`🟢 SAFE`, `🟡 reputation/lindy warnings`, `🟠 security warnings`).
   - Rationale: make reports comparable across users with different capital sizes and improve fast triage quality.
 
+- 2026-02-04: Audit intake expansion + exploration quota pattern:
+  - Increased audit-stage budget (`max_audit_candidates`) to widen addressable candidate coverage.
+  - Reserve exploration slots (`exploration_slots`) for high-APR pools that may rank low by TVL in primary sorting.
+  - Exploration lane can be stable-focused (`exploration_stable_only=true`) with configurable floor (`exploration_min_apy`).
+  - Remaining unused exploration slots are backfilled by normal priority order.
+  - Rationale: reduce false negatives for promising pools (e.g., lower TVL but strong APR) without removing core risk gates.
+
+- 2026-02-04: Telegram report chunking pattern:
+  - Report output is split into <= 3500-character chunks before sending via Telegram Bot API.
+  - Chunking preserves line boundaries to keep Markdown formatting stable.
+  - Rationale: prevent HTTP 400 failures on oversized messages when report volume increases.
+
 ## Conventions
 - Naming:
 - Testing:

@@ -45,6 +45,10 @@
 - [x] **Расширение Chain Mapping (EVM):**
     - Добавить маппинг для популярных EVM сетей (например: Polygon, BSC, Fantom, Linea и т.п.).
     - Цель: уменьшить долю кандидатов без `chain_id` и не терять хорошие EVM пулы.
+- [x] **Audit Intake Expansion (Fast Win):**
+    - Увеличен бюджет аудита кандидатов (`max_audit_candidates`: 15 -> 40).
+    - Добавлена exploration-квота (`exploration_slots`) для high-APR stable-focused пулов вне top-TVL.
+    - Цель: снизить missed-opportunity из-за ранжирования только по TVL.
 - [ ] **Non‑EVM стратегия (явно):**
     - Solana / Sui / Aptos: либо добавить отдельные адаптеры, либо пометить как `UNSUPPORTED` (но не “молча отбрасывать”).
     - Цель: понимать реальный missed-opportunity, а не терять его в нулевой статистике.

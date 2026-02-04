@@ -63,6 +63,10 @@
 - 2026-02-04: Added notifier report-format tests (`tests/test_notifier.py`); full suite green (`30 passed`) — 2026-02-04
 - 2026-02-04: Updated Telegram report to universal decision format with color badges and pair-type sorting; output now prioritizes chain/pair/project/APY/TVL/risk fields — 2026-02-04
 - 2026-02-04: Replaced user-specific displayed net-profit figure with normalized `Net@1k` metric for cross-user comparability — 2026-02-04
+- 2026-02-04: Expanded audit intake capacity (`max_audit_candidates=40`) and added exploration quota for high-APR stable-focused pools (`exploration_slots`, `exploration_min_apy`) — 2026-02-04
+- 2026-02-04: Added exploration quota unit test in `tests/test_scout.py`; full suite green (`31 passed`) — 2026-02-04
+- 2026-02-04: Added Telegram report chunking to prevent 400 errors on oversized Markdown messages after wider intake/report payloads — 2026-02-04
+- 2026-02-04: Extended notifier tests for chunking behavior; full suite green (`32 passed`) — 2026-02-04
 
 ## Changelog
 - 2026-02-01: Template initialized
@@ -116,3 +120,5 @@
 - 2026-02-04: Hardened operational logging path to avoid secret exposure in HTTP logs (Telegram token safety) — 2026-02-04
 - 2026-02-04: Added report-stage classification and reason visibility to reduce manual triage time in Telegram channel — 2026-02-04
 - 2026-02-04: Shifted report presentation from operator-centric to public decision-centric view (universal metric + sorting + risk colors) — 2026-02-04
+- 2026-02-04: Implemented Phase 2 fast-intake tuning (bigger audit budget + exploration slots) to reduce missed high-APR candidates outside top TVL ranks — 2026-02-04
+- 2026-02-04: Hardened Telegram delivery path for long reports (auto-chunking under API message-size limits) — 2026-02-04

@@ -35,19 +35,18 @@ class YieldScout:
 
         # Prioritize and select *addressable* candidates for security checks.
         # This avoids wasting the audit budget on items without chain_id/address.
+        prioritized = self._prioritize(filtered)
         missing_address = 0
         missing_chain_id = 0
         addressable_total = 0
-        addressable_candidates: List[ScoutCandidate] = []
-        for pool in self._prioritize(filtered):
+        for pool in prioritized:
             if not pool.address:
                 missing_address += 1
             if pool.chain_id is None:
                 missing_chain_id += 1
             if pool.address and pool.chain_id is not None:
                 addressable_total += 1
-                if len(addressable_candidates) < self.config.max_audit_candidates:
-                    addressable_candidates.append(pool)
+        addressable_candidates = self._select_audit_candidates(prioritized)
 
         results: List[ScoutResult] = []
         security_counts = {s.value: 0 for s in SecurityStatus}
@@ -130,7 +129,7 @@ class YieldScout:
         deduped = self._deduplicate(results)
         logger.info(
             "Funnel metrics: raw=%s heuristics=%s addressable_selected=%s missing_address=%s missing_chain_id=%s "
-            "addressable_total=%s security_counts=%s top_reasons=%s lindy_softened=%s tactical_filtered=%s "
+            "addressable_total=%s security_counts=%s top_reasons=%s lindy_softened=%s exploration_slots=%s tactical_filtered=%s "
             "capacity_filtered=%s cost_filtered=%s results=%s deduped=%s",
             raw_count,
             heuristics_count,
@@ -141,6 +140,7 @@ class YieldScout:
             security_counts,
             reason_counts.most_common(5),
             lindy_softened,
+            min(max(0, self.config.exploration_slots), max(0, self.config.max_audit_candidates - 1)),
             tactical_filtered,
             capacity_filtered,
             cost_filtered,
@@ -178,6 +178,56 @@ class YieldScout:
 
     def _is_lindy_softened(self, security) -> bool:  # noqa: ANN001
         return any(getattr(r, "code", "") == "LINDY_SOFTENED" for r in getattr(security, "reasons", []) or [])
+
+    def _select_audit_candidates(self, prioritized: List[ScoutCandidate]) -> List[ScoutCandidate]:
+        budget = max(1, int(self.config.max_audit_candidates))
+        reserve_slots = min(max(0, int(self.config.exploration_slots)), max(0, budget - 1))
+        primary_budget = budget - reserve_slots
+        selected: List[ScoutCandidate] = []
+        selected_ids: set[str] = set()
+
+        for pool in prioritized:
+            if len(selected) >= primary_budget:
+                break
+            if not (pool.address and pool.chain_id is not None):
+                continue
+            selected.append(pool)
+            selected_ids.add(pool.pool_id)
+
+        exploration_pool: List[ScoutCandidate] = []
+        for pool in prioritized:
+            if pool.pool_id in selected_ids:
+                continue
+            if not (pool.address and pool.chain_id is not None):
+                continue
+            if self.config.exploration_stable_only and self._classify_priority(pool) not in {
+                PriorityTier.LOW_VOLATILITY,
+                PriorityTier.COIN_STABLE,
+            }:
+                continue
+            if (pool.apy or 0.0) < self.config.exploration_min_apy:
+                continue
+            exploration_pool.append(pool)
+
+        exploration_pool.sort(key=lambda p: ((p.apy or 0.0), (p.tvl_usd or 0.0)), reverse=True)
+        for pool in exploration_pool:
+            if len(selected) >= budget:
+                break
+            selected.append(pool)
+            selected_ids.add(pool.pool_id)
+
+        if len(selected) < budget:
+            for pool in prioritized:
+                if len(selected) >= budget:
+                    break
+                if pool.pool_id in selected_ids:
+                    continue
+                if not (pool.address and pool.chain_id is not None):
+                    continue
+                selected.append(pool)
+                selected_ids.add(pool.pool_id)
+
+        return selected
 
     def _maybe_apply_lindy(self, pool: ScoutCandidate, security) -> bool:  # noqa: ANN001
         """Softens missing-audit/reputation blocks into WARN for high-lindy pools.
