@@ -91,6 +91,8 @@ Active Task: Phase 2 freshness hardening (two-step re-check + freshness/divergen
 - 2026-02-04: Updated roadmap/indexes to include Phase 2 freshness workstream (decision-grade actionable gating)
 - 2026-02-04: Phase A (spec 010) implemented: added `freshness` config schema, freshness metadata wiring, downgrade policy scaffold, and cycle counters (`rechecked/fresh/stale/unverified/diverged/downgraded`)
 - 2026-02-04: Telegram report now includes freshness/delta fields; added unit tests for freshness policy and report rendering (`35 passed`)
+- 2026-02-04: Applied output-volume tuning preset: `exploration_slots=15`, `exploration_stable_only=false`, and configurable dedupe TTL (`dedupe_ttl_seconds=14400`) to reduce over-pruning
+- 2026-02-04: Cleared persisted scout dedupe cache and validated broader report mix in dry run (`LOW_VOLATILITY`, `COIN_STABLE`, `COIN_COIN`)
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits

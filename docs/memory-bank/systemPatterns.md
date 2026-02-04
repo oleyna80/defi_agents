@@ -250,6 +250,12 @@
   - Remaining unused exploration slots are backfilled by normal priority order.
   - Rationale: reduce false negatives for promising pools (e.g., lower TVL but strong APR) without removing core risk gates.
 
+- 2026-02-04: Dedupe TTL tuning pattern:
+  - Deduper TTL is now configurable (`dedupe_ttl_seconds`) instead of fixed 24h.
+  - Default reduced to 4h to avoid over-suppressing legitimate updates in active markets.
+  - Operational note: after major scoring/policy changes, clear persisted dedupe cache once to remove stale suppression state.
+  - Rationale: keep anti-spam behavior while preserving signal throughput.
+
 - 2026-02-04: Telegram report chunking pattern:
   - Report output is split into <= 3500-character chunks before sending via Telegram Bot API.
   - Chunking preserves line boundaries to keep Markdown formatting stable.

@@ -117,6 +117,7 @@ class ScoutConfig(BaseModel):
     yield_quality_min: float = 0.2
     apy_anomaly_ratio: float = 2.0
     max_audit_candidates: int = 40
+    dedupe_ttl_seconds: int = 14_400
     # Reserve part of audit budget for high-APR exploration so low-TVL gems are not starved by TVL sorting.
     exploration_slots: int = 10
     exploration_min_apy: float = 20.0

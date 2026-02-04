@@ -25,7 +25,7 @@ class YieldScout:
         self.config = config
         self.client = client
         self.auditor = auditor
-        self.deduper = deduper or ScoutDeduper()
+        self.deduper = deduper or ScoutDeduper(ttl_seconds=self.config.dedupe_ttl_seconds)
 
     async def analyze(self) -> List[ScoutResult]:
         pools = await self.client.get_pools()

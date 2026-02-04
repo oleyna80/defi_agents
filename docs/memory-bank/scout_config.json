@@ -36,9 +36,10 @@
       "max_chain_allocation_pct": 0.5
     },
     "max_audit_candidates": 40,
-    "exploration_slots": 10,
+    "dedupe_ttl_seconds": 14400,
+    "exploration_slots": 15,
     "exploration_min_apy": 20.0,
-    "exploration_stable_only": true,
+    "exploration_stable_only": false,
     "freshness": {
       "recheck_enabled": false,
       "enforce_freshness_for_actionable": false,
