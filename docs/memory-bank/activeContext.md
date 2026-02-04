@@ -89,6 +89,8 @@ Active Task: Phase 2 freshness hardening (two-step re-check + freshness/divergen
 - 2026-02-04: Added direct DefiLlama pool hyperlinks in Telegram report rows (`[Pool](https://defillama.com/yields/pool/<pool_id>)`) for faster decision workflow
 - 2026-02-04: Drafted and approved Spec/Plan 010 for freshness re-check v1 (`docs/specs/010-*`, `docs/plans/010-*`)
 - 2026-02-04: Updated roadmap/indexes to include Phase 2 freshness workstream (decision-grade actionable gating)
+- 2026-02-04: Phase A (spec 010) implemented: added `freshness` config schema, freshness metadata wiring, downgrade policy scaffold, and cycle counters (`rechecked/fresh/stale/unverified/diverged/downgraded`)
+- 2026-02-04: Telegram report now includes freshness/delta fields; added unit tests for freshness policy and report rendering (`35 passed`)
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits
@@ -101,8 +103,8 @@ Active Task: Phase 2 freshness hardening (two-step re-check + freshness/divergen
 
 ## Next Steps
 1. Rotate Telegram bot token on VPS (old token appeared in historical logs before hardening) and restart user service
-2. Implement Phase A of spec 010: freshness config + metadata + downgrade policy (`FRESH` only in actionable)
-3. Implement re-check adapter MVP and cycle counters (`rechecked/fresh/stale/unverified/diverged`)
+2. Implement Phase B of spec 010: first re-check adapter MVP (`recheck_max_candidates`, timeout budget, explicit `UNVERIFIED` fallback)
+3. Add divergence computations (`apy_divergence_pct`, `tvl_divergence_pct`) from adapter snapshots and enforce strict freshness gating on actionable
 4. Finalize Lindy `age` source (pool age vs contract-age proxy) and document the chosen source in spec/policy matrix
 5. Implement explicit Non-EVM unsupported reporting path (per-chain counters/tags, not only missing-chain totals)
 6. Add heartbeat (daily "no opportunities" message) for healthy-but-silent cycles

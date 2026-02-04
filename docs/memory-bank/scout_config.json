@@ -39,6 +39,15 @@
     "exploration_slots": 10,
     "exploration_min_apy": 20.0,
     "exploration_stable_only": true,
+    "freshness": {
+      "recheck_enabled": false,
+      "enforce_freshness_for_actionable": false,
+      "recheck_max_candidates": 10,
+      "recheck_timeout_seconds": 8,
+      "max_age_minutes": 90,
+      "max_apy_divergence_pct": 25.0,
+      "max_tvl_divergence_pct": 20.0
+    },
     "min_warn_score": 2.0
   }
 }

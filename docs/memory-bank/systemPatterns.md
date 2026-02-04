@@ -267,6 +267,15 @@
   - Downgrade stale/unverified/divergent rows into watchlist with explicit reason codes.
   - Rationale: preserve opportunity coverage while reducing decision risk from stale aggregator snapshots.
 
+- 2026-02-04: Freshness Phase A wiring pattern:
+  - Introduced `freshness` config schema in Scout settings (feature flags + thresholds + budget knobs).
+  - Added metadata contract fields to report pipeline:
+    - `freshness_status`, `freshness_provider`, `source_timestamp`, `age_minutes`,
+      `staleness_score`, `apy_divergence_pct`, `tvl_divergence_pct`.
+  - Added deterministic policy function (`freshness.policy`) to append freshness reason codes and optionally downgrade actionable rows when strict mode is enabled.
+  - Added cycle-level freshness counters to logs for calibration.
+  - Rationale: ship safe scaffolding first, then plug concrete adapters without breaking running operations.
+
 ## Conventions
 - Naming:
 - Testing:

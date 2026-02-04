@@ -85,10 +85,10 @@ FreshnessDecision {
   - Confirm downgrade tags match observed divergence.
 
 ## 6. Implementation Checklist
-- [ ] Add freshness config block + defaults.
-- [ ] Implement freshness manager and decision policy.
-- [ ] Insert pre-alert re-check stage into main cycle.
-- [ ] Add report tags and history fields for freshness/divergence.
-- [ ] Add freshness counters to cycle logs.
-- [ ] Add tests (unit + integration smoke).
+- [x] Add freshness config block + defaults.
+- [x] Implement freshness manager and decision policy.
+- [x] Insert pre-alert re-check stage into main cycle (Phase A scaffold; adapter-backed snapshots pending).
+- [x] Add report tags for freshness/divergence (history persistence pending in Phase B/C).
+- [x] Add freshness counters to cycle logs.
+- [x] Add tests (unit + integration smoke for Phase A scaffold).
 - [ ] Tune thresholds on VPS and update docs.

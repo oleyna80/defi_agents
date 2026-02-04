@@ -82,6 +82,16 @@ class CapacityGuards(BaseModel):
     max_chain_allocation_pct: float = 0.50
 
 
+class FreshnessConfig(BaseModel):
+    recheck_enabled: bool = False
+    enforce_freshness_for_actionable: bool = False
+    recheck_max_candidates: int = 10
+    recheck_timeout_seconds: int = 8
+    max_age_minutes: int = 90
+    max_apy_divergence_pct: float = 25.0
+    max_tvl_divergence_pct: float = 20.0
+
+
 class ScoutConfig(BaseModel):
     min_tvl_usd: float = 1_000_000
     min_apy: float = 0.0
@@ -92,6 +102,7 @@ class ScoutConfig(BaseModel):
     investor_profile: InvestorProfile = Field(default_factory=InvestorProfile)
     sleeves: SleevesConfig = Field(default_factory=SleevesConfig)
     capacity_guards: CapacityGuards = Field(default_factory=CapacityGuards)
+    freshness: FreshnessConfig = Field(default_factory=FreshnessConfig)
     stable_symbols: List[str] = Field(
         default_factory=lambda: [
             "USDC",

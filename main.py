@@ -20,6 +20,7 @@ from defi_agents.security.defi_client import DeFiClient
 from defi_agents.security.goplus_client import GoPlusClient
 from defi_agents.security.whitelist import WhitelistProvider
 from defi_agents.notifier import TelegramNotifier
+from defi_agents.freshness import apply_freshness_policy
 from defi_agents.history import save_to_history
 
 logging.basicConfig(
@@ -141,6 +142,16 @@ async def run_sentinel_cycle() -> None:
             )
             net_profit_1k = (1000.0 * (opt.net_apy / 100.0) / 12.0) - config.gas_efficiency.monthly_gas_cost_usd
             opt.metadata["net_profit_1k_usd"] = f"{net_profit_1k:.2f}"
+            # Phase A wiring: re-check metadata fields are present before adapters are integrated.
+            opt.metadata.setdefault("freshness_status", "UNVERIFIED")
+            opt.metadata.setdefault("freshness_provider", "none")
+            opt.metadata.setdefault("source_timestamp", "")
+            opt.metadata.setdefault("age_minutes", "")
+            opt.metadata.setdefault("staleness_score", "")
+            opt.metadata.setdefault("apy_divergence_pct", "")
+            opt.metadata.setdefault("tvl_divergence_pct", "")
+
+        freshness_counts = apply_freshness_policy(report_picks, config.freshness)
 
         logger.info(
             "Final filters: eligible=%s profit_ok=%s safe=%s warn=%s safe_min_score=%.2f warn_min_score=%.2f min_monthly_profit_usd=%.2f",
@@ -155,6 +166,17 @@ async def run_sentinel_cycle() -> None:
 
         actionable_count = sum(1 for pick in report_picks if pick.metadata.get("report_group") == "ACTIONABLE")
         watchlist_count = sum(1 for pick in report_picks if pick.metadata.get("report_group") == "WATCHLIST")
+        logger.info(
+            "Freshness summary: rechecked=%s fresh=%s stale=%s unverified=%s diverged=%s downgraded=%s recheck_enabled=%s strict=%s",
+            freshness_counts["rechecked_count"],
+            freshness_counts["fresh_count"],
+            freshness_counts["stale_count"],
+            freshness_counts["unverified_count"],
+            freshness_counts["diverged_count"],
+            freshness_counts["downgraded_to_watchlist_count"],
+            config.freshness.recheck_enabled,
+            config.freshness.enforce_freshness_for_actionable,
+        )
         # Report both actionable and watchlist sections with clear labels.
         if report_picks:
             await notifier.send_alpha_report(report_picks)

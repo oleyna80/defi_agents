@@ -54,6 +54,9 @@
     - Freshness/divergence теги: `FRESH/STALE/UNVERIFIED`, `STALE_DATA`, `DIVERGENCE_HIGH`.
     - Только `FRESH` кандидаты попадают в публичный actionable; остальные уходят в watchlist.
     - Цель: снизить риск принятия решений на устаревших данных.
+    - Progress:
+      - [x] Phase A: schema + policy wiring (`freshness` config, metadata fields, downgrade policy, counters, report tags).
+      - [ ] Phase B: first re-check adapter MVP (source coverage + timeout budget).
 - [ ] **Non‑EVM стратегия (явно):**
     - Solana / Sui / Aptos: либо добавить отдельные адаптеры, либо пометить как `UNSUPPORTED` (но не “молча отбрасывать”).
     - Цель: понимать реальный missed-opportunity, а не терять его в нулевой статистике.

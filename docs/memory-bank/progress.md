@@ -70,6 +70,8 @@
 - 2026-02-04: Extended notifier tests for chunking behavior; full suite green (`32 passed`) — 2026-02-04
 - 2026-02-04: Added clickable DefiLlama pool links in Telegram report output for each candidate row — 2026-02-04
 - 2026-02-04: Drafted and approved Spec/Plan 010 for freshness re-check before Telegram output — 2026-02-04
+- 2026-02-04: Implemented Spec 010 Phase A baseline: freshness config block + metadata wiring + downgrade-policy scaffold + cycle counters in `main.py` — 2026-02-04
+- 2026-02-04: Extended reporting/tests for freshness tags and policy behavior (`tests/test_freshness_policy.py`, full suite `35 passed`) — 2026-02-04
 
 ## Changelog
 - 2026-02-01: Template initialized
@@ -126,3 +128,4 @@
 - 2026-02-04: Implemented Phase 2 fast-intake tuning (bigger audit budget + exploration slots) to reduce missed high-APR candidates outside top TVL ranks — 2026-02-04
 - 2026-02-04: Hardened Telegram delivery path for long reports (auto-chunking under API message-size limits) — 2026-02-04
 - 2026-02-04: Planned Phase 2 freshness hardening track (spec 010 / plan 010, DoD and rollout sequence) — 2026-02-04
+- 2026-02-04: Phase A freshness foundation completed; Phase B adapter implementation queued next — 2026-02-04

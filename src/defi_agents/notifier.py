@@ -92,10 +92,15 @@ class TelegramNotifier:
                 sleeve = r.metadata.get("sleeve", "n/a")
                 reason_codes = r.metadata.get("warn_reasons", "-") or "-"
                 net_1k = r.metadata.get("net_profit_1k_usd", "n/a")
+                freshness = r.metadata.get("freshness_status", "UNVERIFIED")
+                age_m = r.metadata.get("age_minutes", "-") or "-"
+                d_apy = r.metadata.get("apy_divergence_pct", "-") or "-"
+                d_tvl = r.metadata.get("tvl_divergence_pct", "-") or "-"
                 pool_link = self._pool_link(r)
                 lines.append(
                     f"- {badge} `{chain}` `{sym}` | `{project}` | APY {apy} | TVL {tvl} | "
                     f"Risk `{bucket}` | Sleeve `{sleeve}` | Reasons `{reason_codes}` | "
+                    f"Fresh `{freshness}` ({age_m}m) | ΔAPY {d_apy}% ΔTVL {d_tvl}% | "
                     f"Net@1k ${net_1k}/mo | [Pool]({pool_link})"
                 )
             lines.append("")

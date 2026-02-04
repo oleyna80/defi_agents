@@ -44,6 +44,10 @@ def _result(
             "sleeve": "yield_plus",
             "net_profit_1k_usd": "7.50",
             "warn_reasons": reasons,
+            "freshness_status": "UNVERIFIED",
+            "age_minutes": "-",
+            "apy_divergence_pct": "-",
+            "tvl_divergence_pct": "-",
         },
         flags=[],
     )
@@ -77,6 +81,7 @@ def test_report_includes_decision_fields_and_colors():
     assert "APY 12.34%" in message
     assert "TVL $10.00M" in message
     assert "Risk `WARN/REPUTATION`" in message
+    assert "Fresh `UNVERIFIED`" in message
     assert "Net@1k $7.50/mo" in message
     assert "Reasons `REPUTATION_UNAVAILABLE`" in message
     assert "[Pool](https://defillama.com/yields/pool/pool1)" in message
