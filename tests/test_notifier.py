@@ -79,6 +79,7 @@ def test_report_includes_decision_fields_and_colors():
     assert "Risk `WARN/REPUTATION`" in message
     assert "Net@1k $7.50/mo" in message
     assert "Reasons `REPUTATION_UNAVAILABLE`" in message
+    assert "[Pool](https://defillama.com/yields/pool/pool1)" in message
 
 
 def test_report_is_chunked_for_telegram_limits():

@@ -255,6 +255,11 @@
   - Chunking preserves line boundaries to keep Markdown formatting stable.
   - Rationale: prevent HTTP 400 failures on oversized messages when report volume increases.
 
+- 2026-02-04: Report deep-link pattern:
+  - Each Telegram row includes a direct link to DefiLlama pool page:
+    - `https://defillama.com/yields/pool/<pool_id>`
+  - Rationale: reduce friction from alert -> manual verification -> decision.
+
 ## Conventions
 - Naming:
 - Testing:

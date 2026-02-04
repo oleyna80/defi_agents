@@ -67,6 +67,7 @@
 - 2026-02-04: Added exploration quota unit test in `tests/test_scout.py`; full suite green (`31 passed`) — 2026-02-04
 - 2026-02-04: Added Telegram report chunking to prevent 400 errors on oversized Markdown messages after wider intake/report payloads — 2026-02-04
 - 2026-02-04: Extended notifier tests for chunking behavior; full suite green (`32 passed`) — 2026-02-04
+- 2026-02-04: Added clickable DefiLlama pool links in Telegram report output for each candidate row — 2026-02-04
 
 ## Changelog
 - 2026-02-01: Template initialized

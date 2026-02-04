@@ -92,9 +92,11 @@ class TelegramNotifier:
                 sleeve = r.metadata.get("sleeve", "n/a")
                 reason_codes = r.metadata.get("warn_reasons", "-") or "-"
                 net_1k = r.metadata.get("net_profit_1k_usd", "n/a")
+                pool_link = self._pool_link(r)
                 lines.append(
                     f"- {badge} `{chain}` `{sym}` | `{project}` | APY {apy} | TVL {tvl} | "
-                    f"Risk `{bucket}` | Sleeve `{sleeve}` | Reasons `{reason_codes}` | Net@1k ${net_1k}/mo"
+                    f"Risk `{bucket}` | Sleeve `{sleeve}` | Reasons `{reason_codes}` | "
+                    f"Net@1k ${net_1k}/mo | [Pool]({pool_link})"
                 )
             lines.append("")
         return "\n".join(lines)
@@ -133,3 +135,7 @@ class TelegramNotifier:
         if value >= 1_000:
             return f"${value / 1_000:.1f}K"
         return f"${value:.0f}"
+
+    def _pool_link(self, result: ScoutResult) -> str:
+        pool_id = getattr(result.candidate, "pool_id", "") or ""
+        return f"https://defillama.com/yields/pool/{pool_id}" if pool_id else "https://defillama.com/yields"

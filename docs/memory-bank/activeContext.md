@@ -86,6 +86,7 @@ Active Task: Phase 2.5 profile-aware selection (sleeves + capacity guards + benc
 - 2026-02-04: Added scout test coverage for exploration quota behavior; full suite green (`31 passed`)
 - 2026-02-04: Fixed Telegram delivery reliability after report expansion: added safe message chunking for long Markdown reports to stay under Telegram size limits
 - 2026-02-04: Revalidated full test suite after intake/report updates (`32 passed`) and smoke-run without runtime failures
+- 2026-02-04: Added direct DefiLlama pool hyperlinks in Telegram report rows (`[Pool](https://defillama.com/yields/pool/<pool_id>)`) for faster decision workflow
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits
