@@ -161,3 +161,37 @@
     - Короткий runbook/rollback для смены scheduler.
 - [ ] **History/Artifacts Hygiene:**
     - Ротация/архивация `docs/memory-bank/history.csv` (или периодическая выгрузка), чтобы файл не рос бесконечно.
+
+---
+
+## 📌 DeFi Coverage Blueprint (Master Plan)
+*Цель: закрыть весь спектр DeFi доходности и рисков в одном контуре.*
+
+1) **Coverage (Источники доходности)**
+   - DEX/LP, Lending/Borrowing, Staking/LST, Perps funding, Yield‑bearing stables.
+   - DoD: для каждого класса есть адаптер + нормализованные поля.
+
+2) **Unified Data Contract**
+   - Единый формат кандидата: asset(s), chain, protocol, apy, tvl, liquidity, risk tags, freshness.
+   - DoD: любой новый источник подключается без изменения downstream логики.
+
+3) **Risk Policy**
+   - Security audit + buckets SAFE/WARN/BLOCK.
+   - Stablecoin policy (tiers + FX risk).
+   - DoD: риск всегда важнее доходности.
+
+4) **Freshness**
+   - Re-check перед алертом, метки FRESH/UNVERIFIED/STALE.
+   - DoD: actionable только после freshness‑подтверждения.
+
+5) **Strategy Layer**
+   - Multi‑leg стратегии: delta‑neutral, collateral‑loop, hedged LP.
+   - DoD: стратегия > baseline доходности стейбл‑пулов.
+
+6) **Ops & Observability**
+   - systemd fail‑fast, heartbeat, метрики по воронке.
+   - DoD: система объясняет, почему тишина/нет сигналов.
+
+7) **Decision View**
+   - Отчёт понятен конечному пользователю (что, где, почему, риск).
+   - DoD: “хочу войти” → ясно куда и зачем.
