@@ -110,11 +110,33 @@ class TelegramNotifier:
                     if fx == "true":
                         tags.append("FX_RISK")
                 tags_str = " ".join(tags) if tags else ""
+                # Strategy simulation fields
+                sim_fields = []
+                best_strat = r.metadata.get("sim_best_strategy")
+                if best_strat:
+                    sim_fields.append(f"BestStrategy:{best_strat}")
+                sim_status = r.metadata.get("sim_status")
+                if sim_status:
+                    sim_fields.append(f"SimStatus:{sim_status}")
+                fit_score = r.metadata.get("sim_fit_score")
+                if fit_score:
+                    sim_fields.append(f"FitScore:{fit_score}")
+                exp_apy = r.metadata.get("sim_exp_net_apy_min")
+                if exp_apy:
+                    exp_max = r.metadata.get("sim_exp_net_apy_max", exp_apy)
+                    sim_fields.append(f"ExpNetAPY:{exp_apy}-{exp_max}%")
+                risk_score = r.metadata.get("sim_risk_score")
+                if risk_score:
+                    sim_fields.append(f"SimRisk:{risk_score}")
+                missing = r.metadata.get("sim_required_data_missing")
+                if missing and missing != "":
+                    sim_fields.append(f"MissingData:{missing}")
+                sim_str = " ".join(sim_fields) if sim_fields else ""
                 lines.append(
                     f"- {badge} `{chain}` `{sym}` | `{project}` | APY {apy} | TVL {tvl} | "
                     f"Risk `{bucket}`" + (f" | Tags {tags_str}" if tags_str else "") + f" | Sleeve `{sleeve}` | Reasons `{reason_codes}` | "
                     f"Fresh `{freshness}` ({age_m}m) | ΔAPY {d_apy}% ΔTVL {d_tvl}% | "
-                    f"Net@1k ${net_1k}/mo | [Pool]({pool_link})"
+                    f"Net@1k ${net_1k}/mo" + (f" | {sim_str}" if sim_str else "") + f" | [Pool]({pool_link})"
                 )
             lines.append("")
         return "\n".join(lines)

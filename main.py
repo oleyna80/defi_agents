@@ -22,6 +22,8 @@ from defi_agents.security.whitelist import WhitelistProvider
 from defi_agents.notifier import TelegramNotifier
 from defi_agents.freshness import FreshnessManager, apply_freshness_policy
 from defi_agents.history import save_to_history
+from defi_agents.strategy_sim.engine import StrategySimEngine
+from defi_agents.strategy_sim.models import SimulationCounters
 
 logging.basicConfig(
     level=logging.INFO,
@@ -156,6 +158,33 @@ async def run_sentinel_cycle() -> None:
             await freshness_manager.recheck(report_picks)
 
         freshness_counts = apply_freshness_policy(report_picks, config.freshness)
+
+        # --- Strategy Simulation (v1) ---
+        sim_counters = SimulationCounters()
+        if config.strategy_sim.enabled and report_picks:
+            engine = StrategySimEngine(config)
+            # Simulate each candidate and attach metadata
+            for pick in report_picks:
+                sim_result = engine.simulate_one(pick)
+                pick.metadata.update(sim_result.to_metadata_dict())
+                # Update counters
+                sim_counters.simulated_count += 1
+                if sim_result.status.value == "OK":
+                    sim_counters.ok_count += 1
+                elif sim_result.status.value == "PARTIAL":
+                    sim_counters.partial_count += 1
+                elif sim_result.status.value == "UNSUPPORTED":
+                    sim_counters.unsupported_count += 1
+                if sim_result.best_strategy:
+                    strat_key = sim_result.best_strategy.value
+                    sim_counters.best_strategy_distribution[strat_key] = (
+                        sim_counters.best_strategy_distribution.get(strat_key, 0) + 1
+                    )
+            # Apply policy gates (downgrade to WATCHLIST)
+            sim_counters = engine.apply_policy(report_picks, sim_counters)
+            logger.info(sim_counters.to_log_line())
+        else:
+            logger.info("StrategySim disabled or no candidates.")
 
         logger.info(
             "Final filters: eligible=%s profit_ok=%s safe=%s warn=%s safe_min_score=%.2f warn_min_score=%.2f min_monthly_profit_usd=%.2f",

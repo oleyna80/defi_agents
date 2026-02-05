@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Literal
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from pydantic import BaseModel, Field
 
@@ -143,6 +143,22 @@ class FreshnessConfig(BaseModel):
     )
 
 
+class StrategySimConfig(BaseModel):
+    """Strategy simulation configuration (v1)."""
+    enabled: bool = False
+    max_candidates: int = 20
+    supported_tiers: List[str] = Field(default_factory=lambda: ["T1", "T2"])
+    allow_unsupported_as_watchlist: bool = True
+    risk_thresholds_by_profile: Dict[str, int] = Field(
+        default_factory=lambda: {
+            "micro": 30,
+            "standard": 50,
+            "whale": 70,
+        }
+    )
+    min_data_completeness_pct: float = 80.0
+
+
 class ScoutConfig(BaseModel):
     min_tvl_usd: float = 1_000_000
     min_apy: float = 0.0
@@ -154,6 +170,7 @@ class ScoutConfig(BaseModel):
     sleeves: SleevesConfig = Field(default_factory=SleevesConfig)
     capacity_guards: CapacityGuards = Field(default_factory=CapacityGuards)
     freshness: FreshnessConfig = Field(default_factory=FreshnessConfig)
+    strategy_sim: StrategySimConfig = Field(default_factory=StrategySimConfig)
     token_buckets: TokenBuckets = Field(default_factory=TokenBuckets)
     risk_policy: StableRiskPolicy = Field(default_factory=StableRiskPolicy)
     stable_symbols: List[str] = Field(

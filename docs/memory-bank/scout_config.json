@@ -97,6 +97,21 @@
       "fx_pairs_core_safe_allowed": false,
       "t3_min_apy_premium": 3.0
     },
+    "strategy_sim": {
+      "enabled": false,
+      "max_candidates": 20,
+      "supported_tiers": [
+        "T1",
+        "T2"
+      ],
+      "allow_unsupported_as_watchlist": true,
+      "risk_thresholds_by_profile": {
+        "micro": 30,
+        "standard": 50,
+        "whale": 70
+      },
+      "min_data_completeness_pct": 80.0
+    },
     "min_warn_score": 2.0
   }
 }
