@@ -37,6 +37,23 @@ class ReasonCode(str, Enum):
     NO_DATA = "NO_DATA"
 
 
+class StableTier(str, Enum):
+    """Stablecoin risk tier classification."""
+    T1 = "T1"  # USDC, USDT, DAI, USDS
+    T2 = "T2"  # crvUSD, GHO, PYUSD
+    T3 = "T3"  # USDe, TUSD, FDUSD, FRAX, LUSD
+    UNKNOWN = "UNKNOWN"
+
+
+class PairCurrencyClass(str, Enum):
+    """Pool pair currency classification."""
+    USD_STABLE_STABLE = "USD_STABLE_STABLE"
+    EUR_STABLE_STABLE = "EUR_STABLE_STABLE"
+    FX_STABLE = "FX_STABLE"  # USD/EUR mix
+    TOKEN_STABLE = "TOKEN_STABLE"
+    TOKEN_TOKEN = "TOKEN_TOKEN"
+
+
 class EvidenceItem(BaseModel):
     point: str
     source_type: str  # docs | github | social | onchain

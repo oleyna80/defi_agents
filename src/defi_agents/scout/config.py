@@ -82,6 +82,37 @@ class CapacityGuards(BaseModel):
     max_chain_allocation_pct: float = 0.50
 
 
+class TokenBuckets(BaseModel):
+    """Stablecoin classification buckets for risk policy."""
+    stablecoins_usd: List[str] = Field(
+        default_factory=lambda: [
+            "USDC", "USDT", "DAI", "USDS",  # T1
+            "crvUSD", "GHO", "PYUSD",       # T2
+        ]
+    )
+    stablecoins_eur: List[str] = Field(
+        default_factory=lambda: ["EURS", "EURC", "agEUR", "EURe"]
+    )
+    stablecoins_speculative: List[str] = Field(
+        default_factory=lambda: ["USDe", "TUSD", "FDUSD", "FRAX", "LUSD"]
+    )
+    exclude_symbols: List[str] = Field(default_factory=list)
+    exclude_addresses: List[str] = Field(default_factory=list)
+
+
+class StableRiskPolicy(BaseModel):
+    """Stablecoin risk policy configuration."""
+    enabled: bool = False
+    apply_scoring_penalties: bool = False
+    stable_tier_weights: dict[str, float] = Field(
+        default_factory=lambda: {"T1": 1.0, "T2": 0.9, "T3": 0.7}
+    )
+    fx_pair_penalty: float = 0.15
+    fx_pairs_core_safe_allowed: bool = False
+    t3_min_apy_premium: float = 3.0
+    include_tags_in_report: bool = False
+
+
 class FreshnessConfig(BaseModel):
     recheck_enabled: bool = False
     enforce_freshness_for_actionable: bool = False
@@ -123,6 +154,8 @@ class ScoutConfig(BaseModel):
     sleeves: SleevesConfig = Field(default_factory=SleevesConfig)
     capacity_guards: CapacityGuards = Field(default_factory=CapacityGuards)
     freshness: FreshnessConfig = Field(default_factory=FreshnessConfig)
+    token_buckets: TokenBuckets = Field(default_factory=TokenBuckets)
+    risk_policy: StableRiskPolicy = Field(default_factory=StableRiskPolicy)
     stable_symbols: List[str] = Field(
         default_factory=lambda: [
             "USDC",

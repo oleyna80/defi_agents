@@ -11,9 +11,10 @@ from .scout.models import PriorityTier, ScoutResult
 
 
 class TelegramNotifier:
-    def __init__(self) -> None:
+    def __init__(self, include_tags: bool = False) -> None:
         self.token = os.getenv("TELEGRAM_BOT_TOKEN")
         self.chat_id = os.getenv("TELEGRAM_CHAT_ID") or os.getenv("CHAT_ID")
+        self.include_tags = include_tags
 
     async def send_alpha_report(self, results: List[ScoutResult]) -> None:
         message = self._format_report(results)
@@ -97,9 +98,21 @@ class TelegramNotifier:
                 d_apy = r.metadata.get("apy_divergence_pct", "-") or "-"
                 d_tvl = r.metadata.get("tvl_divergence_pct", "-") or "-"
                 pool_link = self._pool_link(r)
+                tags = []
+                if self.include_tags:
+                    tier = r.metadata.get("stable_tier")
+                    if tier:
+                        tags.append(f"Tier:{tier}")
+                    pair_class = r.metadata.get("pair_currency_class")
+                    if pair_class:
+                        tags.append(f"Class:{pair_class}")
+                    fx = r.metadata.get("fx_exposure")
+                    if fx == "true":
+                        tags.append("FX_RISK")
+                tags_str = " ".join(tags) if tags else ""
                 lines.append(
                     f"- {badge} `{chain}` `{sym}` | `{project}` | APY {apy} | TVL {tvl} | "
-                    f"Risk `{bucket}` | Sleeve `{sleeve}` | Reasons `{reason_codes}` | "
+                    f"Risk `{bucket}`" + (f" | Tags {tags_str}" if tags_str else "") + f" | Sleeve `{sleeve}` | Reasons `{reason_codes}` | "
                     f"Fresh `{freshness}` ({age_m}m) | ΔAPY {d_apy}% ΔTVL {d_tvl}% | "
                     f"Net@1k ${net_1k}/mo | [Pool]({pool_link})"
                 )

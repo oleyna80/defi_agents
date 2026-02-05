@@ -17,6 +17,9 @@ def _result(
     symbol: str = "USDC-USDT",
     chain: str = "Ethereum",
     apy: float = 10.0,
+    stable_tier: str | None = None,
+    pair_class: str | None = None,
+    fx_exposure: str | None = None,
 ) -> ScoutResult:
     candidate = ScoutCandidate.model_validate(
         {
@@ -32,6 +35,22 @@ def _result(
             "apyReward": 0.0,
         }
     )
+    metadata = {
+        "bucket": bucket,
+        "sleeve": "yield_plus",
+        "net_profit_1k_usd": "7.50",
+        "warn_reasons": reasons,
+        "freshness_status": "UNVERIFIED",
+        "age_minutes": "-",
+        "apy_divergence_pct": "-",
+        "tvl_divergence_pct": "-",
+    }
+    if stable_tier is not None:
+        metadata["stable_tier"] = stable_tier
+    if pair_class is not None:
+        metadata["pair_currency_class"] = pair_class
+    if fx_exposure is not None:
+        metadata["fx_exposure"] = fx_exposure
     return ScoutResult(
         candidate=candidate,
         security=SecurityResult(status=SecurityStatus.WARN, score=70),
@@ -39,16 +58,7 @@ def _result(
         score=5.0,
         net_profit_usd=15.0,
         priority=priority,
-        metadata={
-            "bucket": bucket,
-            "sleeve": "yield_plus",
-            "net_profit_1k_usd": "7.50",
-            "warn_reasons": reasons,
-            "freshness_status": "UNVERIFIED",
-            "age_minutes": "-",
-            "apy_divergence_pct": "-",
-            "tvl_divergence_pct": "-",
-        },
+        metadata=metadata,
         flags=[],
     )
 
@@ -97,3 +107,56 @@ def test_report_is_chunked_for_telegram_limits():
     chunks = notifier._chunk_message(message, max_len=700)
     assert len(chunks) > 1
     assert all(len(chunk) <= 700 for chunk in chunks)
+
+
+def test_tags_included_when_flag_enabled():
+    notifier = TelegramNotifier(include_tags=True)
+    message = notifier._format_report([
+        _result(
+            priority=PriorityTier.LOW_VOLATILITY,
+            bucket="SAFE",
+            stable_tier="T1",
+            pair_class="USD_STABLE_STABLE",
+            fx_exposure="false",
+        )
+    ])
+    assert "Tier:T1" in message
+    assert "Class:USD_STABLE_STABLE" in message
+    assert "FX_RISK" not in message
+    # Ensure tags appear after Risk
+    assert "Risk `SAFE` | Tags Tier:T1 Class:USD_STABLE_STABLE" in message
+
+
+def test_fx_risk_tag_included():
+    notifier = TelegramNotifier(include_tags=True)
+    message = notifier._format_report([
+        _result(
+            priority=PriorityTier.COIN_STABLE,
+            bucket="WARN/REPUTATION",
+            stable_tier="T2",
+            pair_class="FX_STABLE",
+            fx_exposure="true",
+        )
+    ])
+    assert "Tier:T2" in message
+    assert "Class:FX_STABLE" in message
+    assert "FX_RISK" in message
+    assert "Risk `WARN/REPUTATION` | Tags Tier:T2 Class:FX_STABLE FX_RISK" in message
+
+
+def test_tags_not_included_when_flag_disabled():
+    notifier = TelegramNotifier(include_tags=False)
+    message = notifier._format_report([
+        _result(
+            priority=PriorityTier.LOW_VOLATILITY,
+            bucket="SAFE",
+            stable_tier="T1",
+            pair_class="USD_STABLE_STABLE",
+            fx_exposure="false",
+        )
+    ])
+    assert "Tier:T1" not in message
+    assert "Class:USD_STABLE_STABLE" not in message
+    assert "FX_RISK" not in message
+    # Ensure the "Tags" substring does not appear
+    assert "Tags" not in message

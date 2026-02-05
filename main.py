@@ -89,7 +89,7 @@ async def run_sentinel_cycle() -> None:
             logger.critical("AI init failed and fallback disabled. Stopping startup.")
             raise RuntimeError("Production AI Init Failure") from exc
     l3_manager = L3AnalysisManager(config=config, provider=provider)
-    notifier = TelegramNotifier()
+    notifier = TelegramNotifier(include_tags=config.risk_policy.include_tags_in_report)
 
     logger.info("Starting Global Scout Cycle (chains: ALL).")
 
