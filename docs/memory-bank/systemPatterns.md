@@ -304,6 +304,15 @@
   - Added protocol-scoped adapter routing (`AerodromeSubgraphAdapter`) reusing the same V3 snapshot logic.
   - Rationale: expand freshness coverage to reward-heavy non-Ethereum chains without weakening fail-safe `UNVERIFIED` behavior when credentials/endpoints are missing.
 
+- 2026-02-05: DeFi Coverage Blueprint (Master Plan):
+  - Coverage across DEX/LP, Lending/Borrowing, Staking/LST, Perps funding, Yield‑bearing stables.
+  - Unified data contract for candidates (asset(s), chain, protocol, apy, tvl, liquidity, risk tags, freshness).
+  - Risk‑first policy gates (SAFE/WARN/BLOCK) + stablecoin tiering + FX risk.
+  - Freshness re-check gating before actionable output.
+  - Strategy layer for multi‑leg strategies with ROI guardrail vs stable LP baseline.
+  - Ops/observability + decision‑grade reporting as first‑class requirements.
+  - Rationale: ensure full market coverage without degrading safety or actionability.
+
 ## Conventions
 - Naming:
 - Testing:

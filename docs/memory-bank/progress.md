@@ -142,3 +142,4 @@
 - 2026-02-05: Added ops runbook for Strategy Simulator v1 safe activation + debug checklist (`docs/runbooks/strategy_sim_v1_ops.md`) — 2026-02-05
 - 2026-02-05: Strategy Simulator v1 validated on VPS (temporary loosened filters for candidates, StrategySim summary observed, PARTIAL/UNSUPPORTED downgraded to WATCHLIST), then rolled back to production thresholds with `strategy_sim.enabled=false` — 2026-02-05
 - 2026-02-05: Telegram report now hides StrategySim fields unless `SimStatus=OK` (noise control), with notifier tests updated — 2026-02-05
+- 2026-02-05: Added DeFi Coverage Blueprint (master plan) to roadmap for full coverage + data contract + risk/freshness/strategy/ops/decision view — 2026-02-05

@@ -3,7 +3,7 @@
 ## Current Session Focus
 Current Spec: docs/specs/011-strategy-simulator-v1.md
 Current Plan: docs/plans/011-strategy-simulator-v1-plan.md
-Active Task: Strategy Simulator v1 ops rollout (observability-only) + runbook formalization
+Active Task: Strategy Simulator v1 ops rollout (observability-only) + DeFi Coverage Blueprint adoption
 
 ## Recent Changes
 - 2026-02-01: Initialized project template
@@ -104,6 +104,7 @@ Active Task: Strategy Simulator v1 ops rollout (observability-only) + runbook fo
 - 2026-02-05: Added ops runbook for Strategy Simulator v1 safe activation and debug checklist (`docs/runbooks/strategy_sim_v1_ops.md`) — 2026-02-05
 - 2026-02-05: Validated Strategy Simulator v1 on VPS with temporary loosened filters; StrategySim summary observed; PARTIAL/UNSUPPORTED downgraded to WATCHLIST; reverted to production thresholds and `strategy_sim.enabled=false` — 2026-02-05
 - 2026-02-05: Adjusted Telegram report to hide StrategySim fields unless `SimStatus=OK` (v1.1 noise control) and added notifier tests — 2026-02-05
+- 2026-02-05: Added DeFi Coverage Blueprint to roadmap as master plan (coverage + unified data contract + risk/freshness/strategy/ops/decision view) — 2026-02-05
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits
