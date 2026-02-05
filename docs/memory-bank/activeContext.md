@@ -3,7 +3,7 @@
 ## Current Session Focus
 Current Spec: docs/specs/011-strategy-simulator-v1.md
 Current Plan: docs/plans/011-strategy-simulator-v1-plan.md
-Active Task: Strategy Simulator v1 ops rollout (observability-only) + DeFi Coverage Blueprint adoption
+Active Task: DeFi Coverage Blueprint execution planning (MVP data sources)
 
 ## Recent Changes
 - 2026-02-01: Initialized project template
@@ -106,6 +106,7 @@ Active Task: Strategy Simulator v1 ops rollout (observability-only) + DeFi Cover
 - 2026-02-05: Adjusted Telegram report to hide StrategySim fields unless `SimStatus=OK` (v1.1 noise control) and added notifier tests — 2026-02-05
 - 2026-02-05: Added DeFi Coverage Blueprint to roadmap as master plan (coverage + unified data contract + risk/freshness/strategy/ops/decision view) — 2026-02-05
 - 2026-02-05: Ingested DeFi data sources MVP research into `docs/research/2026-02-defi-data-sources-mvp.md` — 2026-02-05
+- 2026-02-05: Drafted MVP execution plan for data sources integration (`docs/plans/012-defi-coverage-mvp-plan.md`) — 2026-02-05
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits
