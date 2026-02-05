@@ -98,7 +98,7 @@
       "t3_min_apy_premium": 3.0
     },
     "strategy_sim": {
-      "enabled": false,
+      "enabled": true,
       "max_candidates": 20,
       "supported_tiers": [
         "T1",
