@@ -1,7 +1,7 @@
-# Plan: DeFi Coverage MVP (Data Sources Integration)
+# Unified Plan: DeFi Coverage MVP + Freshness & Ops
 
 **Status:** Draft
-**Goal:** Integrate MVP data sources across DEX/LP, Lending, Staking/LST, and Perps Funding with a unified data contract and safe rollout.
+**Goal:** Integrate MVP data sources across DEX/LP, Lending, Staking/LST, and Perps Funding, while completing Phase 2 freshness (C+/D), non‑EVM visibility, and silent‑mode ops.
 
 ---
 
@@ -13,6 +13,14 @@
 - **Staking/LST:** Lido API + DeFiLlama (staking/vault categories)
 - **Perps Funding:** dYdX Market Data API + Binance Futures API (baseline)
 
+**Freshness (Phase 2 C+/D):**
+- **Aave direct re‑check** (replace deprecated aave‑api‑v2)
+- **Morpho API** + threshold calibration on VPS telemetry
+
+**Ops & Coverage gaps:**
+- **Non‑EVM strategy visibility** (explicit UNSUPPORTED reporting)
+- **Silent mode fix** (daily heartbeat “no opportunities”)
+
 **Non‑goals (MVP):**
 - Full historical time‑series backfill
 - Advanced PnL simulation (multi‑leg execution)
@@ -20,9 +28,9 @@
 
 ---
 
-## Phased Execution
+## Workstreams & Order
 
-### Phase 1 — DEX/LP (Discovery baseline)
+### Workstream A — DEX/LP (Discovery baseline)
 **Work:**
 - Ingest DeFiLlama LP pools into Scout
 - Add Uniswap v3 subgraph adapter for new‑pool detection
@@ -35,7 +43,7 @@
 
 ---
 
-### Phase 2 — Lending (Aave + aggregator)
+### Workstream B — Lending (Aave + aggregator)
 **Work:**
 - Ingest DeFiLlama lending pools
 - Add Aave v3 GraphQL adapter for high‑fidelity lending data
@@ -48,7 +56,7 @@
 
 ---
 
-### Phase 3 — Staking/LST
+### Workstream C — Staking/LST
 **Work:**
 - Add Lido API adapter for ETH staking APR
 - Use DeFiLlama staking/vault categories for LSD coverage
@@ -59,7 +67,7 @@
 
 ---
 
-### Phase 4 — Perps Funding
+### Workstream D — Perps Funding
 **Work:**
 - Add dYdX market data adapter (funding rate)
 - Add Binance Futures API adapter for baseline funding
@@ -67,6 +75,30 @@
 **DoD:**
 - Funding rates available for key perps markets
 - Baseline comparisons possible (DeFi vs CeFi)
+
+---
+
+### Workstream E — Freshness C+/D (Decision‑grade)
+**Work:**
+- Implement Aave direct re‑check (modern endpoint strategy)
+- Add Morpho API adapter
+- Calibrate divergence thresholds on VPS telemetry
+
+**DoD:**
+- Actionable candidates are FRESH‑gated
+- Divergence alerts triggered on outliers
+- Telemetry shows stable freshness coverage
+
+---
+
+### Workstream F — Ops & Coverage Completeness
+**Work:**
+- Non‑EVM explicit reporting path (UNSUPPORTED tag/counters)
+- Daily heartbeat when no opportunities found
+
+**DoD:**
+- No silent cycles: heartbeat confirms system health
+- Missed non‑EVM opportunities are visible in logs/reporting
 
 ---
 
@@ -99,4 +131,5 @@ Each candidate should expose:
 - Each class yields >0 candidates daily
 - No increase in false positives (security gates intact)
 - Freshness tags present for all new sources
+- Daily heartbeat confirms healthy “no‑signal” cycles
 

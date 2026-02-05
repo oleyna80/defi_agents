@@ -145,3 +145,4 @@
 - 2026-02-05: Added DeFi Coverage Blueprint (master plan) to roadmap for full coverage + data contract + risk/freshness/strategy/ops/decision view — 2026-02-05
 - 2026-02-05: Ingested DeFi data sources MVP research into `docs/research/2026-02-defi-data-sources-mvp.md` — 2026-02-05
 - 2026-02-05: Drafted MVP execution plan for DeFi data sources integration (`docs/plans/012-defi-coverage-mvp-plan.md`) — 2026-02-05
+- 2026-02-05: Unified plan updated to include freshness C+/D and ops items (non‑EVM visibility, heartbeat) — 2026-02-05
