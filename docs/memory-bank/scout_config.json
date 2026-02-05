@@ -10,7 +10,7 @@
     },
     "gas_efficiency": {
       "portfolio_total_usd": 10000,
-      "position_size_usd": 2500,
+      "position_size_usd": 1000,
       "min_monthly_net_profit_usd": 0.0,
       "estimated_roundtrip_gas_usd": 8.0,
       "holding_period_days": 45
