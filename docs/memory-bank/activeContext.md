@@ -105,6 +105,7 @@ Active Task: Strategy Simulator v1 ops rollout (observability-only) + DeFi Cover
 - 2026-02-05: Validated Strategy Simulator v1 on VPS with temporary loosened filters; StrategySim summary observed; PARTIAL/UNSUPPORTED downgraded to WATCHLIST; reverted to production thresholds and `strategy_sim.enabled=false` — 2026-02-05
 - 2026-02-05: Adjusted Telegram report to hide StrategySim fields unless `SimStatus=OK` (v1.1 noise control) and added notifier tests — 2026-02-05
 - 2026-02-05: Added DeFi Coverage Blueprint to roadmap as master plan (coverage + unified data contract + risk/freshness/strategy/ops/decision view) — 2026-02-05
+- 2026-02-05: Ingested DeFi data sources MVP research into `docs/research/2026-02-defi-data-sources-mvp.md` — 2026-02-05
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits
