@@ -267,3 +267,210 @@ def _run(coro):
     import asyncio
 
     return asyncio.run(coro)
+
+
+# --- Stablecoin Risk Policy Tests ---
+
+
+def test_classify_token_tier_t1():
+    """T1 stables (USDC, USDT, DAI, USDS) are classified as T1."""
+    cfg = ScoutConfig(min_tvl_usd=1, risk_policy={"enabled": True})
+    pool = _candidate("pool1", "Base", "USDC-USDT", 12, 10, 10_000_000)
+    status_map = {pool.address: SecurityResult.pass_as_tier1()}
+    scout = _scout(cfg, [pool], status_map)
+    
+    from defi_agents.scout.models import StableTier
+    assert scout._classify_token_tier("USDC") == StableTier.T1
+    assert scout._classify_token_tier("USDT") == StableTier.T1
+    assert scout._classify_token_tier("DAI") == StableTier.T1
+    assert scout._classify_token_tier("USDS") == StableTier.T1
+
+
+def test_classify_token_tier_t2():
+    """T2 stables (crvUSD, GHO, PYUSD) are classified as T2."""
+    cfg = ScoutConfig(min_tvl_usd=1, risk_policy={"enabled": True})
+    pool = _candidate("pool1", "Base", "GHO-USDC", 12, 10, 10_000_000)
+    status_map = {pool.address: SecurityResult.pass_as_tier1()}
+    scout = _scout(cfg, [pool], status_map)
+    
+    from defi_agents.scout.models import StableTier
+    assert scout._classify_token_tier("crvUSD") == StableTier.T2
+    assert scout._classify_token_tier("GHO") == StableTier.T2
+    assert scout._classify_token_tier("PYUSD") == StableTier.T2
+
+
+def test_classify_token_tier_t3():
+    """T3 speculative stables (USDe, TUSD, FDUSD) are classified as T3."""
+    cfg = ScoutConfig(min_tvl_usd=1, risk_policy={"enabled": True})
+    pool = _candidate("pool1", "Base", "USDe-USDC", 12, 10, 10_000_000)
+    status_map = {pool.address: SecurityResult.pass_as_tier1()}
+    scout = _scout(cfg, [pool], status_map)
+    
+    from defi_agents.scout.models import StableTier
+    assert scout._classify_token_tier("USDe") == StableTier.T3
+    assert scout._classify_token_tier("TUSD") == StableTier.T3
+    assert scout._classify_token_tier("FDUSD") == StableTier.T3
+
+
+def test_classify_pair_usd_stable_stable():
+    """USD-only pair is classified as USD_STABLE_STABLE."""
+    cfg = ScoutConfig(min_tvl_usd=1, risk_policy={"enabled": True})
+    pool = _candidate("pool1", "Base", "USDC-USDT", 12, 10, 10_000_000)
+    status_map = {pool.address: SecurityResult.pass_as_tier1()}
+    scout = _scout(cfg, [pool], status_map)
+    
+    from defi_agents.scout.models import PairCurrencyClass
+    pair_class, fx_exposure = scout._classify_pair(pool)
+    assert pair_class == PairCurrencyClass.USD_STABLE_STABLE
+    assert fx_exposure is False
+
+
+def test_classify_pair_fx_stable():
+    """USD/EUR mixed pair is classified as FX_STABLE with fx_exposure=True."""
+    cfg = ScoutConfig(min_tvl_usd=1, risk_policy={"enabled": True})
+    pool = _candidate("pool1", "Base", "EURC-USDC", 12, 10, 10_000_000)
+    status_map = {pool.address: SecurityResult.pass_as_tier1()}
+    scout = _scout(cfg, [pool], status_map)
+    
+    from defi_agents.scout.models import PairCurrencyClass
+    pair_class, fx_exposure = scout._classify_pair(pool)
+    assert pair_class == PairCurrencyClass.FX_STABLE
+    assert fx_exposure is True
+
+
+def test_blacklist_blocks_by_symbol():
+    """Blacklisted symbol is rejected before security calls."""
+    cfg = ScoutConfig(
+        min_tvl_usd=1,
+        risk_policy={"enabled": True},
+        token_buckets={"exclude_symbols": ["BADTOKEN"]},
+    )
+    pool = _candidate("pool1", "Base", "BADTOKEN-USDC", 12, 10, 10_000_000)
+    status_map = {pool.address: SecurityResult.pass_as_tier1()}
+    scout = _scout(cfg, [pool], status_map)
+    
+    blocked, blacklist_by = scout._check_blacklist(pool)
+    assert blocked is True
+    assert blacklist_by == "symbol"
+
+
+def test_blacklist_blocks_by_address():
+    """Blacklisted address is rejected before symbol check."""
+    bad_address = "0x" + ("b" * 40)
+    cfg = ScoutConfig(
+        min_tvl_usd=1,
+        risk_policy={"enabled": True},
+        token_buckets={"exclude_addresses": [bad_address]},
+    )
+    pool = ScoutCandidate.model_validate({
+        "pool": "pool1",
+        "project": "dex",
+        "chain": "Base",
+        "symbol": "USDC-USDT",
+        "address": bad_address,
+        "chain_id": 8453,
+        "tvlUsd": 10_000_000,
+        "apy": 12,
+        "apyBase": 12,
+        "apyMean30d": 10,
+    })
+    status_map = {pool.address: SecurityResult.pass_as_tier1()}
+    scout = _scout(cfg, [pool], status_map)
+    
+    blocked, blacklist_by = scout._check_blacklist(pool)
+    assert blocked is True
+    assert blacklist_by == "address"
+
+
+def test_metadata_contains_tier_and_class():
+    """Result metadata contains stable_tier, pair_currency_class, and fx_exposure."""
+    cfg = ScoutConfig(min_tvl_usd=1, risk_policy={"enabled": True})
+    pool = _candidate("pool1", "Base", "USDC-USDT", 12, 10, 10_000_000)
+    status_map = {pool.address: SecurityResult.pass_as_tier1()}
+    results = _run(_scout(cfg, [pool], status_map).analyze())
+    
+    assert len(results) == 1
+    meta = results[0].metadata
+    assert meta.get("stable_tier") == "T1"
+    assert meta.get("pair_currency_class") == "USD_STABLE_STABLE"
+    assert meta.get("fx_exposure") == "false"
+
+
+def test_fx_pair_has_fx_exposure_in_metadata():
+    """FX pair has fx_exposure=true in metadata."""
+    cfg = ScoutConfig(min_tvl_usd=1, risk_policy={"enabled": True})
+    pool = _candidate("pool1", "Base", "EURC-USDC", 12, 10, 10_000_000)
+    status_map = {pool.address: SecurityResult.pass_as_tier1()}
+    results = _run(_scout(cfg, [pool], status_map).analyze())
+    
+    assert len(results) == 1
+    meta = results[0].metadata
+    assert meta.get("pair_currency_class") == "FX_STABLE"
+    assert meta.get("fx_exposure") == "true"
+
+
+def test_fx_stable_priority_not_low_volatility():
+    """FX_STABLE pair must not be classified as LOW_VOLATILITY when risk policy enabled."""
+    from defi_agents.scout.models import PairCurrencyClass, PriorityTier
+
+    cfg = ScoutConfig(
+        min_tvl_usd=1,
+        risk_policy={"enabled": True, "fx_pairs_core_safe_allowed": False},
+    )
+    pool = _candidate("pool1", "Base", "EURC-USDC", 12, 10, 10_000_000)
+    scout = _scout(cfg, [pool], {pool.address: SecurityResult.pass_as_tier1()})
+
+    # Verify pair classification
+    pair_class, fx_exposure = scout._classify_pair(pool)
+    assert pair_class == PairCurrencyClass.FX_STABLE
+    assert fx_exposure is True
+
+    # Verify priority override
+    priority = scout._classify_priority(pool)
+    assert priority != PriorityTier.LOW_VOLATILITY
+    assert priority == PriorityTier.COIN_STABLE  # as per our override
+
+
+def test_fx_stable_sleeve_routing_when_core_safe_disallowed():
+    """FX_STABLE pair must be routed to yield_plus when fx_pairs_core_safe_allowed=false."""
+    from defi_agents.scout.models import PairCurrencyClass
+    from defi_agents.security.models import SecurityStatus
+
+    cfg = ScoutConfig(
+        min_tvl_usd=1,
+        risk_policy={"enabled": True, "fx_pairs_core_safe_allowed": False},
+    )
+    pool = _candidate("pool1", "Base", "EURC-USDC", 12, 10, 10_000_000)
+    scout = _scout(cfg, [pool], {pool.address: SecurityResult.pass_as_tier1()})
+
+    # Should be FX_STABLE
+    pair_class, _ = scout._classify_pair(pool)
+    assert pair_class == PairCurrencyClass.FX_STABLE
+
+    # Sleeve assignment with TRUSTED security (would normally be core_safe)
+    sleeve, reason = scout._assign_sleeve(pool, SecurityStatus.TRUSTED)
+    assert sleeve == "yield_plus"
+    assert reason is None
+
+
+def test_fx_stable_sleeve_routing_when_core_safe_allowed():
+    """FX_STABLE pair can be core_safe when fx_pairs_core_safe_allowed=true."""
+    from defi_agents.scout.models import PairCurrencyClass
+    from defi_agents.security.models import SecurityStatus
+
+    cfg = ScoutConfig(
+        min_tvl_usd=1,
+        risk_policy={"enabled": True, "fx_pairs_core_safe_allowed": True},
+    )
+    pool = _candidate("pool1", "Base", "EURC-USDC", 12, 10, 10_000_000)
+    scout = _scout(cfg, [pool], {pool.address: SecurityResult.pass_as_tier1()})
+
+    pair_class, _ = scout._classify_pair(pool)
+    assert pair_class == PairCurrencyClass.FX_STABLE
+
+    # With TRUSTED security and low volatility tier (but priority overridden to COIN_STABLE)
+    # However, tier will be COIN_STABLE, which is still eligible for core_safe.
+    # Let's just verify that sleeve is core_safe (since security is TRUSTED and tier is COIN_STABLE)
+    sleeve, reason = scout._assign_sleeve(pool, SecurityStatus.TRUSTED)
+    assert sleeve == "core_safe"
+    assert reason is None

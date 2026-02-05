@@ -7,7 +7,7 @@ from typing import List, Tuple
 from .config import ScoutConfig
 from .defillama_client import DeFiLlamaClient
 from .cache import ScoutDeduper
-from .models import PriorityTier, ScoutCandidate, ScoutResult
+from .models import PairCurrencyClass, PriorityTier, ScoutCandidate, ScoutResult, StableTier
 from ..security.auditor import SecurityAuditor
 from ..security.models import SecurityReason, SecuritySeverity, SecuritySource, SecurityStatus
 
@@ -55,12 +55,30 @@ class YieldScout:
         tactical_filtered = 0
         capacity_filtered = 0
         cost_filtered = 0
+        # Stablecoin risk policy counters
+        blacklist_filtered = 0
+        tier_counts: Counter[str] = Counter()
+        pair_class_counts: Counter[str] = Counter()
 
         for pool in addressable_candidates:
             # address + chain_id are guaranteed by selection above
             assert pool.address and pool.chain_id is not None
 
             target_type = pool.address_source or "TOKEN"
+
+            # Stablecoin risk policy: blacklist check (before security calls)
+            blocked, blacklist_by = self._check_blacklist(pool)
+            if blocked:
+                blacklist_filtered += 1
+                reason_counts[f"BLACKLIST_{blacklist_by.upper()}"] += 1
+                continue
+
+            # Classify for observability
+            pool_tier = self._get_pool_tier(pool)
+            pair_class, fx_exposure = self._classify_pair(pool)
+            tier_counts[pool_tier.value] += 1
+            pair_class_counts[pair_class.value] += 1
+
             sec = await self.auditor.evaluate(pool.address, str(pool.chain_id))
             if self._maybe_apply_lindy(pool, sec):
                 lindy_softened += 1
@@ -121,6 +139,10 @@ class YieldScout:
                             "benchmark_delta_apy": f"{benchmark_delta:.2f}",
                             "benchmark_threshold_apy": f"{benchmark_threshold:.2f}",
                             "warn_reasons": ",".join(reason_codes[:3]),
+                            # Stablecoin risk policy classification
+                            "stable_tier": pool_tier.value,
+                            "pair_currency_class": pair_class.value,
+                            "fx_exposure": "true" if fx_exposure else "false",
                         },
                         flags=self._flags(pool),
                     )
@@ -130,7 +152,7 @@ class YieldScout:
         logger.info(
             "Funnel metrics: raw=%s heuristics=%s addressable_selected=%s missing_address=%s missing_chain_id=%s "
             "addressable_total=%s security_counts=%s top_reasons=%s lindy_softened=%s exploration_slots=%s tactical_filtered=%s "
-            "capacity_filtered=%s cost_filtered=%s results=%s deduped=%s",
+            "capacity_filtered=%s cost_filtered=%s blacklist_filtered=%s results=%s deduped=%s",
             raw_count,
             heuristics_count,
             len(addressable_candidates),
@@ -144,9 +166,16 @@ class YieldScout:
             tactical_filtered,
             capacity_filtered,
             cost_filtered,
+            blacklist_filtered,
             len(results),
             len(deduped),
         )
+        if self.config.risk_policy.enabled:
+            logger.info(
+                "Stablecoin risk policy: tier_counts=%s pair_class_counts=%s",
+                dict(tier_counts),
+                dict(pair_class_counts),
+            )
         return sorted(deduped, key=lambda x: x.score, reverse=True)
 
     def _prioritize(self, pools: List[ScoutCandidate]) -> List[ScoutCandidate]:
@@ -178,6 +207,134 @@ class YieldScout:
 
     def _is_lindy_softened(self, security) -> bool:  # noqa: ANN001
         return any(getattr(r, "code", "") == "LINDY_SOFTENED" for r in getattr(security, "reasons", []) or [])
+
+    # --- Stablecoin Risk Policy helpers (Phase 1) ---
+
+    def _check_blacklist(self, pool: ScoutCandidate) -> Tuple[bool, str]:
+        """Check if pool should be blocked by blacklist.
+
+        Check order: address → underlyingTokens → symbol.
+        Returns: (blocked: bool, blacklist_by: str or empty).
+        """
+        if not self.config.risk_policy.enabled:
+            return False, ""
+
+        buckets = self.config.token_buckets
+
+        # Lazy‑compute normalized blacklist sets once per scout instance
+        if not hasattr(self, '_blacklist_address_lower'):
+            self._blacklist_address_lower = {a.lower() for a in buckets.exclude_addresses}
+            self._blacklist_symbol_upper = {s.upper() for s in buckets.exclude_symbols}
+
+        # Check by address first
+        if pool.address and pool.address.lower() in self._blacklist_address_lower:
+            return True, "address"
+
+        # Check underlying tokens
+        for token in pool.underlying_tokens or []:
+            token_lower = token.lower()
+            if token_lower in self._blacklist_address_lower:
+                return True, "token_address"
+            token_upper = token.upper()
+            if token_upper in self._blacklist_symbol_upper:
+                return True, "token_symbol"
+
+        # Check pool symbol
+        symbols = [s.strip().upper() for s in (pool.symbol or "").split("-") if s.strip()]
+        for sym in symbols:
+            if sym in self._blacklist_symbol_upper:
+                return True, "symbol"
+
+        return False, ""
+
+    def _classify_token_tier(self, symbol: str) -> StableTier:
+        """Classify a single token symbol into a stablecoin tier."""
+        sym_upper = symbol.strip().upper()
+        buckets = self.config.token_buckets
+
+        # T1: Core USD stables
+        t1_symbols = {"USDC", "USDT", "DAI", "USDS"}
+        if sym_upper in t1_symbols:
+            return StableTier.T1
+
+        # T2: Secondary stables
+        t2_symbols = {"CRVUSD", "GHO", "PYUSD"}
+        if sym_upper in t2_symbols:
+            return StableTier.T2
+
+        # T3: Speculative stables
+        speculative = {s.upper() for s in buckets.stablecoins_speculative}
+        if sym_upper in speculative:
+            return StableTier.T3
+
+        # Check if in any USD bucket
+        usd_all = {s.upper() for s in buckets.stablecoins_usd}
+        if sym_upper in usd_all:
+            # If in USD bucket but not T1/T2, it's T2 by default
+            return StableTier.T2
+
+        # Check if it's a EUR stable
+        eur_all = {s.upper() for s in buckets.stablecoins_eur}
+        if sym_upper in eur_all:
+            return StableTier.T2  # EUR stables are T2 by default
+
+        return StableTier.UNKNOWN
+
+    def _classify_pair(self, pool: ScoutCandidate) -> Tuple[PairCurrencyClass, bool]:
+        """Classify pool pair into currency class.
+
+        Returns: (pair_class, fx_exposure).
+        """
+        if not self.config.risk_policy.enabled:
+            return PairCurrencyClass.TOKEN_TOKEN, False
+
+        buckets = self.config.token_buckets
+        usd_set = {s.upper() for s in buckets.stablecoins_usd} | {s.upper() for s in buckets.stablecoins_speculative}
+        eur_set = {s.upper() for s in buckets.stablecoins_eur}
+        all_stables = usd_set | eur_set
+
+        symbols = [s.strip().upper() for s in (pool.symbol or "").split("-") if s.strip()]
+
+        if len(symbols) < 2:
+            # Single token or unrecognized format
+            if len(symbols) == 1 and symbols[0] in all_stables:
+                return PairCurrencyClass.TOKEN_STABLE, False
+            return PairCurrencyClass.TOKEN_TOKEN, False
+
+        # Classify each token
+        usd_count = sum(1 for s in symbols if s in usd_set)
+        eur_count = sum(1 for s in symbols if s in eur_set)
+        stable_count = usd_count + eur_count
+
+        # All USD stables
+        if usd_count == len(symbols):
+            return PairCurrencyClass.USD_STABLE_STABLE, False
+
+        # All EUR stables
+        if eur_count == len(symbols):
+            return PairCurrencyClass.EUR_STABLE_STABLE, False
+
+        # Mixed USD/EUR = FX exposure
+        if usd_count > 0 and eur_count > 0:
+            return PairCurrencyClass.FX_STABLE, True
+
+        # At least one stable + non-stable
+        if stable_count > 0 and stable_count < len(symbols):
+            return PairCurrencyClass.TOKEN_STABLE, False
+
+        return PairCurrencyClass.TOKEN_TOKEN, False
+
+    def _get_pool_tier(self, pool: ScoutCandidate) -> StableTier:
+        """Get the worst (highest risk) tier among pool tokens."""
+        symbols = [s.strip().upper() for s in (pool.symbol or "").split("-") if s.strip()]
+        if not symbols:
+            return StableTier.UNKNOWN
+
+        tiers = [self._classify_token_tier(s) for s in symbols]
+        # Priority: T3 > T2 > T1 > UNKNOWN (worst tier wins)
+        tier_priority = {StableTier.T3: 3, StableTier.T2: 2, StableTier.T1: 1, StableTier.UNKNOWN: 0}
+        worst = max(tiers, key=lambda t: tier_priority.get(t, 0))
+        return worst
 
     def _select_audit_candidates(self, prioritized: List[ScoutCandidate]) -> List[ScoutCandidate]:
         budget = max(1, int(self.config.max_audit_candidates))
@@ -295,6 +452,14 @@ class YieldScout:
         return candidates
 
     def _classify_priority(self, pool: ScoutCandidate) -> PriorityTier:
+        # Stablecoin risk policy: FX_STABLE pairs must not be classified as LOW_VOLATILITY
+        if self.config.risk_policy.enabled:
+            pair_class, _ = self._classify_pair(pool)
+            if pair_class == PairCurrencyClass.FX_STABLE:
+                # Force COIN_STABLE (or at least not LOW_VOLATILITY)
+                # If pool.stablecoin is True, we still override to COIN_STABLE
+                return PriorityTier.COIN_STABLE
+
         if pool.stablecoin is True:
             return PriorityTier.LOW_VOLATILITY
 
@@ -352,6 +517,13 @@ class YieldScout:
             if not sleeves.tactical_enabled:
                 return None, "TACTICAL_DISABLED"
             return "tactical_high_apy", None
+
+        # Stablecoin risk policy: FX_STABLE pairs cannot go into core_safe if not allowed
+        if self.config.risk_policy.enabled:
+            pair_class, _ = self._classify_pair(pool)
+            if pair_class == PairCurrencyClass.FX_STABLE and not self.config.risk_policy.fx_pairs_core_safe_allowed:
+                # Override any core_safe eligibility
+                return "yield_plus", None
 
         tier = self._classify_priority(pool)
         if security_status in {SecurityStatus.TRUSTED, SecurityStatus.PASS} and tier in {
