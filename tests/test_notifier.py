@@ -20,6 +20,13 @@ def _result(
     stable_tier: str | None = None,
     pair_class: str | None = None,
     fx_exposure: str | None = None,
+    sim_status: str | None = None,
+    sim_best_strategy: str | None = None,
+    sim_fit_score: str | None = None,
+    sim_exp_net_apy_min: str | None = None,
+    sim_exp_net_apy_max: str | None = None,
+    sim_risk_score: str | None = None,
+    sim_required_data_missing: str | None = None,
 ) -> ScoutResult:
     candidate = ScoutCandidate.model_validate(
         {
@@ -51,6 +58,20 @@ def _result(
         metadata["pair_currency_class"] = pair_class
     if fx_exposure is not None:
         metadata["fx_exposure"] = fx_exposure
+    if sim_status is not None:
+        metadata["sim_status"] = sim_status
+    if sim_best_strategy is not None:
+        metadata["sim_best_strategy"] = sim_best_strategy
+    if sim_fit_score is not None:
+        metadata["sim_fit_score"] = sim_fit_score
+    if sim_exp_net_apy_min is not None:
+        metadata["sim_exp_net_apy_min"] = sim_exp_net_apy_min
+    if sim_exp_net_apy_max is not None:
+        metadata["sim_exp_net_apy_max"] = sim_exp_net_apy_max
+    if sim_risk_score is not None:
+        metadata["sim_risk_score"] = sim_risk_score
+    if sim_required_data_missing is not None:
+        metadata["sim_required_data_missing"] = sim_required_data_missing
     return ScoutResult(
         candidate=candidate,
         security=SecurityResult(status=SecurityStatus.WARN, score=70),
@@ -160,3 +181,49 @@ def test_tags_not_included_when_flag_disabled():
     assert "FX_RISK" not in message
     # Ensure the "Tags" substring does not appear
     assert "Tags" not in message
+
+
+def test_strategy_fields_hidden_when_not_ok():
+    notifier = TelegramNotifier()
+    message = notifier._format_report([
+        _result(
+            priority=PriorityTier.COIN_COIN,
+            bucket="WARN/REPUTATION",
+            symbol="WETH-AERO",
+            sim_status="PARTIAL",
+            sim_best_strategy="clmm_range_harvest",
+            sim_fit_score="0",
+            sim_exp_net_apy_min="0.00",
+            sim_exp_net_apy_max="0.00",
+            sim_risk_score="100",
+            sim_required_data_missing="volume24h,fees24h",
+        )
+    ])
+    assert "BestStrategy" not in message
+    assert "SimStatus" not in message
+    assert "FitScore" not in message
+    assert "ExpNetAPY" not in message
+    assert "SimRisk" not in message
+    assert "MissingData" not in message
+
+
+def test_strategy_fields_visible_when_ok():
+    notifier = TelegramNotifier()
+    message = notifier._format_report([
+        _result(
+            priority=PriorityTier.COIN_COIN,
+            bucket="WARN/REPUTATION",
+            symbol="WETH-AERO",
+            sim_status="OK",
+            sim_best_strategy="clmm_range_harvest",
+            sim_fit_score="42",
+            sim_exp_net_apy_min="5.00",
+            sim_exp_net_apy_max="9.00",
+            sim_risk_score="25",
+        )
+    ])
+    assert "BestStrategy:clmm_range_harvest" in message
+    assert "SimStatus:OK" in message
+    assert "FitScore:42" in message
+    assert "ExpNetAPY:5.00-9.00%" in message
+    assert "SimRisk:25" in message

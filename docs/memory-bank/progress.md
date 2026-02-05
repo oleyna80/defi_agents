@@ -141,3 +141,4 @@
 - 2026-02-04: Phase C kickoff completed for freshness: multi-chain Graph source registry + Aerodrome adapter scaffold, with Aave re-check moved to next iteration due deprecated v2 endpoint — 2026-02-04
 - 2026-02-05: Added ops runbook for Strategy Simulator v1 safe activation + debug checklist (`docs/runbooks/strategy_sim_v1_ops.md`) — 2026-02-05
 - 2026-02-05: Strategy Simulator v1 validated on VPS (temporary loosened filters for candidates, StrategySim summary observed, PARTIAL/UNSUPPORTED downgraded to WATCHLIST), then rolled back to production thresholds with `strategy_sim.enabled=false` — 2026-02-05
+- 2026-02-05: Telegram report now hides StrategySim fields unless `SimStatus=OK` (noise control), with notifier tests updated — 2026-02-05
