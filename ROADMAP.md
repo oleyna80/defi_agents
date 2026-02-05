@@ -34,6 +34,8 @@
 ## 🟡 Phase 2: Pipeline Relaxation (Приоритет: High, IN PROGRESS)
 *Проблема: Бот работает стабильно, но находит 0 кандидатов из-за слишком строгих фильтров.*
 
+- **Исполнительный план:** `docs/plans/012-defi-coverage-mvp-plan.md`
+
 - [x] **Policy v1 agreed (Lindy + output buckets):**
     - Lindy v1: `TVL >= $100M` и `age >= 180d` смягчают только audit/reputation сигналы (до `WARN`), но не обходят критические tech-флаги.
     - Выдача в 2 корзины: `SAFE` и `LINDY/WARN` (manual review).
