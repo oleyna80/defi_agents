@@ -74,6 +74,10 @@
     - Разрешить `unknown` аудиты для “Blue Chip” протоколов (Aave, Uniswap, Curve) через реестр/whitelist, а не через хардкод.
 - [ ] **Fix "Silent Mode":**
     - Настроить отправку уведомления "No opportunities found" раз в сутки (Heartbeat), чтобы подтверждать работоспособность.
+- [ ] **Scout: Staking Yield Discovery (новый источник):**
+    - Добавить discovery не только LP‑пулов, но и стейкинг‑доходности (LST / chain‑native / yield‑bearing stables).
+    - Классифицировать как отдельный тип кандидата (`staking` / `yield-bearing`) с метриками `apy`, `tvl`, `lockup`, `unbonding`, `slashing risk`.
+    - Цель: расширить “сырьё” для Strategy Simulator.
 
 ---
 
@@ -148,6 +152,9 @@
 
 - [ ] **Dashboard:** Простая веб-страница или сообщение с текущим статусом портфеля (вместо чтения логов).
 - [ ] **Execution:** Автоматический вход в позицию (пока только алерты, execution — следующий большой шаг).
+- [ ] **Strategy ROI Guardrail:**
+    - Сложные стратегии должны превышать базовую доходность стейбл‑пулов.
+    - Ввести baseline‑порог (например: `stable_lp_baseline_apy`) и отдавать “strategy‑only” сигналы, если `expected_net_apy > baseline`.
 - [ ] **Retry Policy:** Добавить умные повторы (backoff) для внешних API (DeFiLlama), чтобы избегать ошибок 429.
 - [ ] **Ops Invariants (SSOT):**
     - Явно зафиксировать правило “single scheduler”: VPS systemd *или* GitHub Actions, но не оба одновременно.
