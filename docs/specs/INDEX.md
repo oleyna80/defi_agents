@@ -11,4 +11,5 @@
 - 007-pipeline-relaxation-v1.md
 - 009-investor-profiles-allocation.md
 - 010-freshness-recheck-v1.md
+- 012-defi-coverage-mvp-dex-lp.md
 - (add specs here)

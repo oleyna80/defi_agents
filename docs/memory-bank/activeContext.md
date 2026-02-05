@@ -1,9 +1,9 @@
 # Active Context
 
 ## Current Session Focus
-Current Spec: docs/specs/011-strategy-simulator-v1.md
-Current Plan: docs/plans/011-strategy-simulator-v1-plan.md
-Active Task: Unified plan for DeFi coverage + freshness + ops (MVP execution)
+Current Spec: docs/specs/012-defi-coverage-mvp-dex-lp.md
+Current Plan: docs/plans/012-defi-coverage-mvp-plan.md
+Active Task: DEX/LP discovery spec (Workstream A) under unified coverage plan
 
 ## Recent Changes
 - 2026-02-01: Initialized project template
@@ -108,6 +108,7 @@ Active Task: Unified plan for DeFi coverage + freshness + ops (MVP execution)
 - 2026-02-05: Ingested DeFi data sources MVP research into `docs/research/2026-02-defi-data-sources-mvp.md` — 2026-02-05
 - 2026-02-05: Drafted MVP execution plan for data sources integration (`docs/plans/012-defi-coverage-mvp-plan.md`) — 2026-02-05
 - 2026-02-05: Unified plan updated to include freshness C+/D and ops items (non‑EVM visibility, heartbeat) — 2026-02-05
+- 2026-02-05: Drafted DEX/LP discovery spec for DeFi coverage MVP (`docs/specs/012-defi-coverage-mvp-dex-lp.md`) — 2026-02-05
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits
