@@ -139,3 +139,4 @@
 - 2026-02-04: Phase A freshness foundation completed; Phase B adapter implementation queued next — 2026-02-04
 - 2026-02-04: Phase B freshness adapter MVP completed (feature-flagged rollout) — 2026-02-04
 - 2026-02-04: Phase C kickoff completed for freshness: multi-chain Graph source registry + Aerodrome adapter scaffold, with Aave re-check moved to next iteration due deprecated v2 endpoint — 2026-02-04
+- 2026-02-05: Added ops runbook for Strategy Simulator v1 safe activation + debug checklist (`docs/runbooks/strategy_sim_v1_ops.md`) — 2026-02-05

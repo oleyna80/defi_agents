@@ -1,9 +1,9 @@
 # Active Context
 
 ## Current Session Focus
-Current Spec: docs/specs/010-freshness-recheck-v1.md
-Current Plan: docs/plans/010-freshness-recheck-v1-plan.md
-Active Task: Phase 2 freshness Phase C (multi-chain source registry + non-Ethereum adapter coverage)
+Current Spec: docs/specs/011-strategy-simulator-v1.md
+Current Plan: docs/plans/011-strategy-simulator-v1-plan.md
+Active Task: Strategy Simulator v1 ops rollout (observability-only) + runbook formalization
 
 ## Recent Changes
 - 2026-02-01: Initialized project template
@@ -100,6 +100,8 @@ Active Task: Phase 2 freshness Phase C (multi-chain source registry + non-Ethere
 - 2026-02-04: Expanded freshness source registry to non-Ethereum chains using Graph subgraph IDs (`Ethereum`, `Arbitrum`, `Base`, `BSC/Binance`, `Avalanche`) and optional `GRAPH_API_KEY` env wiring
 - 2026-02-04: Added `AerodromeSubgraphAdapter` scaffold (project-keyword routing for `aerodrome/slipstream/velodrome`) with explicit safe fallback to `UNVERIFIED` when endpoint/key is missing
 - 2026-02-04: Revalidated full suite after Phase C changes (`42 passed`)
+
+- 2026-02-05: Added ops runbook for Strategy Simulator v1 safe activation and debug checklist (`docs/runbooks/strategy_sim_v1_ops.md`) — 2026-02-05
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits
