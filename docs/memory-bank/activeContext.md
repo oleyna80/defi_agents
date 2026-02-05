@@ -102,6 +102,7 @@ Active Task: Strategy Simulator v1 ops rollout (observability-only) + runbook fo
 - 2026-02-04: Revalidated full suite after Phase C changes (`42 passed`)
 
 - 2026-02-05: Added ops runbook for Strategy Simulator v1 safe activation and debug checklist (`docs/runbooks/strategy_sim_v1_ops.md`) — 2026-02-05
+- 2026-02-05: Validated Strategy Simulator v1 on VPS with temporary loosened filters; StrategySim summary observed; PARTIAL/UNSUPPORTED downgraded to WATCHLIST; reverted to production thresholds and `strategy_sim.enabled=false` — 2026-02-05
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits
