@@ -110,6 +110,7 @@ Active Task: DEX/LP discovery implementation plan (Workstream A)
 - 2026-02-05: Unified plan updated to include freshness C+/D and ops items (non‑EVM visibility, heartbeat) — 2026-02-05
 - 2026-02-05: Drafted DEX/LP discovery spec for DeFi coverage MVP (`docs/specs/012-defi-coverage-mvp-dex-lp.md`) — 2026-02-05
 - 2026-02-05: Drafted DEX/LP discovery implementation plan (`docs/plans/012-defi-coverage-mvp-dex-lp-plan.md`) — 2026-02-05
+- 2026-02-05: Added RooCode agent skills (SSOT prompts) under `.roo/skills/` for memory sync, prod-safe review, spec writing, and VPS ops ask-first — 2026-02-05
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits

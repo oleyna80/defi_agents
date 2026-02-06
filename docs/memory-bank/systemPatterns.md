@@ -313,6 +313,11 @@
   - Ops/observability + decision‑grade reporting as first‑class requirements.
   - Rationale: ensure full market coverage without degrading safety or actionability.
 
+- 2026-02-05: RooCode skills as SSOT prompts:
+  - Store reusable “agent skills” under `.roo/skills/*/SKILL.md` in the repository.
+  - Skills encode mandatory process (Memory Bank sync), prod-safe review rubric, spec-writing flow, and VPS ops ask-first discipline.
+  - Rationale: keep multiple agents aligned on process, safety, and output format.
+
 ## Conventions
 - Naming:
 - Testing:
