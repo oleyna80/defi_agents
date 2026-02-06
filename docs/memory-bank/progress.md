@@ -149,3 +149,4 @@
 - 2026-02-05: Drafted DEX/LP discovery spec for DeFi coverage MVP (`docs/specs/012-defi-coverage-mvp-dex-lp.md`) — 2026-02-05
 - 2026-02-05: Drafted DEX/LP discovery implementation plan (`docs/plans/012-defi-coverage-mvp-dex-lp-plan.md`) — 2026-02-05
 - 2026-02-05: Added RooCode agent skills under `.roo/skills/` (memory sync, prod-safe review, spec writer, VPS ops ask-first) — 2026-02-05
+- 2026-02-05: Expanded RooCode skills pack under `.roo/skills/` (funnel debug, freshness rollout, safe config edits, report quality, adapter engineering) — 2026-02-05

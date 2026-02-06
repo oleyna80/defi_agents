@@ -317,6 +317,7 @@
   - Store reusable “agent skills” under `.roo/skills/*/SKILL.md` in the repository.
   - Skills encode mandatory process (Memory Bank sync), prod-safe review rubric, spec-writing flow, and VPS ops ask-first discipline.
   - Rationale: keep multiple agents aligned on process, safety, and output format.
+  - Extended set covers funnel debugging, freshness rollout, safe config edits, report quality, and adapter engineering.
 
 ## Conventions
 - Naming:
