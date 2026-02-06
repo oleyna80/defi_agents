@@ -112,6 +112,7 @@ Active Task: DEX/LP discovery implementation plan (Workstream A)
 - 2026-02-05: Drafted DEX/LP discovery implementation plan (`docs/plans/012-defi-coverage-mvp-dex-lp-plan.md`) — 2026-02-05
 - 2026-02-05: Added RooCode agent skills (SSOT prompts) under `.roo/skills/` for memory sync, prod-safe review, spec writing, and VPS ops ask-first — 2026-02-05
 - 2026-02-05: Expanded RooCode skills pack for project operations (funnel debug, freshness rollout, safe config edits, report quality, adapter engineering) — 2026-02-05
+- 2026-02-05: Lowered Scout `min_tvl_usd` baseline to $500k to widen DEX/LP discovery intake — 2026-02-05
 
 ## Open Questions / Decisions
 - Debank Cloud auth requirements and rate limits
