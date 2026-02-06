@@ -31,6 +31,10 @@
 - Plan 008 (L3 AI-Analyst): production hardening and real provider integration
 
 ## Completed
+- Hardened Uniswap DEX discovery adapter logs to mask Graph gateway API keys and avoid logging raw response text on failures — 2026-02-06
+- Added Scout lending snapshot extraction from DeFiLlama for lending markets: top ETH supply APY, top BTC supply APY, and minimum stablecoin borrow APR — 2026-02-06
+- Wired lending snapshot into orchestrator logs and Telegram report (`Lending Snapshot` section) without changing core scoring/security/freshness pipeline behavior — 2026-02-06
+- Added lending snapshot unit tests (`tests/test_lending_snapshot.py`) and notifier coverage for snapshot rendering; full suite green (`78 passed`) — 2026-02-06
 - Workstream A (DEX/LP Discovery minimal): added Uniswap v3 new-pool adapter with bounded config controls (`enabled`, `timeout_seconds`, `max_pools`, `min_tvl_usd`, paging/order) and fail-safe non-crashing behavior — 2026-02-06
 - Wired discovery into Scout before security gate and attached metadata (`dex_new_pool`, `pool_age_minutes`, `source_timestamp`, `freshness_status=UNVERIFIED`) for discovered pools — 2026-02-06
 - Added DEX per-cycle counters log line in orchestrator (`llama/new/filtered/errors/timeouts/total`) — 2026-02-06

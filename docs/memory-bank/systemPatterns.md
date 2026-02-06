@@ -267,6 +267,16 @@
   - If `pool_id` looks like an onchain contract address (`0x...`), link to chain explorer (by `chain_id`) for verification.
   - Rationale: reduce friction from alert -> manual verification -> decision, including DEX discovery rows not present in DefiLlama yet.
 
+- 2026-02-06: Lending snapshot side-channel pattern:
+  - Scout computes lending highlights from the same DeFiLlama universe as a separate snapshot (`best ETH supply`, `best BTC supply`, `lowest stable borrow`) and keeps core candidate ranking/filtering unchanged.
+  - Snapshot uses borrow-specific fields (`apyBaseBorrow`, `apyRewardBorrow`) and can include low-APY markets even when global `min_apy` is higher.
+  - Rationale: expose lending entry signals without weakening risk-first discovery gates for the main opportunity feed.
+
+- 2026-02-06: Discovery error logging hygiene pattern:
+  - DEX discovery adapters must never log raw Graph gateway endpoints with embedded API keys; logs must sanitize `/api/<key>/` to `/api/***/`.
+  - Avoid logging raw HTTP response text for upstream API failures; log status/error class only.
+  - Rationale: keep troubleshooting signal while preventing credential leakage to journal/log sinks.
+
 - 2026-02-04: Freshness re-check gating pattern (spec 010):
   - Keep broad intake from DeFiLlama, then re-check shortlist candidates before Telegram publication.
   - Attach freshness metadata (`FRESH/STALE/UNVERIFIED`, age, staleness score, divergence deltas).

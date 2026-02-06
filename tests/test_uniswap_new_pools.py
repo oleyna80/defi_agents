@@ -93,3 +93,9 @@ def test_uniswap_new_pools_adapter_fail_safe_timeout(monkeypatch):
     assert result.candidates == []
     assert result.stats.dex_timeout_count == 1
     assert result.stats.dex_error_count == 0
+
+
+def test_sanitize_endpoint_masks_graph_key():
+    endpoint = "https://gateway.thegraph.com/api/abc123SECRET/subgraphs/id/QmTest"
+    masked = UniswapV3NewPoolsAdapter._sanitize_endpoint(endpoint)
+    assert masked == "https://gateway.thegraph.com/api/***/subgraphs/id/QmTest"

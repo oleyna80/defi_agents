@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import logging
 import os
+import re
 from typing import Any
 
 import httpx
@@ -217,13 +218,27 @@ class UniswapV3NewPoolsAdapter:
 
     async def _query(self, endpoint: str, query: str, variables: dict[str, Any], timeout_seconds: int) -> dict[str, Any]:
         payload = {"query": query, "variables": variables}
-        async with httpx.AsyncClient(timeout=float(timeout_seconds)) as client:
-            resp = await client.post(endpoint, json=payload)
-        resp.raise_for_status()
-        body = resp.json()
-        if body.get("errors"):
-            raise RuntimeError("graphql_errors")
-        data = body.get("data")
-        if not isinstance(data, dict):
-            raise RuntimeError("invalid_graphql_data")
-        return data
+        safe_endpoint = self._sanitize_endpoint(endpoint)
+        try:
+            async with httpx.AsyncClient(timeout=float(timeout_seconds)) as client:
+                resp = await client.post(endpoint, json=payload)
+            resp.raise_for_status()
+            body = resp.json()
+            if body.get("errors"):
+                logger.warning("GraphQL errors for %s", safe_endpoint)
+                raise RuntimeError("graphql_errors")
+            data = body.get("data")
+            if not isinstance(data, dict):
+                logger.warning("GraphQL data missing or not dict for %s", safe_endpoint)
+                raise RuntimeError("invalid_graphql_data")
+            return data
+        except httpx.HTTPStatusError as e:
+            logger.warning("HTTP %s for %s", e.response.status_code, safe_endpoint)
+            raise RuntimeError("http_error") from e
+        except httpx.RequestError as e:
+            logger.warning("Request error for %s: %s", safe_endpoint, e.__class__.__name__)
+            raise RuntimeError("request_error") from e
+
+    @staticmethod
+    def _sanitize_endpoint(endpoint: str) -> str:
+        return re.sub(r"/api/[^/]+/", "/api/***/", endpoint)

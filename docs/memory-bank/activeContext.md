@@ -6,6 +6,10 @@ Current Plan: docs/plans/012-defi-coverage-mvp-dex-lp-plan.md
 Active Task: DEX/LP discovery implementation plan (Workstream A)
 
 ## Recent Changes
+- 2026-02-06: Hardened Uniswap DEX discovery logging to mask Graph API key in endpoint logs (`/api/***/`) and avoid raw response body logging on GraphQL/HTTP errors — 2026-02-06
+- 2026-02-06: Added Scout lending-market snapshot from DeFiLlama (`best ETH supply APY`, `best BTC supply APY`, `lowest stable borrow APR`) using side-channel parsing that does not alter core candidate filters — 2026-02-06
+- 2026-02-06: Wired lending snapshot observability into cycle logs (`Lending snapshot: best_eth_supply/best_btc_supply/lowest_stable_borrow`) and Telegram report section `Lending Snapshot` — 2026-02-06
+- 2026-02-06: Added tests for lending snapshot selection and report rendering; full suite green (`78 passed`) — 2026-02-06
 - 2026-02-06: Implemented Workstream A (minimal) DEX/LP discovery: added Uniswap v3 new-pool adapter with bounded GraphQL query config (`enabled`, `timeout`, `max_pools`, `min_tvl_usd`, paging/order) and fail-safe behavior (adapter errors/timeouts do not break cycle) — 2026-02-06
 - 2026-02-06: Wired discovery into Scout before security gate in [`YieldScout.analyze()`](src/defi_agents/scout/scout.py:30), attaching metadata (`dex_new_pool`, `pool_age_minutes`, `source_timestamp`, `freshness_status=UNVERIFIED`) to discovered candidates — 2026-02-06
 - 2026-02-06: Added DEX discovery counters logging in [`main.py:run_sentinel_cycle()`](main.py:71): llama/new/filtered/errors/timeouts/total — 2026-02-06
