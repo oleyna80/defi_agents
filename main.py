@@ -109,6 +109,29 @@ async def run_sentinel_cycle() -> None:
                 dex_stats.dex_discovery_total,
                 config.dex_discovery.uniswap_v3_new_pools.enabled,
             )
+        lending_snapshot = getattr(scout, "last_lending_snapshot", None)
+        if lending_snapshot is not None and lending_snapshot.has_any():
+            eth_supply = (
+                f"{lending_snapshot.best_eth_supply.metric_value_pct:.2f}%"
+                if lending_snapshot.best_eth_supply
+                else "n/a"
+            )
+            btc_supply = (
+                f"{lending_snapshot.best_btc_supply.metric_value_pct:.2f}%"
+                if lending_snapshot.best_btc_supply
+                else "n/a"
+            )
+            stable_borrow = (
+                f"{lending_snapshot.lowest_stable_borrow.metric_value_pct:.2f}%"
+                if lending_snapshot.lowest_stable_borrow
+                else "n/a"
+            )
+            logger.info(
+                "Lending snapshot: best_eth_supply=%s best_btc_supply=%s lowest_stable_borrow=%s",
+                eth_supply,
+                btc_supply,
+                stable_borrow,
+            )
         opportunities = await l3_manager.process_batch(opportunities)
 
         # Save to history (post hard filters + security gate)
@@ -224,7 +247,7 @@ async def run_sentinel_cycle() -> None:
         )
         # Report both actionable and watchlist sections with clear labels.
         if report_picks:
-            await notifier.send_alpha_report(report_picks)
+            await notifier.send_alpha_report(report_picks, lending_snapshot=lending_snapshot)
             logger.info(
                 "Reported %s opportunities (safe=%s warn=%s actionable=%s watchlist=%s).",
                 len(report_picks),

@@ -7,7 +7,7 @@ from typing import List, Tuple
 from .config import ScoutConfig
 from .defillama_client import DeFiLlamaClient
 from .cache import ScoutDeduper
-from .models import PairCurrencyClass, PriorityTier, ScoutCandidate, ScoutResult, StableTier
+from .models import LendingSnapshot, PairCurrencyClass, PriorityTier, ScoutCandidate, ScoutResult, StableTier
 from .uniswap_v3_new_pools import DexDiscoveryStats, UniswapV3NewPoolsAdapter
 from ..security.auditor import SecurityAuditor
 from ..security.models import SecurityReason, SecuritySeverity, SecuritySource, SecurityStatus
@@ -29,8 +29,15 @@ class YieldScout:
         self.deduper = deduper or ScoutDeduper(ttl_seconds=self.config.dedupe_ttl_seconds)
         self._new_pools_adapter = UniswapV3NewPoolsAdapter(config)
         self.last_discovery_stats = DexDiscoveryStats()
+        self.last_lending_snapshot = LendingSnapshot()
 
     async def analyze(self) -> List[ScoutResult]:
+        try:
+            self.last_lending_snapshot = await self.client.get_lending_snapshot()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Lending snapshot fetch failed: %s", exc.__class__.__name__)
+            self.last_lending_snapshot = LendingSnapshot()
+
         pools = await self.client.get_pools()
         discovery = await self._new_pools_adapter.fetch_new_pools(self.config.target_chains)
         if discovery.candidates:

@@ -102,6 +102,10 @@ class ScoutCandidate(BaseModel):
     apy: float
     apy_base: Optional[float] = Field(alias="apyBase", default=0.0)
     apy_reward: Optional[float] = Field(alias="apyReward", default=0.0)
+    apy_base_borrow: Optional[float] = Field(alias="apyBaseBorrow", default=None)
+    apy_reward_borrow: Optional[float] = Field(alias="apyRewardBorrow", default=None)
+    total_supply_usd: Optional[float] = Field(alias="totalSupplyUsd", default=None)
+    total_borrow_usd: Optional[float] = Field(alias="totalBorrowUsd", default=None)
     reward_tokens: List[str] = Field(alias="rewardTokens", default_factory=list)
     apy_mean_30d: Optional[float] = Field(alias="apyMean30d", default=None)
     stablecoin: Optional[bool] = Field(alias="stablecoin", default=None)
@@ -133,3 +137,24 @@ class ScoutResult(BaseModel):
     priority: PriorityTier
     metadata: Dict[str, str] = Field(default_factory=dict)
     flags: List[str] = Field(default_factory=list)
+
+
+class LendingSnapshotItem(BaseModel):
+    candidate: ScoutCandidate
+    metric_name: str
+    metric_value_pct: float
+
+
+class LendingSnapshot(BaseModel):
+    best_eth_supply: Optional[LendingSnapshotItem] = None
+    best_btc_supply: Optional[LendingSnapshotItem] = None
+    lowest_stable_borrow: Optional[LendingSnapshotItem] = None
+
+    def has_any(self) -> bool:
+        return any(
+            [
+                self.best_eth_supply is not None,
+                self.best_btc_supply is not None,
+                self.lowest_stable_borrow is not None,
+            ]
+        )

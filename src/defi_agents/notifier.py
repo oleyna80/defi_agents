@@ -8,7 +8,7 @@ from typing import List
 
 import httpx
 
-from .scout.models import PriorityTier, ScoutResult
+from .scout.models import LendingSnapshot, PriorityTier, ScoutCandidate, ScoutResult
 
 
 class TelegramNotifier:
@@ -17,8 +17,12 @@ class TelegramNotifier:
         self.chat_id = os.getenv("TELEGRAM_CHAT_ID") or os.getenv("CHAT_ID")
         self.include_tags = include_tags
 
-    async def send_alpha_report(self, results: List[ScoutResult]) -> None:
-        message = self._format_report(results)
+    async def send_alpha_report(
+        self,
+        results: List[ScoutResult],
+        lending_snapshot: LendingSnapshot | None = None,
+    ) -> None:
+        message = self._format_report(results, lending_snapshot=lending_snapshot)
         for chunk in self._chunk_message(message):
             await self._send(chunk)
 
@@ -62,12 +66,17 @@ class TelegramNotifier:
         logging.error("Telegram notification failed after retries.")
         return False
 
-    def _format_report(self, results: List[ScoutResult]) -> str:
+    def _format_report(
+        self,
+        results: List[ScoutResult],
+        lending_snapshot: LendingSnapshot | None = None,
+    ) -> str:
         lines = [
             "*Scout Report — Decision View*",
             "Legend: 🟢 `SAFE` | 🟡 `WARN/REPUTATION`/`LINDY/WARN` | 🟠 `WARN/SECURITY`",
             "",
         ]
+        self._append_lending_snapshot(lines, lending_snapshot)
         sections = [
             (PriorityTier.LOW_VOLATILITY, "1) Stable/Stable"),
             (PriorityTier.COIN_STABLE, "2) Token/Stable"),
@@ -139,6 +148,38 @@ class TelegramNotifier:
             lines.append("")
         return "\n".join(lines)
 
+    def _append_lending_snapshot(
+        self,
+        lines: List[str],
+        lending_snapshot: LendingSnapshot | None,
+    ) -> None:
+        if lending_snapshot is None or not lending_snapshot.has_any():
+            return
+
+        lines.append("*Lending Snapshot*")
+        if lending_snapshot.best_eth_supply:
+            item = lending_snapshot.best_eth_supply
+            lines.append(
+                f"- Best ETH supply: `{item.candidate.chain}` `{item.candidate.symbol}` | "
+                f"`{item.candidate.project}` | Supply APY {item.metric_value_pct:.2f}% | "
+                f"TVL {self._format_tvl(item.candidate.tvl_usd)} | [Pool]({self._pool_link_from_candidate(item.candidate)})"
+            )
+        if lending_snapshot.best_btc_supply:
+            item = lending_snapshot.best_btc_supply
+            lines.append(
+                f"- Best BTC supply: `{item.candidate.chain}` `{item.candidate.symbol}` | "
+                f"`{item.candidate.project}` | Supply APY {item.metric_value_pct:.2f}% | "
+                f"TVL {self._format_tvl(item.candidate.tvl_usd)} | [Pool]({self._pool_link_from_candidate(item.candidate)})"
+            )
+        if lending_snapshot.lowest_stable_borrow:
+            item = lending_snapshot.lowest_stable_borrow
+            lines.append(
+                f"- Cheapest stable borrow: `{item.candidate.chain}` `{item.candidate.symbol}` | "
+                f"`{item.candidate.project}` | Borrow APR {item.metric_value_pct:.2f}% | "
+                f"TVL {self._format_tvl(item.candidate.tvl_usd)} | [Pool]({self._pool_link_from_candidate(item.candidate)})"
+            )
+        lines.append("")
+
     def _chunk_message(self, text: str, max_len: int = 3500) -> List[str]:
         chunks: List[str] = []
         current = ""
@@ -175,13 +216,16 @@ class TelegramNotifier:
         return f"${value:.0f}"
 
     def _pool_link(self, result: ScoutResult) -> str:
-        pool_id = getattr(result.candidate, "pool_id", "") or ""
+        return self._pool_link_from_candidate(result.candidate)
+
+    def _pool_link_from_candidate(self, candidate: ScoutCandidate) -> str:
+        pool_id = getattr(candidate, "pool_id", "") or ""
         if not pool_id:
             return "https://defillama.com/yields"
 
         # If pool_id looks like an onchain contract address (DEX discovery), link to a chain explorer.
         if re.fullmatch(r"0x[a-fA-F0-9]{40}", pool_id):
-            chain_id = getattr(result.candidate, "chain_id", None)
+            chain_id = getattr(candidate, "chain_id", None)
             explorer = {
                 1: "https://etherscan.io/address/",
                 10: "https://optimistic.etherscan.io/address/",

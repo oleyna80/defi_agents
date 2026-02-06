@@ -5,7 +5,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from defi_agents.notifier import TelegramNotifier
-from defi_agents.scout.models import PriorityTier, ScoutCandidate, ScoutResult
+from defi_agents.scout.models import LendingSnapshot, LendingSnapshotItem, PriorityTier, ScoutCandidate, ScoutResult
 from defi_agents.security.models import SecurityResult, SecurityStatus
 
 
@@ -116,6 +116,32 @@ def test_report_includes_decision_fields_and_colors():
     assert "Net@1k $7.50/mo" in message
     assert "Reasons `REPUTATION_UNAVAILABLE`" in message
     assert "[Pool](https://defillama.com/yields/pool/pool1)" in message
+
+
+def test_report_includes_lending_snapshot_section():
+    notifier = TelegramNotifier()
+    candidate_eth = ScoutCandidate.model_validate(
+        {
+            "pool": "eth-market",
+            "project": "aave-v3",
+            "chain": "Ethereum",
+            "symbol": "WETH",
+            "address": "0x1111111111111111111111111111111111111111",
+            "chain_id": 1,
+            "tvlUsd": 20_000_000,
+            "apy": 4.5,
+            "apyBase": 4.5,
+            "apyReward": 0.0,
+        }
+    )
+    snapshot = LendingSnapshot(
+        best_eth_supply=LendingSnapshotItem(candidate=candidate_eth, metric_name="supply_apy", metric_value_pct=4.5)
+    )
+    message = notifier._format_report([], lending_snapshot=snapshot)
+    assert "Lending Snapshot" in message
+    assert "Best ETH supply" in message
+    assert "Supply APY 4.50%" in message
+    assert "[Pool](https://defillama.com/yields/pool/eth-market)" in message
 
 
 def test_pool_link_uses_explorer_for_address_like_pool_id():

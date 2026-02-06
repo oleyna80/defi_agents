@@ -7,7 +7,7 @@ from typing import List
 import httpx
 
 from .config import ScoutConfig
-from .models import ScoutCandidate
+from .models import LendingSnapshot, LendingSnapshotItem, ScoutCandidate
 
 
 class DeFiLlamaClient:
@@ -18,12 +18,40 @@ class DeFiLlamaClient:
         self._timeout = timeout_seconds
 
     async def get_pools(self) -> List[ScoutCandidate]:
+        pools = await self._fetch_raw_pools()
+        return self._build_candidates(pools, apply_min_apy=True)
+
+    async def get_lending_snapshot(self) -> LendingSnapshot:
+        pools = await self._fetch_raw_pools()
+        candidates = self._build_candidates(pools, apply_min_apy=False)
+
+        lending_candidates = [candidate for candidate in candidates if self._is_lending_candidate(candidate)]
+        if not lending_candidates:
+            return LendingSnapshot()
+
+        eth_assets = {"ETH", "WETH", "STETH", "WSTETH", "RETH", "CBETH", "WEETH", "EZETH"}
+        btc_assets = {"BTC", "WBTC", "TBTC", "RENBTC", "SBTC", "LBTC", "CBBTC", "WBTC.B"}
+        stable_assets = self._stable_symbol_set()
+
+        best_eth_supply = self._pick_best_supply(lending_candidates, eth_assets)
+        best_btc_supply = self._pick_best_supply(lending_candidates, btc_assets)
+        lowest_stable_borrow = self._pick_lowest_borrow(lending_candidates, stable_assets)
+
+        return LendingSnapshot(
+            best_eth_supply=best_eth_supply,
+            best_btc_supply=best_btc_supply,
+            lowest_stable_borrow=lowest_stable_borrow,
+        )
+
+    async def _fetch_raw_pools(self) -> list[dict]:
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             resp = await client.get(self.BASE_URL)
             resp.raise_for_status()
             data = resp.json()
-
         pools = data.get("data", []) if isinstance(data, dict) else []
+        return pools if isinstance(pools, list) else []
+
+    def _build_candidates(self, pools: list[dict], apply_min_apy: bool) -> List[ScoutCandidate]:
         results: List[ScoutCandidate] = []
         for item in pools:
             try:
@@ -40,7 +68,7 @@ class DeFiLlamaClient:
             if candidate.tvl_usd < self.config.min_tvl_usd:
                 continue
 
-            if candidate.apy is not None and candidate.apy < self.config.min_apy:
+            if apply_min_apy and candidate.apy is not None and candidate.apy < self.config.min_apy:
                 continue
 
             if self.config.target_chains and candidate.chain not in self.config.target_chains:
@@ -49,6 +77,83 @@ class DeFiLlamaClient:
             results.append(candidate)
 
         return results
+
+    def _is_lending_candidate(self, candidate: ScoutCandidate) -> bool:
+        return (
+            candidate.apy_base_borrow is not None
+            or candidate.apy_reward_borrow is not None
+            or candidate.total_borrow_usd is not None
+            or "aave" in candidate.project.lower()
+            or "compound" in candidate.project.lower()
+            or "morpho" in candidate.project.lower()
+            or "spark" in candidate.project.lower()
+            or "euler" in candidate.project.lower()
+        )
+
+    def _pick_best_supply(
+        self,
+        candidates: List[ScoutCandidate],
+        tracked_symbols: set[str],
+    ) -> LendingSnapshotItem | None:
+        eligible: list[ScoutCandidate] = []
+        for candidate in candidates:
+            tokens = self._extract_symbol_tokens(candidate.symbol)
+            if any(token in tracked_symbols for token in tokens):
+                eligible.append(candidate)
+
+        if not eligible:
+            return None
+
+        best = max(eligible, key=lambda candidate: candidate.apy)
+        return LendingSnapshotItem(
+            candidate=best,
+            metric_name="supply_apy",
+            metric_value_pct=float(best.apy),
+        )
+
+    def _pick_lowest_borrow(
+        self,
+        candidates: List[ScoutCandidate],
+        stable_symbols: set[str],
+    ) -> LendingSnapshotItem | None:
+        scored: list[tuple[ScoutCandidate, float]] = []
+        for candidate in candidates:
+            tokens = self._extract_symbol_tokens(candidate.symbol)
+            if not any(token in stable_symbols for token in tokens):
+                continue
+            borrow_apr = self._borrow_apr(candidate)
+            if borrow_apr is None or borrow_apr < 0:
+                continue
+            scored.append((candidate, borrow_apr))
+
+        if not scored:
+            return None
+
+        best, value = min(scored, key=lambda item: item[1])
+        return LendingSnapshotItem(
+            candidate=best,
+            metric_name="borrow_apr",
+            metric_value_pct=float(value),
+        )
+
+    def _borrow_apr(self, candidate: ScoutCandidate) -> float | None:
+        base = candidate.apy_base_borrow
+        reward = candidate.apy_reward_borrow
+        if base is None and reward is None:
+            return None
+        return float(base or 0.0) + float(reward or 0.0)
+
+    def _stable_symbol_set(self) -> set[str]:
+        stable = {symbol.upper() for symbol in self.config.stable_symbols}
+        stable.update(symbol.upper() for symbol in self.config.token_buckets.stablecoins_usd)
+        stable.update(symbol.upper() for symbol in self.config.token_buckets.stablecoins_eur)
+        stable.update(symbol.upper() for symbol in self.config.token_buckets.stablecoins_speculative)
+        return stable
+
+    @staticmethod
+    def _extract_symbol_tokens(symbol: str) -> set[str]:
+        parts = re.split(r"[^A-Za-z0-9.]+", symbol.upper())
+        return {part for part in parts if part}
 
     def _resolve_chain_id(self, item: dict, chain: str) -> int | None:
         raw_chain_id = item.get("chainId")
