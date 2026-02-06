@@ -59,6 +59,25 @@
         "Base": "https://gateway.thegraph.com/api/{GRAPH_API_KEY}/deployments/id/QmasYjypV6nTLp4iNH4Vjf7fksRNxAkAskqDdKf2DCsQkV"
       }
     },
+    "dex_discovery": {
+      "uniswap_v3_new_pools": {
+        "enabled": false,
+        "timeout_seconds": 8,
+        "max_pools": 200,
+        "min_tvl_usd": 250000,
+        "page_size": 50,
+        "max_pages": 4,
+        "order_by": "createdAtTimestamp",
+        "order_direction": "desc",
+        "graph_api_key_env": "GRAPH_API_KEY",
+        "subgraph_endpoints": {},
+        "subgraph_ids": {
+          "Ethereum": "5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV",
+          "Arbitrum": "C2KJVEU6fA9Bqf8QwK4MAnuS8xPYYn9N6HqFA7gKjsXo",
+          "Base": "3hCPRGfHk8NAxU1wR8UWQ2N8isf2Xn7u6xQ5q4VYqW3G"
+        }
+      }
+    },
     "token_buckets": {
       "stablecoins_usd": [
         "USDC",

@@ -261,10 +261,11 @@
   - Chunking preserves line boundaries to keep Markdown formatting stable.
   - Rationale: prevent HTTP 400 failures on oversized messages when report volume increases.
 
-- 2026-02-04: Report deep-link pattern:
-  - Each Telegram row includes a direct link to DefiLlama pool page:
+- 2026-02-06: Report deep-link pattern:
+  - If `pool_id` is a DefiLlama yields id, link to pool page:
     - `https://defillama.com/yields/pool/<pool_id>`
-  - Rationale: reduce friction from alert -> manual verification -> decision.
+  - If `pool_id` looks like an onchain contract address (`0x...`), link to chain explorer (by `chain_id`) for verification.
+  - Rationale: reduce friction from alert -> manual verification -> decision, including DEX discovery rows not present in DefiLlama yet.
 
 - 2026-02-04: Freshness re-check gating pattern (spec 010):
   - Keep broad intake from DeFiLlama, then re-check shortlist candidates before Telegram publication.

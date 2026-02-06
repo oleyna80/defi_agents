@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 from typing import List
 
 import httpx
@@ -175,4 +176,22 @@ class TelegramNotifier:
 
     def _pool_link(self, result: ScoutResult) -> str:
         pool_id = getattr(result.candidate, "pool_id", "") or ""
-        return f"https://defillama.com/yields/pool/{pool_id}" if pool_id else "https://defillama.com/yields"
+        if not pool_id:
+            return "https://defillama.com/yields"
+
+        # If pool_id looks like an onchain contract address (DEX discovery), link to a chain explorer.
+        if re.fullmatch(r"0x[a-fA-F0-9]{40}", pool_id):
+            chain_id = getattr(result.candidate, "chain_id", None)
+            explorer = {
+                1: "https://etherscan.io/address/",
+                10: "https://optimistic.etherscan.io/address/",
+                56: "https://bscscan.com/address/",
+                137: "https://polygonscan.com/address/",
+                42161: "https://arbiscan.io/address/",
+                43114: "https://snowtrace.io/address/",
+                8453: "https://basescan.org/address/",
+            }.get(chain_id)
+            if explorer:
+                return f"{explorer}{pool_id}"
+
+        return f"https://defillama.com/yields/pool/{pool_id}"

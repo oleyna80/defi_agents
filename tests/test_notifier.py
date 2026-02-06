@@ -118,6 +118,44 @@ def test_report_includes_decision_fields_and_colors():
     assert "[Pool](https://defillama.com/yields/pool/pool1)" in message
 
 
+def test_pool_link_uses_explorer_for_address_like_pool_id():
+    notifier = TelegramNotifier()
+    candidate = ScoutCandidate.model_validate(
+        {
+            "pool": "0x1111111111111111111111111111111111111111",
+            "project": "Uniswap V3",
+            "chain": "Base",
+            "symbol": "USDC-USDT",
+            "address": "0x2222222222222222222222222222222222222222",
+            "chain_id": 8453,
+            "tvlUsd": 1_000_000,
+            "apy": 10.0,
+            "apyBase": 10.0,
+            "apyReward": 0.0,
+        }
+    )
+    result = ScoutResult(
+        candidate=candidate,
+        security=SecurityResult(status=SecurityStatus.WARN, score=70),
+        net_apy=10.0,
+        score=5.0,
+        net_profit_usd=15.0,
+        priority=PriorityTier.LOW_VOLATILITY,
+        metadata={
+            "bucket": "WARN/REPUTATION",
+            "sleeve": "yield_plus",
+            "net_profit_1k_usd": "7.50",
+            "warn_reasons": "REPUTATION_UNAVAILABLE",
+            "freshness_status": "UNVERIFIED",
+            "age_minutes": "-",
+            "apy_divergence_pct": "-",
+            "tvl_divergence_pct": "-",
+        },
+        flags=[],
+    )
+    assert notifier._pool_link(result) == "https://basescan.org/address/0x1111111111111111111111111111111111111111"
+
+
 def test_report_is_chunked_for_telegram_limits():
     notifier = TelegramNotifier()
     many = [

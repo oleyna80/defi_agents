@@ -97,6 +97,18 @@ async def run_sentinel_cycle() -> None:
 
     try:
         opportunities = await scout.analyze()
+        dex_stats = getattr(scout, "last_discovery_stats", None)
+        if dex_stats is not None:
+            logger.info(
+                "DEX discovery: llama=%s uniswap_new=%s filtered=%s errors=%s timeouts=%s total=%s enabled=%s",
+                dex_stats.dex_llama_count,
+                dex_stats.dex_uniswap_new_count,
+                dex_stats.dex_filtered_count,
+                dex_stats.dex_error_count,
+                dex_stats.dex_timeout_count,
+                dex_stats.dex_discovery_total,
+                config.dex_discovery.uniswap_v3_new_pools.enabled,
+            )
         opportunities = await l3_manager.process_batch(opportunities)
 
         # Save to history (post hard filters + security gate)

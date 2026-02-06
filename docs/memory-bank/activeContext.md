@@ -6,6 +6,10 @@ Current Plan: docs/plans/012-defi-coverage-mvp-dex-lp-plan.md
 Active Task: DEX/LP discovery implementation plan (Workstream A)
 
 ## Recent Changes
+- 2026-02-06: Implemented Workstream A (minimal) DEX/LP discovery: added Uniswap v3 new-pool adapter with bounded GraphQL query config (`enabled`, `timeout`, `max_pools`, `min_tvl_usd`, paging/order) and fail-safe behavior (adapter errors/timeouts do not break cycle) — 2026-02-06
+- 2026-02-06: Wired discovery into Scout before security gate in [`YieldScout.analyze()`](src/defi_agents/scout/scout.py:30), attaching metadata (`dex_new_pool`, `pool_age_minutes`, `source_timestamp`, `freshness_status=UNVERIFIED`) to discovered candidates — 2026-02-06
+- 2026-02-06: Added DEX discovery counters logging in [`main.py:run_sentinel_cycle()`](main.py:71): llama/new/filtered/errors/timeouts/total — 2026-02-06
+- 2026-02-06: Added unit tests for new adapter behavior (`enable/disable`, TVL filter+metadata mapping, timeout fail-safe) in [`tests/test_uniswap_new_pools.py`](tests/test_uniswap_new_pools.py:1), full suite green (`75 passed`) — 2026-02-06
 - 2026-02-01: Initialized project template
 - 2026-02-01: Filled product context for Universal DeFi Sentinel
 - 2026-02-01: Drafted concept spec for Universal DeFi Agent (Multi-Protocol)

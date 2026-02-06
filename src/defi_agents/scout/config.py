@@ -159,6 +159,24 @@ class StrategySimConfig(BaseModel):
     min_data_completeness_pct: float = 80.0
 
 
+class UniswapV3NewPoolsConfig(BaseModel):
+    enabled: bool = False
+    timeout_seconds: int = 8
+    max_pools: int = 200
+    min_tvl_usd: float = 250_000.0
+    page_size: int = 50
+    max_pages: int = 4
+    order_by: str = "createdAtTimestamp"
+    order_direction: Literal["desc", "asc"] = "desc"
+    graph_api_key_env: str = "GRAPH_API_KEY"
+    subgraph_endpoints: dict[str, str] = Field(default_factory=dict)
+    subgraph_ids: dict[str, str] = Field(default_factory=dict)
+
+
+class DexDiscoveryConfig(BaseModel):
+    uniswap_v3_new_pools: UniswapV3NewPoolsConfig = Field(default_factory=UniswapV3NewPoolsConfig)
+
+
 class ScoutConfig(BaseModel):
     min_tvl_usd: float = 1_000_000
     min_apy: float = 0.0
@@ -170,6 +188,7 @@ class ScoutConfig(BaseModel):
     sleeves: SleevesConfig = Field(default_factory=SleevesConfig)
     capacity_guards: CapacityGuards = Field(default_factory=CapacityGuards)
     freshness: FreshnessConfig = Field(default_factory=FreshnessConfig)
+    dex_discovery: DexDiscoveryConfig = Field(default_factory=DexDiscoveryConfig)
     strategy_sim: StrategySimConfig = Field(default_factory=StrategySimConfig)
     token_buckets: TokenBuckets = Field(default_factory=TokenBuckets)
     risk_policy: StableRiskPolicy = Field(default_factory=StableRiskPolicy)

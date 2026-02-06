@@ -8,6 +8,7 @@ from .config import ScoutConfig
 from .defillama_client import DeFiLlamaClient
 from .cache import ScoutDeduper
 from .models import PairCurrencyClass, PriorityTier, ScoutCandidate, ScoutResult, StableTier
+from .uniswap_v3_new_pools import DexDiscoveryStats, UniswapV3NewPoolsAdapter
 from ..security.auditor import SecurityAuditor
 from ..security.models import SecurityReason, SecuritySeverity, SecuritySource, SecurityStatus
 
@@ -26,9 +27,20 @@ class YieldScout:
         self.client = client
         self.auditor = auditor
         self.deduper = deduper or ScoutDeduper(ttl_seconds=self.config.dedupe_ttl_seconds)
+        self._new_pools_adapter = UniswapV3NewPoolsAdapter(config)
+        self.last_discovery_stats = DexDiscoveryStats()
 
     async def analyze(self) -> List[ScoutResult]:
         pools = await self.client.get_pools()
+        discovery = await self._new_pools_adapter.fetch_new_pools(self.config.target_chains)
+        if discovery.candidates:
+            pools.extend(discovery.candidates)
+
+        self.last_discovery_stats = discovery.stats
+        self.last_discovery_stats.dex_llama_count = len(pools) - len(discovery.candidates)
+        self.last_discovery_stats.dex_discovery_total = len(pools)
+
+        new_pool_meta = discovery.metadata_by_pool_id
         raw_count = len(pools)
         filtered = self._apply_heuristics(pools)
         heuristics_count = len(filtered)
@@ -147,6 +159,8 @@ class YieldScout:
                         flags=self._flags(pool),
                     )
                 )
+                if pool.pool_id in new_pool_meta:
+                    results[-1].metadata.update(new_pool_meta[pool.pool_id])
 
         deduped = self._deduplicate(results)
         logger.info(

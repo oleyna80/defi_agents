@@ -31,6 +31,10 @@
 - Plan 008 (L3 AI-Analyst): production hardening and real provider integration
 
 ## Completed
+- Workstream A (DEX/LP Discovery minimal): added Uniswap v3 new-pool adapter with bounded config controls (`enabled`, `timeout_seconds`, `max_pools`, `min_tvl_usd`, paging/order) and fail-safe non-crashing behavior — 2026-02-06
+- Wired discovery into Scout before security gate and attached metadata (`dex_new_pool`, `pool_age_minutes`, `source_timestamp`, `freshness_status=UNVERIFIED`) for discovered pools — 2026-02-06
+- Added DEX per-cycle counters log line in orchestrator (`llama/new/filtered/errors/timeouts/total`) — 2026-02-06
+- Added unit tests for discovery adapter and validated full suite (`75 passed`) — 2026-02-06
 - Security module Step 3 completed (tests green, aggregation logic) — 2026-02-01
 - Scout module Step 5-6 completed — 2026-02-01
 - Scout->Auditor identifier mapping fix (address + chain id normalization) — 2026-02-02
