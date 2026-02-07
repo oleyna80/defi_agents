@@ -134,13 +134,68 @@ def test_report_includes_lending_snapshot_section():
             "apyReward": 0.0,
         }
     )
+    candidate_gho = ScoutCandidate.model_validate(
+        {
+            "pool": "gho-market",
+            "project": "aave-v3",
+            "chain": "Arbitrum",
+            "symbol": "GHO",
+            "address": "0x2222222222222222222222222222222222222222",
+            "chain_id": 42161,
+            "tvlUsd": 7_000_000,
+            "apy": 5.2,
+            "apyBase": 5.2,
+            "apyReward": 0.0,
+        }
+    )
+    candidate_eurc = ScoutCandidate.model_validate(
+        {
+            "pool": "eurc-market",
+            "project": "aave-v3",
+            "chain": "Base",
+            "symbol": "EURC",
+            "address": "0x3333333333333333333333333333333333333333",
+            "chain_id": 8453,
+            "tvlUsd": 5_000_000,
+            "apy": 2.0,
+            "apyBase": 2.0,
+            "apyReward": 0.0,
+            "apyBaseBorrow": 1.9,
+            "apyRewardBorrow": 0.0,
+        }
+    )
+    candidate_usdc = ScoutCandidate.model_validate(
+        {
+            "pool": "usdc-market",
+            "project": "aave-v3",
+            "chain": "Ethereum",
+            "symbol": "USDC",
+            "address": "0x4444444444444444444444444444444444444444",
+            "chain_id": 1,
+            "tvlUsd": 12_000_000,
+            "apy": 2.1,
+            "apyBase": 2.1,
+            "apyReward": 0.0,
+            "apyBaseBorrow": 2.3,
+            "apyRewardBorrow": 0.0,
+        }
+    )
     snapshot = LendingSnapshot(
-        best_eth_supply=LendingSnapshotItem(candidate=candidate_eth, metric_name="supply_apy", metric_value_pct=4.5)
+        best_eth_supply=LendingSnapshotItem(candidate=candidate_eth, metric_name="supply_apy", metric_value_pct=4.5),
+        best_gho_supply=LendingSnapshotItem(candidate=candidate_gho, metric_name="supply_apy", metric_value_pct=5.2),
+        lowest_eurc_borrow=LendingSnapshotItem(candidate=candidate_eurc, metric_name="borrow_apr", metric_value_pct=1.9),
+        lowest_usdc_borrow=LendingSnapshotItem(candidate=candidate_usdc, metric_name="borrow_apr", metric_value_pct=2.3),
     )
     message = notifier._format_report([], lending_snapshot=snapshot)
     assert "Lending Snapshot" in message
     assert "Best ETH supply" in message
     assert "Supply APY 4.50%" in message
+    assert "Best GHO supply" in message
+    assert "Supply APY 5.20%" in message
+    assert "Cheapest EURC borrow" in message
+    assert "Borrow APR 1.90%" in message
+    assert "Cheapest USDC borrow" in message
+    assert "Borrow APR 2.30%" in message
     assert "[Pool](https://defillama.com/yields/pool/eth-market)" in message
 
 

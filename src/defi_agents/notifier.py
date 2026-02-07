@@ -171,10 +171,31 @@ class TelegramNotifier:
                 f"`{item.candidate.project}` | Supply APY {item.metric_value_pct:.2f}% | "
                 f"TVL {self._format_tvl(item.candidate.tvl_usd)} | [Pool]({self._pool_link_from_candidate(item.candidate)})"
             )
+        if lending_snapshot.best_gho_supply:
+            item = lending_snapshot.best_gho_supply
+            lines.append(
+                f"- Best GHO supply: `{item.candidate.chain}` `{item.candidate.symbol}` | "
+                f"`{item.candidate.project}` | Supply APY {item.metric_value_pct:.2f}% | "
+                f"TVL {self._format_tvl(item.candidate.tvl_usd)} | [Pool]({self._pool_link_from_candidate(item.candidate)})"
+            )
         if lending_snapshot.lowest_stable_borrow:
             item = lending_snapshot.lowest_stable_borrow
             lines.append(
                 f"- Cheapest stable borrow: `{item.candidate.chain}` `{item.candidate.symbol}` | "
+                f"`{item.candidate.project}` | Borrow APR {item.metric_value_pct:.2f}% | "
+                f"TVL {self._format_tvl(item.candidate.tvl_usd)} | [Pool]({self._pool_link_from_candidate(item.candidate)})"
+            )
+        if lending_snapshot.lowest_eurc_borrow:
+            item = lending_snapshot.lowest_eurc_borrow
+            lines.append(
+                f"- Cheapest EURC borrow: `{item.candidate.chain}` `{item.candidate.symbol}` | "
+                f"`{item.candidate.project}` | Borrow APR {item.metric_value_pct:.2f}% | "
+                f"TVL {self._format_tvl(item.candidate.tvl_usd)} | [Pool]({self._pool_link_from_candidate(item.candidate)})"
+            )
+        if lending_snapshot.lowest_usdc_borrow:
+            item = lending_snapshot.lowest_usdc_borrow
+            lines.append(
+                f"- Cheapest USDC borrow: `{item.candidate.chain}` `{item.candidate.symbol}` | "
                 f"`{item.candidate.project}` | Borrow APR {item.metric_value_pct:.2f}% | "
                 f"TVL {self._format_tvl(item.candidate.tvl_usd)} | [Pool]({self._pool_link_from_candidate(item.candidate)})"
             )

@@ -85,6 +85,7 @@ class FreshnessManager:
                 enabled=config.aave_direct_enabled,
                 timeout_seconds=config.aave_direct_timeout_seconds,
                 endpoints=config.aave_direct_endpoints,
+                chain_ids=config.aave_direct_chain_ids,
                 reserve_symbols=config.aave_direct_reserve_symbols,
                 api_key_env=config.aave_direct_api_key_env,
             ),

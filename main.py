@@ -121,16 +121,35 @@ async def run_sentinel_cycle() -> None:
                 if lending_snapshot.best_btc_supply
                 else "n/a"
             )
+            gho_supply = (
+                f"{lending_snapshot.best_gho_supply.metric_value_pct:.2f}%"
+                if lending_snapshot.best_gho_supply
+                else "n/a"
+            )
             stable_borrow = (
                 f"{lending_snapshot.lowest_stable_borrow.metric_value_pct:.2f}%"
                 if lending_snapshot.lowest_stable_borrow
                 else "n/a"
             )
+            eurc_borrow = (
+                f"{lending_snapshot.lowest_eurc_borrow.metric_value_pct:.2f}%"
+                if lending_snapshot.lowest_eurc_borrow
+                else "n/a"
+            )
+            usdc_borrow = (
+                f"{lending_snapshot.lowest_usdc_borrow.metric_value_pct:.2f}%"
+                if lending_snapshot.lowest_usdc_borrow
+                else "n/a"
+            )
             logger.info(
-                "Lending snapshot: best_eth_supply=%s best_btc_supply=%s lowest_stable_borrow=%s",
+                "Lending snapshot: best_eth_supply=%s best_btc_supply=%s best_gho_supply=%s "
+                "lowest_stable_borrow=%s lowest_eurc_borrow=%s lowest_usdc_borrow=%s",
                 eth_supply,
                 btc_supply,
+                gho_supply,
                 stable_borrow,
+                eurc_borrow,
+                usdc_borrow,
             )
         opportunities = await l3_manager.process_batch(opportunities)
 
@@ -235,13 +254,21 @@ async def run_sentinel_cycle() -> None:
         actionable_count = sum(1 for pick in report_picks if pick.metadata.get("report_group") == "ACTIONABLE")
         watchlist_count = sum(1 for pick in report_picks if pick.metadata.get("report_group") == "WATCHLIST")
         logger.info(
-            "Freshness summary: rechecked=%s fresh=%s stale=%s unverified=%s diverged=%s downgraded=%s recheck_enabled=%s strict=%s",
+            "Freshness summary: rechecked=%s fresh=%s stale=%s unverified=%s diverged=%s downgraded=%s "
+            "aave_checked=%s aave_ok=%s aave_timeout=%s aave_error=%s aave_schema_mismatch=%s aave_addr_mismatch=%s "
+            "recheck_enabled=%s strict=%s",
             freshness_counts["rechecked_count"],
             freshness_counts["fresh_count"],
             freshness_counts["stale_count"],
             freshness_counts["unverified_count"],
             freshness_counts["diverged_count"],
             freshness_counts["downgraded_to_watchlist_count"],
+            freshness_counts["aave_checked_count"],
+            freshness_counts["aave_ok_count"],
+            freshness_counts["aave_timeout_count"],
+            freshness_counts["aave_error_count"],
+            freshness_counts["aave_schema_mismatch_count"],
+            freshness_counts["aave_addr_mismatch_count"],
             config.freshness.recheck_enabled,
             config.freshness.enforce_freshness_for_actionable,
         )

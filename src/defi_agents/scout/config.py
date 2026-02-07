@@ -144,8 +144,22 @@ class FreshnessConfig(BaseModel):
     aave_direct_enabled: bool = False
     aave_direct_timeout_seconds: int = 8
     aave_direct_api_key_env: str = "AAVE_DIRECT_API_KEY"
-    aave_direct_endpoints: dict[str, str] = Field(
-        default_factory=dict
+    # Per-chain endpoint(s): supports single URL string or ordered fallback list.
+    aave_direct_endpoints: dict[str, str | list[str]] = Field(
+        default_factory=lambda: {"Ethereum": ["https://api.v3.aave.com/graphql"]}
+    )
+    # Per-chain Aave GraphQL chainId map.
+    aave_direct_chain_ids: dict[str, int] = Field(
+        default_factory=lambda: {
+            "Ethereum": 1,
+            "Arbitrum": 42161,
+            "Avalanche": 43114,
+            "Base": 8453,
+            "BSC": 56,
+            "Binance": 56,
+            "Optimism": 10,
+            "Polygon": 137,
+        }
     )
     # Allowlist map: SYMBOL -> underlying EVM address (not reserve symbol string).
     aave_direct_reserve_symbols: dict[str, dict[str, str]] = Field(

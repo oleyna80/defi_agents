@@ -14,6 +14,12 @@ def apply_freshness_policy(results: List[ScoutResult], config: FreshnessConfig) 
         "unverified_count": 0,
         "diverged_count": 0,
         "downgraded_to_watchlist_count": 0,
+        "aave_checked_count": 0,
+        "aave_ok_count": 0,
+        "aave_timeout_count": 0,
+        "aave_error_count": 0,
+        "aave_schema_mismatch_count": 0,
+        "aave_addr_mismatch_count": 0,
     }
 
     if not results:
@@ -21,6 +27,20 @@ def apply_freshness_policy(results: List[ScoutResult], config: FreshnessConfig) 
 
     for res in results:
         meta = res.metadata
+        if meta.get("aave_recheck_checked") == "1":
+            counters["aave_checked_count"] += 1
+            outcome = (meta.get("aave_recheck_outcome") or "").strip().lower()
+            if outcome == "ok":
+                counters["aave_ok_count"] += 1
+            elif outcome == "timeout":
+                counters["aave_timeout_count"] += 1
+            elif outcome == "schema_mismatch":
+                counters["aave_schema_mismatch_count"] += 1
+            elif outcome == "addr_mismatch":
+                counters["aave_addr_mismatch_count"] += 1
+            else:
+                counters["aave_error_count"] += 1
+
         status = (meta.get("freshness_status") or "UNVERIFIED").upper()
         meta["freshness_status"] = status
         meta.setdefault("freshness_provider", "none")

@@ -18,7 +18,7 @@ def _result(
     project: str = "aave-v3",
     chain: str = "Ethereum",
     symbol: str = "USDC-WETH",
-    address: str = "0x1111111111111111111111111111111111111111",
+    address: str = "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
 ) -> ScoutResult:
     candidate = ScoutCandidate.model_validate(
         {
@@ -46,22 +46,6 @@ def _result(
     )
 
 
-def test_aave_adapter_supports_flag_and_shape_filters():
-    endpoints = {"Ethereum": "https://aave.example/v3/reserves"}
-    symbols = {"Ethereum": {"USDC": "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"}}
-
-    off_adapter = AaveDirectAdapter(enabled=False, endpoints=endpoints, reserve_symbols=symbols)
-    assert off_adapter.supports(_result()) is False
-
-    adapter = AaveDirectAdapter(enabled=True, endpoints=endpoints, reserve_symbols=symbols)
-    assert adapter.supports(_result(project="aave-v3")) is True
-    assert adapter.supports(_result(project="spark", symbol="USDC/DAI")) is True
-    assert adapter.supports(_result(project="uniswap-v3")) is False
-    assert adapter.supports(_result(chain="Arbitrum")) is False
-    assert adapter.supports(_result(symbol="", project="aave-v3")) is False
-    assert adapter.supports(_result(address="not-an-evm-address", project="aave-v3")) is False
-
-
 class _FakeResponse:
     def __init__(self, *, status_code: int, body: object) -> None:
         self.status_code = status_code
@@ -76,9 +60,8 @@ class _FakeResponse:
 
 
 class _FakeClient:
-    def __init__(self, *, response: _FakeResponse | None = None, exc: Exception | None = None) -> None:
-        self._response = response
-        self._exc = exc
+    def __init__(self, responder) -> None:  # noqa: ANN001
+        self._responder = responder
 
     async def __aenter__(self):
         return self
@@ -86,39 +69,84 @@ class _FakeClient:
     async def __aexit__(self, exc_type, exc, tb):
         return None
 
-    async def get(self, *args, **kwargs):
-        if self._exc is not None:
-            raise self._exc
-        return self._response
+    async def post(self, url: str, *args, **kwargs):  # noqa: ANN002, ANN003
+        return self._responder(url, *args, **kwargs)
+
+
+def _adapter(*, endpoints: dict[str, str | list[str]]) -> AaveDirectAdapter:
+    return AaveDirectAdapter(
+        enabled=True,
+        timeout_seconds=5,
+        endpoints=endpoints,
+        chain_ids={"Ethereum": 1},
+        reserve_symbols={"Ethereum": {"USDC": "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"}},
+    )
+
+
+def test_aave_adapter_supports_flag_and_shape_filters():
+    endpoints = {"Ethereum": "https://api.v3.aave.com/graphql"}
+    chain_ids = {"Ethereum": 1}
+    symbols = {"Ethereum": {"USDC": "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"}}
+
+    off_adapter = AaveDirectAdapter(
+        enabled=False,
+        endpoints=endpoints,
+        chain_ids=chain_ids,
+        reserve_symbols=symbols,
+    )
+    assert off_adapter.supports(_result()) is False
+
+    adapter = AaveDirectAdapter(
+        enabled=True,
+        endpoints=endpoints,
+        chain_ids=chain_ids,
+        reserve_symbols=symbols,
+    )
+    assert adapter.supports(_result(project="aave-v3")) is True
+    assert adapter.supports(_result(project="spark", symbol="USDC/DAI")) is True
+    assert adapter.supports(_result(project="uniswap-v3")) is False
+    assert adapter.supports(_result(chain="Arbitrum")) is False
+    assert adapter.supports(_result(symbol="", project="aave-v3")) is False
+    assert adapter.supports(_result(address="not-an-evm-address", project="aave-v3")) is False
 
 
 @pytest.mark.asyncio
 async def test_aave_adapter_fetch_snapshot_success(monkeypatch):
-    endpoint = "https://aave.example/v3/reserves"
-    underlying = "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
-    adapter = AaveDirectAdapter(
-        enabled=True,
-        timeout_seconds=5,
-        endpoints={"Ethereum": endpoint},
-        reserve_symbols={"Ethereum": {"USDC": underlying}},
-    )
-    candidate = _result(address=underlying)
+    endpoint = "https://api.v3.aave.com/graphql"
+    adapter = _adapter(endpoints={"Ethereum": endpoint})
+    candidate = _result()
 
     body = {
-        "reserves": [
-            {
-                "symbol": "USDC",
-                "underlyingAsset": underlying,
-                "lastUpdateTimestamp": 1_706_000_000,
-                "supplyAPY": 0.031,
-                "totalLiquidityUSD": "1234567.89",
-            }
-        ]
+        "data": {
+            "markets": [
+                {
+                    "reserves": [
+                        {
+                            "underlyingToken": {
+                                "symbol": "USDC",
+                                "address": "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+                            },
+                            "isFrozen": False,
+                            "isPaused": False,
+                            "size": {"usd": "1234567.89"},
+                            "supplyInfo": {"apy": {"value": "0.031"}},
+                        }
+                    ]
+                }
+            ]
+        }
     }
-    fake_response = _FakeResponse(status_code=200, body=body)
+
+    def responder(url, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        assert url == endpoint
+        payload = kwargs["json"]
+        assert payload["variables"]["chainIds"] == [1]
+        assert "markets(" in payload["query"]
+        return _FakeResponse(status_code=200, body=body)
+
     monkeypatch.setattr(
         "defi_agents.freshness.adapters.aave_direct.httpx.AsyncClient",
-        lambda timeout: _FakeClient(response=fake_response),
+        lambda timeout: _FakeClient(responder),
     )
 
     snapshot = await adapter.fetch_snapshot(candidate)
@@ -127,50 +155,106 @@ async def test_aave_adapter_fetch_snapshot_success(monkeypatch):
     assert snapshot.source_timestamp is not None
     assert snapshot.apy == pytest.approx(3.1, rel=1e-6)
     assert snapshot.tvl_usd == pytest.approx(1_234_567.89, rel=1e-6)
+    assert candidate.metadata["aave_recheck_checked"] == "1"
+    assert candidate.metadata["aave_recheck_outcome"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_aave_adapter_fallback_endpoint_success(monkeypatch):
+    primary = "https://primary.example/graphql"
+    fallback = "https://fallback.example/graphql"
+    adapter = _adapter(endpoints={"Ethereum": [primary, fallback]})
+    candidate = _result()
+
+    body = {
+        "data": {
+            "markets": [
+                {
+                    "reserves": [
+                        {
+                            "underlyingToken": {
+                                "symbol": "USDC",
+                                "address": "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+                            },
+                            "isFrozen": False,
+                            "isPaused": False,
+                            "size": {"usd": "2000"},
+                            "supplyInfo": {"apy": {"value": "0.020"}},
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+    calls = {"primary": 0, "fallback": 0}
+
+    def responder(url, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        payload = kwargs["json"]
+        assert payload["variables"]["chainIds"] == [1]
+        if url == primary:
+            calls["primary"] += 1
+            return _FakeResponse(status_code=500, body={})
+        calls["fallback"] += 1
+        return _FakeResponse(status_code=200, body=body)
+
+    monkeypatch.setattr(
+        "defi_agents.freshness.adapters.aave_direct.httpx.AsyncClient",
+        lambda timeout: _FakeClient(responder),
+    )
+
+    snapshot = await adapter.fetch_snapshot(candidate)
+    assert snapshot is not None
+    assert calls["primary"] == 1
+    assert calls["fallback"] == 1
+    assert candidate.metadata["aave_recheck_outcome"] == "ok"
 
 
 @pytest.mark.asyncio
 async def test_aave_adapter_fail_safe_on_timeout(monkeypatch, caplog):
-    adapter = AaveDirectAdapter(
-        enabled=True,
-        timeout_seconds=1,
-        endpoints={"Ethereum": "https://aave.example/v3/reserves"},
-        reserve_symbols={"Ethereum": {"USDC": "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"}},
-    )
-    candidate = _result(address="0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")
+    adapter = _adapter(endpoints={"Ethereum": "https://api.v3.aave.com/graphql"})
+    candidate = _result()
+
+    def responder(url, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        raise httpx.TimeoutException("simulated timeout")
 
     monkeypatch.setattr(
         "defi_agents.freshness.adapters.aave_direct.httpx.AsyncClient",
-        lambda timeout: _FakeClient(exc=httpx.TimeoutException("simulated timeout")),
+        lambda timeout: _FakeClient(responder),
     )
     caplog.set_level(logging.WARNING)
 
     snapshot = await adapter.fetch_snapshot(candidate)
     assert snapshot is None
-    assert "Aave direct re-check request error" in caplog.text
+    assert "request timeout" in caplog.text
+    assert candidate.metadata["aave_recheck_checked"] == "1"
+    assert candidate.metadata["aave_recheck_outcome"] == "timeout"
 
 
 @pytest.mark.asyncio
 async def test_aave_adapter_logs_do_not_leak_secrets(monkeypatch, caplog):
     secret = "tok_secret_123"
-    endpoint_with_query = "https://aave.example/v3/reserves?api_key=very-secret"
+    endpoint_with_query = "https://api.v3.aave.com/graphql?api_key=very-secret"
     monkeypatch.setenv("AAVE_DIRECT_API_KEY", secret)
 
     adapter = AaveDirectAdapter(
         enabled=True,
         timeout_seconds=1,
         endpoints={"Ethereum": endpoint_with_query},
+        chain_ids={"Ethereum": 1},
         reserve_symbols={"Ethereum": {"USDC": "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"}},
         api_key_env="AAVE_DIRECT_API_KEY",
     )
 
+    def responder(url, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        return _FakeResponse(status_code=500, body={})
+
     monkeypatch.setattr(
         "defi_agents.freshness.adapters.aave_direct.httpx.AsyncClient",
-        lambda timeout: _FakeClient(response=_FakeResponse(status_code=500, body={})),
+        lambda timeout: _FakeClient(responder),
     )
 
     caplog.set_level(logging.WARNING)
-    snapshot = await adapter.fetch_snapshot(_result(address="0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"))
+    snapshot = await adapter.fetch_snapshot(_result())
 
     assert snapshot is None
     logs = caplog.text
@@ -181,14 +265,8 @@ async def test_aave_adapter_logs_do_not_leak_secrets(monkeypatch, caplog):
 
 
 @pytest.mark.asyncio
-async def test_aave_adapter_fail_safe_on_candidate_underlying_mismatch(monkeypatch, caplog):
-    underlying = "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
-    adapter = AaveDirectAdapter(
-        enabled=True,
-        timeout_seconds=1,
-        endpoints={"Ethereum": "https://aave.example/v3/reserves"},
-        reserve_symbols={"Ethereum": {"USDC": underlying}},
-    )
+async def test_aave_adapter_addr_mismatch_is_fail_safe(caplog):
+    adapter = _adapter(endpoints={"Ethereum": "https://api.v3.aave.com/graphql"})
     candidate = _result(address="0x1111111111111111111111111111111111111111")
 
     caplog.set_level(logging.WARNING)
@@ -196,3 +274,24 @@ async def test_aave_adapter_fail_safe_on_candidate_underlying_mismatch(monkeypat
 
     assert snapshot is None
     assert "candidate/reserve mismatch" in caplog.text
+    assert candidate.metadata["aave_recheck_checked"] == "1"
+    assert candidate.metadata["aave_recheck_outcome"] == "addr_mismatch"
+
+
+@pytest.mark.asyncio
+async def test_aave_adapter_schema_mismatch_outcome(monkeypatch):
+    adapter = _adapter(endpoints={"Ethereum": "https://api.v3.aave.com/graphql"})
+    candidate = _result()
+
+    def responder(url, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        return _FakeResponse(status_code=200, body={"data": {"foo": []}})
+
+    monkeypatch.setattr(
+        "defi_agents.freshness.adapters.aave_direct.httpx.AsyncClient",
+        lambda timeout: _FakeClient(responder),
+    )
+
+    snapshot = await adapter.fetch_snapshot(candidate)
+    assert snapshot is None
+    assert candidate.metadata["aave_recheck_checked"] == "1"
+    assert candidate.metadata["aave_recheck_outcome"] == "schema_mismatch"

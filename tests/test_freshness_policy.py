@@ -93,3 +93,23 @@ def test_divergence_high_forces_watchlist_when_enforced():
     assert "DIVERGENCE_HIGH" in result.metadata["warn_reasons"]
     assert counters["diverged_count"] == 1
     assert counters["downgraded_to_watchlist_count"] == 1
+
+
+def test_aave_outcome_counters_include_mismatch_and_schema():
+    cfg = FreshnessConfig(recheck_enabled=True, enforce_freshness_for_actionable=False)
+    res1 = _make_result(report_group="WATCHLIST", freshness_status="UNVERIFIED")
+    res2 = _make_result(report_group="WATCHLIST", freshness_status="UNVERIFIED")
+    res3 = _make_result(report_group="WATCHLIST", freshness_status="UNVERIFIED")
+    res1.metadata["aave_recheck_checked"] = "1"
+    res2.metadata["aave_recheck_checked"] = "1"
+    res3.metadata["aave_recheck_checked"] = "1"
+    res1.metadata["aave_recheck_outcome"] = "schema_mismatch"
+    res2.metadata["aave_recheck_outcome"] = "addr_mismatch"
+    res3.metadata["aave_recheck_outcome"] = "error"
+
+    counters = apply_freshness_policy([res1, res2, res3], cfg)
+
+    assert counters["aave_checked_count"] == 3
+    assert counters["aave_schema_mismatch_count"] == 1
+    assert counters["aave_addr_mismatch_count"] == 1
+    assert counters["aave_error_count"] == 1

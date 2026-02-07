@@ -35,12 +35,18 @@ class DeFiLlamaClient:
 
         best_eth_supply = self._pick_best_supply(lending_candidates, eth_assets)
         best_btc_supply = self._pick_best_supply(lending_candidates, btc_assets)
+        best_gho_supply = self._pick_best_supply(lending_candidates, {"GHO"})
         lowest_stable_borrow = self._pick_lowest_borrow(lending_candidates, stable_assets)
+        lowest_eurc_borrow = self._pick_lowest_borrow(lending_candidates, {"EURC"})
+        lowest_usdc_borrow = self._pick_lowest_borrow(lending_candidates, {"USDC"})
 
         return LendingSnapshot(
             best_eth_supply=best_eth_supply,
             best_btc_supply=best_btc_supply,
+            best_gho_supply=best_gho_supply,
             lowest_stable_borrow=lowest_stable_borrow,
+            lowest_eurc_borrow=lowest_eurc_borrow,
+            lowest_usdc_borrow=lowest_usdc_borrow,
         )
 
     async def _fetch_raw_pools(self) -> list[dict]:

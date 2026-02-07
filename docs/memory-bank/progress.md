@@ -31,6 +31,13 @@
 - Plan 008 (L3 AI-Analyst): production hardening and real provider integration
 
 ## Completed
+- 2026-02-07: Expanded Scout lending snapshot with targeted carry metrics (`best GHO supply APY`, `lowest EURC borrow APR`, `lowest USDC borrow APR`) in addition to existing ETH/BTC/stable aggregates — 2026-02-07
+- 2026-02-07: Wired new lending metrics into runtime observability (`Lending snapshot` log line) and Telegram `Lending Snapshot` report output — 2026-02-07
+- 2026-02-07: Added/updated snapshot tests (`tests/test_lending_snapshot.py`, `tests/test_notifier.py`) and revalidated full test suite (`87 passed`) — 2026-02-07
+- 2026-02-07: Migrated Aave direct freshness adapter from legacy REST shape to official AaveKit GraphQL (`markets` by `chainIds`) with bounded fail-safe logic and endpoint fallback support — 2026-02-07
+- 2026-02-07: Added explicit Aave freshness counters for `schema_mismatch` and `addr_mismatch` in policy + `Freshness summary` logs, enabling stricter rollout diagnostics — 2026-02-07
+- 2026-02-07: Added `aave_direct_chain_ids` config support and switched example endpoint defaults to `https://api.v3.aave.com/graphql` list form in `docs/memory-bank/scout_config.json` — 2026-02-07
+- 2026-02-07: Updated Aave adapter test suite for GraphQL payloads/fallback/schema-mismatch and added policy counter tests; revalidated targeted + full suites (`13 passed` targeted, `87 passed` full) — 2026-02-07
 - 2026-02-07: Finalized technical plan for Aave direct freshness hardening with fallback/counters/rollout gates (`docs/plans/013-freshness-aave-hardening-plan.md`) — 2026-02-07
 - 2026-02-07: Prepared execution-ready Roo task for Aave freshness hardening (`docs/plans/013-freshness-aave-hardening-roo-task.md`) with scope, constraints, DoD, and verification commands — 2026-02-07
 - 2026-02-07: Fixed Aave direct contract mismatch: `aave_direct_reserve_symbols` is now enforced as allowlist `symbol -> underlying address`; adapter payload/search now uses underlying address and returns fail-safe `None` on candidate/address mismatch — 2026-02-07
@@ -95,6 +102,8 @@
 - 2026-02-04: Updated deployment/config templates for Graph gateway auth and revalidated full suite (`42 passed`) — 2026-02-04
 
 ## Changelog
+- 2026-02-07: Added Scout lending carry snapshot fields for `GHO/EURC/USDC` and integrated them into logs + Telegram decision view without changing filter/scoring logic — 2026-02-07
+- 2026-02-07: Aave direct freshness path aligned with AaveKit GraphQL schema (`chains`/`markets`/`reserves`) and production telemetry expanded with mismatch counters for rollout gating — 2026-02-07
 - 2026-02-07: Added Aave freshness hardening artifacts for execution management: `docs/plans/013-freshness-aave-hardening-plan.md` and `docs/plans/013-freshness-aave-hardening-roo-task.md` — 2026-02-07
 - 2026-02-07: Production-safe minimal-diff hotfix for Aave direct reserve mapping semantics and adapter matching (underlying address allowlist, mismatch fail-safe, no secret/raw URL logging), plus test updates and full validation run — 2026-02-07
 - 2026-02-07: DoD follow-up after Aave direct implementation: updated `docs/memory-bank/scout_config.json` with `aave_direct_*` freshness example fields (feature flag OFF by default, no secret values), and revalidated test suites — 2026-02-07

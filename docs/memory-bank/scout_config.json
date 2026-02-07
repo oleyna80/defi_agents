@@ -58,16 +58,32 @@
       "aerodrome_subgraph_ids": {
         "Base": "https://gateway.thegraph.com/api/{GRAPH_API_KEY}/deployments/id/QmasYjypV6nTLp4iNH4Vjf7fksRNxAkAskqDdKf2DCsQkV"
       },
-      "aave_direct_enabled": false,
+      "aave_direct_enabled": true,
       "aave_direct_timeout_seconds": 8,
       "aave_direct_api_key_env": "AAVE_DIRECT_API_KEY",
       "aave_direct_endpoints": {
-        "Ethereum": "https://aave-api-v3.aave.com/data/reserves"
+        "Ethereum": [
+          "https://api.v3.aave.com/graphql"
+        ]
+      },
+      "aave_direct_chain_ids": {
+        "Ethereum": 1,
+        "Arbitrum": 42161,
+        "Avalanche": 43114,
+        "Base": 8453,
+        "BSC": 56,
+        "Binance": 56,
+        "Optimism": 10,
+        "Polygon": 137
       },
       "aave_direct_reserve_symbols": {
         "Ethereum": {
           "WETH": "0xC02aaA39b223FE8D0A0E5C4F27eAD9083C756Cc2",
-          "USDC": "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+          "WBTC": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+          "USDC": "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+          "USDT": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+          "DAI": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+          "GHO": "0x40D16FC0246aB6A3AE3E2fD7D8F9aE22fE2387bD"
         }
       }
     },

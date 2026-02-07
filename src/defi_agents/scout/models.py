@@ -148,13 +148,19 @@ class LendingSnapshotItem(BaseModel):
 class LendingSnapshot(BaseModel):
     best_eth_supply: Optional[LendingSnapshotItem] = None
     best_btc_supply: Optional[LendingSnapshotItem] = None
+    best_gho_supply: Optional[LendingSnapshotItem] = None
     lowest_stable_borrow: Optional[LendingSnapshotItem] = None
+    lowest_eurc_borrow: Optional[LendingSnapshotItem] = None
+    lowest_usdc_borrow: Optional[LendingSnapshotItem] = None
 
     def has_any(self) -> bool:
         return any(
             [
                 self.best_eth_supply is not None,
                 self.best_btc_supply is not None,
+                self.best_gho_supply is not None,
                 self.lowest_stable_borrow is not None,
+                self.lowest_eurc_borrow is not None,
+                self.lowest_usdc_borrow is not None,
             ]
         )

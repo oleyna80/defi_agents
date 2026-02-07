@@ -6,6 +6,12 @@ Current Plan: docs/plans/013-freshness-aave-hardening-plan.md
 Active Task: Aave direct freshness hardening package (fallback + counters + safe rollout)
 
 ## Recent Changes
+- 2026-02-07: Extended lending snapshot signals with market-level carry metrics (`best_gho_supply`, `lowest_eurc_borrow`, `lowest_usdc_borrow`) in `DeFiLlamaClient`, cycle logs, and Telegram `Lending Snapshot` section — 2026-02-07
+- 2026-02-07: Added regression coverage for new lending snapshot metrics in `tests/test_lending_snapshot.py` and `tests/test_notifier.py`; full suite remains green (`87 passed`) — 2026-02-07
+- 2026-02-07: Switched `AaveDirectAdapter` to official AaveKit GraphQL (`https://api.v3.aave.com/graphql`) with `markets(request:{chainIds})` query flow, deterministic underlying-address match, and fail-safe outcomes (`ok/timeout/error/schema_mismatch/addr_mismatch`) — 2026-02-07
+- 2026-02-07: Added explicit Aave freshness telemetry counters (`aave_schema_mismatch`, `aave_addr_mismatch`) to policy + cycle summary log line in `main.py` for strict-rollout gating — 2026-02-07
+- 2026-02-07: Extended freshness config with `aave_direct_chain_ids` map and updated default `aave_direct_endpoints` example to AaveKit GraphQL endpoint list — 2026-02-07
+- 2026-02-07: Updated Aave adapter tests for GraphQL payload/endpoint fallback/schema-mismatch paths and added policy test coverage for new mismatch counters; full suite green (`87 passed`) — 2026-02-07
 - 2026-02-07: Finalized technical hardening plan for Aave direct freshness (`docs/plans/013-freshness-aave-hardening-plan.md`) with rollout gates and acceptance criteria — 2026-02-07
 - 2026-02-07: Added execution-ready Roo task package for Aave hardening (`docs/plans/013-freshness-aave-hardening-roo-task.md`) including scope/constraints/DoD/verification commands — 2026-02-07
 - 2026-02-07: Fixed Aave direct reserve mapping contract to explicit allowlist `symbol -> underlying address`; adapter now matches reserves by underlying asset address, enforces candidate/address mismatch fail-safe (`None`), and uses allowlist underlying in request payload — 2026-02-07
@@ -138,10 +144,9 @@ Active Task: Aave direct freshness hardening package (fallback + counters + safe
   - `docs/memory-bank/security/whitelist.json` (tokens + protocols)
 
 ## Next Steps
-1. Execute Roo task from `docs/plans/013-freshness-aave-hardening-roo-task.md` and deliver code/test package
-2. Run validation commands from the task file and confirm green targeted + full test suites
-3. Roll out `aave_direct_enabled=true` on VPS in shadow mode only and collect telemetry counters for 24h
-4. Promote to strict freshness gating only after counter thresholds are met and error/timeout rates are stable
-5. Rotate Telegram bot token on VPS (old token appeared in historical logs before hardening) and restart user service
-6. Implement explicit Non-EVM unsupported reporting path (per-chain counters/tags, not only missing-chain totals)
-7. Add heartbeat (daily "no opportunities" message) for healthy-but-silent cycles
+1. Run VPS shadow rollout for AaveKit path (`aave_direct_enabled=true`, strict OFF) and collect 24h counters (`aave_ok`, `aave_timeout`, `aave_schema_mismatch`, `aave_addr_mismatch`)
+2. Validate chain coverage by extending `aave_direct_reserve_symbols` for Arbitrum/Base/Avalanche stable and core assets
+3. Promote to strict freshness gating only after threshold pass (`aave_ok / aave_checked >= 0.70` and no sustained timeout/error streaks)
+4. Rotate Telegram bot token on VPS (old token appeared in historical logs before hardening) and restart user service
+5. Implement explicit Non-EVM unsupported reporting path (per-chain counters/tags, not only missing-chain totals)
+6. Add heartbeat (daily "no opportunities" message) for healthy-but-silent cycles

@@ -77,6 +77,34 @@ def test_lending_snapshot_selects_best_supply_and_lowest_borrow(monkeypatch):
                 "totalBorrowUsd": 4_000_000,
             },
             {
+                "pool": "eurc1",
+                "project": "aave-v3",
+                "chain": "Base",
+                "symbol": "EURC",
+                "address": "0x6666666666666666666666666666666666666666",
+                "tvlUsd": 5_000_000,
+                "apy": 2.1,
+                "apyBase": 2.1,
+                "apyReward": 0.0,
+                "apyBaseBorrow": 1.8,
+                "apyRewardBorrow": 0.0,
+                "totalBorrowUsd": 1_500_000,
+            },
+            {
+                "pool": "gho1",
+                "project": "aave-v3",
+                "chain": "Arbitrum",
+                "symbol": "GHO",
+                "address": "0x7777777777777777777777777777777777777777",
+                "tvlUsd": 7_000_000,
+                "apy": 5.1,
+                "apyBase": 5.1,
+                "apyReward": 0.0,
+                "apyBaseBorrow": 7.0,
+                "apyRewardBorrow": 0.0,
+                "totalBorrowUsd": 1_000_000,
+            },
+            {
                 "pool": "dai1",
                 "project": "spark",
                 "chain": "Ethereum",
@@ -99,9 +127,17 @@ def test_lending_snapshot_selects_best_supply_and_lowest_borrow(monkeypatch):
     assert snapshot.best_eth_supply.candidate.pool_id == "eth2"
     assert snapshot.best_btc_supply is not None
     assert snapshot.best_btc_supply.candidate.pool_id == "btc1"
+    assert snapshot.best_gho_supply is not None
+    assert snapshot.best_gho_supply.candidate.pool_id == "gho1"
     assert snapshot.lowest_stable_borrow is not None
     assert snapshot.lowest_stable_borrow.candidate.pool_id == "dai1"
     assert snapshot.lowest_stable_borrow.metric_value_pct == 1.2
+    assert snapshot.lowest_eurc_borrow is not None
+    assert snapshot.lowest_eurc_borrow.candidate.pool_id == "eurc1"
+    assert snapshot.lowest_eurc_borrow.metric_value_pct == 1.8
+    assert snapshot.lowest_usdc_borrow is not None
+    assert snapshot.lowest_usdc_borrow.candidate.pool_id == "usdc1"
+    assert snapshot.lowest_usdc_borrow.metric_value_pct == 2.4
 
 
 def test_get_pools_still_applies_min_apy_filter(monkeypatch):
