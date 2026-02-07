@@ -6,7 +6,7 @@ from typing import Iterable, List
 
 from ..scout.config import FreshnessConfig
 from ..scout.models import ScoutResult
-from .adapters import AerodromeSubgraphAdapter, FreshnessAdapter, UniswapSubgraphAdapter
+from .adapters import AaveDirectAdapter, AerodromeSubgraphAdapter, FreshnessAdapter, UniswapSubgraphAdapter
 from .types import FreshnessSnapshot
 
 
@@ -80,6 +80,13 @@ class FreshnessManager:
                 subgraph_ids=config.aerodrome_subgraph_ids,
                 graph_api_key_env=config.graph_api_key_env,
                 timeout_seconds=config.recheck_timeout_seconds,
+            ),
+            AaveDirectAdapter(
+                enabled=config.aave_direct_enabled,
+                timeout_seconds=config.aave_direct_timeout_seconds,
+                endpoints=config.aave_direct_endpoints,
+                reserve_symbols=config.aave_direct_reserve_symbols,
+                api_key_env=config.aave_direct_api_key_env,
             ),
         ]
 

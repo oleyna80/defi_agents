@@ -31,6 +31,11 @@
 - Plan 008 (L3 AI-Analyst): production hardening and real provider integration
 
 ## Completed
+- 2026-02-07: Finalized technical plan for Aave direct freshness hardening with fallback/counters/rollout gates (`docs/plans/013-freshness-aave-hardening-plan.md`) — 2026-02-07
+- 2026-02-07: Prepared execution-ready Roo task for Aave freshness hardening (`docs/plans/013-freshness-aave-hardening-roo-task.md`) with scope, constraints, DoD, and verification commands — 2026-02-07
+- 2026-02-07: Fixed Aave direct contract mismatch: `aave_direct_reserve_symbols` is now enforced as allowlist `symbol -> underlying address`; adapter payload/search now uses underlying address and returns fail-safe `None` on candidate/address mismatch — 2026-02-07
+- 2026-02-07: Updated Aave adapter tests for underlying-address semantics (`underlyingAsset` success path + explicit mismatch fail-safe); targeted freshness tests and full suite revalidated green — 2026-02-07
+- 2026-02-07: Completed freshness Phase C+ lending direct path (`AaveDirectAdapter`) with production-safe default OFF (`aave_direct_enabled=false`) and synced example knobs in `docs/memory-bank/scout_config.json` (including per-chain endpoints/reserve map, no API key value in JSON) — 2026-02-07
 - Hardened Uniswap DEX discovery adapter logs to mask Graph gateway API keys and avoid logging raw response text on failures — 2026-02-06
 - Added Scout lending snapshot extraction from DeFiLlama for lending markets: top ETH supply APY, top BTC supply APY, and minimum stablecoin borrow APR — 2026-02-06
 - Wired lending snapshot into orchestrator logs and Telegram report (`Lending Snapshot` section) without changing core scoring/security/freshness pipeline behavior — 2026-02-06
@@ -90,6 +95,9 @@
 - 2026-02-04: Updated deployment/config templates for Graph gateway auth and revalidated full suite (`42 passed`) — 2026-02-04
 
 ## Changelog
+- 2026-02-07: Added Aave freshness hardening artifacts for execution management: `docs/plans/013-freshness-aave-hardening-plan.md` and `docs/plans/013-freshness-aave-hardening-roo-task.md` — 2026-02-07
+- 2026-02-07: Production-safe minimal-diff hotfix for Aave direct reserve mapping semantics and adapter matching (underlying address allowlist, mismatch fail-safe, no secret/raw URL logging), plus test updates and full validation run — 2026-02-07
+- 2026-02-07: DoD follow-up after Aave direct implementation: updated `docs/memory-bank/scout_config.json` with `aave_direct_*` freshness example fields (feature flag OFF by default, no secret values), and revalidated test suites — 2026-02-07
 - 2026-02-01: Template initialized
 - 2026-02-01: Added Universal DeFi Sentinel product context
 - 2026-02-01: Drafted spec 000 (Universal DeFi Agent concept)

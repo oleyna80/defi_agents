@@ -141,6 +141,25 @@ class FreshnessConfig(BaseModel):
     aerodrome_subgraph_ids: dict[str, str] = Field(
         default_factory=dict
     )
+    aave_direct_enabled: bool = False
+    aave_direct_timeout_seconds: int = 8
+    aave_direct_api_key_env: str = "AAVE_DIRECT_API_KEY"
+    aave_direct_endpoints: dict[str, str] = Field(
+        default_factory=dict
+    )
+    # Allowlist map: SYMBOL -> underlying EVM address (not reserve symbol string).
+    aave_direct_reserve_symbols: dict[str, dict[str, str]] = Field(
+        default_factory=lambda: {
+            "Ethereum": {
+                "WETH": "0xC02aaA39b223FE8D0A0E5C4F27eAD9083C756Cc2",
+                "WBTC": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+                "USDC": "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+                "USDT": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "DAI": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "GHO": "0x40D16FC0246aB6A3AE3E2fD7D8F9aE22fE2387bD",
+            }
+        }
+    )
 
 
 class StrategySimConfig(BaseModel):

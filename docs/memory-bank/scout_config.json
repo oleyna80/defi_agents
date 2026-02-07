@@ -57,6 +57,18 @@
       },
       "aerodrome_subgraph_ids": {
         "Base": "https://gateway.thegraph.com/api/{GRAPH_API_KEY}/deployments/id/QmasYjypV6nTLp4iNH4Vjf7fksRNxAkAskqDdKf2DCsQkV"
+      },
+      "aave_direct_enabled": false,
+      "aave_direct_timeout_seconds": 8,
+      "aave_direct_api_key_env": "AAVE_DIRECT_API_KEY",
+      "aave_direct_endpoints": {
+        "Ethereum": "https://aave-api-v3.aave.com/data/reserves"
+      },
+      "aave_direct_reserve_symbols": {
+        "Ethereum": {
+          "WETH": "0xC02aaA39b223FE8D0A0E5C4F27eAD9083C756Cc2",
+          "USDC": "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+        }
       }
     },
     "dex_discovery": {

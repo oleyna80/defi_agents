@@ -1,11 +1,17 @@
 # Active Context
 
 ## Current Session Focus
-Current Spec: docs/specs/012-defi-coverage-mvp-dex-lp.md
-Current Plan: docs/plans/012-defi-coverage-mvp-dex-lp-plan.md
-Active Task: DEX/LP discovery implementation plan (Workstream A)
+Current Spec: docs/specs/010-freshness-recheck-v1.md
+Current Plan: docs/plans/013-freshness-aave-hardening-plan.md
+Active Task: Aave direct freshness hardening package (fallback + counters + safe rollout)
 
 ## Recent Changes
+- 2026-02-07: Finalized technical hardening plan for Aave direct freshness (`docs/plans/013-freshness-aave-hardening-plan.md`) with rollout gates and acceptance criteria — 2026-02-07
+- 2026-02-07: Added execution-ready Roo task package for Aave hardening (`docs/plans/013-freshness-aave-hardening-roo-task.md`) including scope/constraints/DoD/verification commands — 2026-02-07
+- 2026-02-07: Fixed Aave direct reserve mapping contract to explicit allowlist `symbol -> underlying address`; adapter now matches reserves by underlying asset address, enforces candidate/address mismatch fail-safe (`None`), and uses allowlist underlying in request payload — 2026-02-07
+- 2026-02-07: Updated Aave adapter tests for underlying-address semantics (success by `underlyingAsset`, explicit mismatch fail-safe) and revalidated targeted + full pytest suites — 2026-02-07
+- 2026-02-07: Implemented freshness Phase C+ lending adapter (`AaveDirectAdapter`) and wired config fields in `FreshnessConfig`; default feature flag remains OFF (`aave_direct_enabled=false`) for production-safe rollout — 2026-02-07
+- 2026-02-07: Completed validation set for Aave direct rollout branch: targeted adapter/policy/manager tests and full test suite passed locally; config JSON example updated with Aave direct freshness knobs (no embedded API keys) — 2026-02-07
 - 2026-02-06: Hardened Uniswap DEX discovery logging to mask Graph API key in endpoint logs (`/api/***/`) and avoid raw response body logging on GraphQL/HTTP errors — 2026-02-06
 - 2026-02-06: Added Scout lending-market snapshot from DeFiLlama (`best ETH supply APY`, `best BTC supply APY`, `lowest stable borrow APR`) using side-channel parsing that does not alter core candidate filters — 2026-02-06
 - 2026-02-06: Wired lending snapshot observability into cycle logs (`Lending snapshot: best_eth_supply/best_btc_supply/lowest_stable_borrow`) and Telegram report section `Lending Snapshot` — 2026-02-06
@@ -132,10 +138,10 @@ Active Task: DEX/LP discovery implementation plan (Workstream A)
   - `docs/memory-bank/security/whitelist.json` (tokens + protocols)
 
 ## Next Steps
-1. Rotate Telegram bot token on VPS (old token appeared in historical logs before hardening) and restart user service
-2. Populate VPS `.env` with `GRAPH_API_KEY` and configure `aerodrome_subgraph_{endpoints|ids}` for Base, then run freshness smoke checks
-3. Implement lending Phase C+ adapter: replace deprecated `aave-api-v2` path with current Aave source contract (official API/subgraph)
-4. Enable and calibrate strict freshness gating on VPS (`recheck_enabled=true`, then `enforce_freshness_for_actionable=true`) after telemetry baseline
-5. Finalize Lindy `age` source (pool age vs contract-age proxy) and document the chosen source in spec/policy matrix
+1. Execute Roo task from `docs/plans/013-freshness-aave-hardening-roo-task.md` and deliver code/test package
+2. Run validation commands from the task file and confirm green targeted + full test suites
+3. Roll out `aave_direct_enabled=true` on VPS in shadow mode only and collect telemetry counters for 24h
+4. Promote to strict freshness gating only after counter thresholds are met and error/timeout rates are stable
+5. Rotate Telegram bot token on VPS (old token appeared in historical logs before hardening) and restart user service
 6. Implement explicit Non-EVM unsupported reporting path (per-chain counters/tags, not only missing-chain totals)
 7. Add heartbeat (daily "no opportunities" message) for healthy-but-silent cycles
