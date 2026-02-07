@@ -199,6 +199,20 @@ class TelegramNotifier:
                 f"`{item.candidate.project}` | Borrow APR {item.metric_value_pct:.2f}% | "
                 f"TVL {self._format_tvl(item.candidate.tvl_usd)} | [Pool]({self._pool_link_from_candidate(item.candidate)})"
             )
+        extra_borrows = [
+            (symbol, item)
+            for symbol, item in sorted(
+                lending_snapshot.lowest_borrow_by_symbol.items(),
+                key=lambda pair: pair[1].metric_value_pct,
+            )
+            if symbol not in {"EURC", "USDC"}
+        ]
+        for symbol, item in extra_borrows:
+            lines.append(
+                f"- Cheapest {symbol} borrow: `{item.candidate.chain}` `{item.candidate.symbol}` | "
+                f"`{item.candidate.project}` | Borrow APR {item.metric_value_pct:.2f}% | "
+                f"TVL {self._format_tvl(item.candidate.tvl_usd)} | [Pool]({self._pool_link_from_candidate(item.candidate)})"
+            )
         if lending_snapshot.best_gho_supply:
             borrow_candidates = [
                 item

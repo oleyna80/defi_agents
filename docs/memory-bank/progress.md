@@ -31,6 +31,8 @@
 - Plan 008 (L3 AI-Analyst): production hardening and real provider integration
 
 ## Completed
+- 2026-02-07: Added multi-stable borrow view to `Lending Snapshot` (`lowest_borrow_by_symbol`) so Telegram can show cheapest borrow per additional stablecoins beyond EURC/USDC — 2026-02-07
+- 2026-02-07: Kept carry logic targeted to `GHO supply` vs `min(EURC/USDC borrow)` while surfacing extra stable borrow rates for manual strategy screening — 2026-02-07
 - 2026-02-07: Hardened lending snapshot source selection to lending-only single-asset markets (no DEX pair leakage), fixing misleading entries in Telegram lending block — 2026-02-07
 - 2026-02-07: Added Telegram `Carry pre-check` output (`GHO supply` vs cheapest `EURC/USDC borrow`, spread + coverage) to support borrow-funded pool strategy screening — 2026-02-07
 - 2026-02-07: Expanded Scout lending snapshot with targeted carry metrics (`best GHO supply APY`, `lowest EURC borrow APR`, `lowest USDC borrow APR`) in addition to existing ETH/BTC/stable aggregates — 2026-02-07
@@ -104,6 +106,7 @@
 - 2026-02-04: Updated deployment/config templates for Graph gateway auth and revalidated full suite (`42 passed`) — 2026-02-04
 
 ## Changelog
+- 2026-02-07: Lending snapshot Telegram output now includes cheapest borrow lines for additional stablecoins when data is available (DAI/USDT/USDS/FRAX/etc.), while preserving focused carry gate for EURC/USDC — 2026-02-07
 - 2026-02-07: Lending snapshot now enforces `deposit/borrow` semantics and includes financing carry pre-check to reduce false-positive strategy signals from DEX-like pairs — 2026-02-07
 - 2026-02-07: Added Scout lending carry snapshot fields for `GHO/EURC/USDC` and integrated them into logs + Telegram decision view without changing filter/scoring logic — 2026-02-07
 - 2026-02-07: Aave direct freshness path aligned with AaveKit GraphQL schema (`chains`/`markets`/`reserves`) and production telemetry expanded with mismatch counters for rollout gating — 2026-02-07

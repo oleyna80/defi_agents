@@ -160,6 +160,9 @@ def test_lending_snapshot_selects_best_supply_and_lowest_borrow(monkeypatch):
     assert snapshot.lowest_usdc_borrow is not None
     assert snapshot.lowest_usdc_borrow.candidate.pool_id == "usdc1"
     assert snapshot.lowest_usdc_borrow.metric_value_pct == 2.4
+    assert snapshot.lowest_borrow_by_symbol["DAI"].candidate.pool_id == "dai1"
+    assert snapshot.lowest_borrow_by_symbol["USDC"].candidate.pool_id == "usdc1"
+    assert snapshot.lowest_borrow_by_symbol["EURC"].candidate.pool_id == "eurc1"
 
 
 def test_get_pools_still_applies_min_apy_filter(monkeypatch):

@@ -180,11 +180,32 @@ def test_report_includes_lending_snapshot_section():
             "apyRewardBorrow": 0.0,
         }
     )
+    candidate_dai = ScoutCandidate.model_validate(
+        {
+            "pool": "dai-market",
+            "project": "spark",
+            "chain": "Ethereum",
+            "symbol": "DAI",
+            "address": "0x5555555555555555555555555555555555555555",
+            "chain_id": 1,
+            "tvlUsd": 8_000_000,
+            "apy": 1.9,
+            "apyBase": 1.9,
+            "apyReward": 0.0,
+            "apyBaseBorrow": 1.7,
+            "apyRewardBorrow": 0.0,
+        }
+    )
     snapshot = LendingSnapshot(
         best_eth_supply=LendingSnapshotItem(candidate=candidate_eth, metric_name="supply_apy", metric_value_pct=4.5),
         best_gho_supply=LendingSnapshotItem(candidate=candidate_gho, metric_name="supply_apy", metric_value_pct=5.2),
         lowest_eurc_borrow=LendingSnapshotItem(candidate=candidate_eurc, metric_name="borrow_apr", metric_value_pct=1.9),
         lowest_usdc_borrow=LendingSnapshotItem(candidate=candidate_usdc, metric_name="borrow_apr", metric_value_pct=2.3),
+        lowest_borrow_by_symbol={
+            "EURC": LendingSnapshotItem(candidate=candidate_eurc, metric_name="borrow_apr", metric_value_pct=1.9),
+            "USDC": LendingSnapshotItem(candidate=candidate_usdc, metric_name="borrow_apr", metric_value_pct=2.3),
+            "DAI": LendingSnapshotItem(candidate=candidate_dai, metric_name="borrow_apr", metric_value_pct=1.7),
+        },
     )
     message = notifier._format_report([], lending_snapshot=snapshot)
     assert "Lending Snapshot" in message
@@ -196,6 +217,8 @@ def test_report_includes_lending_snapshot_section():
     assert "Borrow APR 1.90%" in message
     assert "Cheapest USDC borrow" in message
     assert "Borrow APR 2.30%" in message
+    assert "Cheapest DAI borrow" in message
+    assert "Borrow APR 1.70%" in message
     assert "Carry pre-check" in message
     assert "Spread +3.30pp" in message
     assert "[Pool](https://defillama.com/yields/pool/eth-market)" in message

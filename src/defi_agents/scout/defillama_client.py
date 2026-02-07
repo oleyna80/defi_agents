@@ -36,14 +36,15 @@ class DeFiLlamaClient:
 
         eth_assets = {"ETH", "WETH", "STETH", "WSTETH", "RETH", "CBETH", "WEETH", "EZETH"}
         btc_assets = {"BTC", "WBTC", "TBTC", "RENBTC", "SBTC", "LBTC", "CBBTC", "WBTC.B"}
-        stable_assets = self._stable_symbol_set()
+        tracked_stables = self._lending_report_stable_symbols()
 
         best_eth_supply = self._pick_best_supply(lending_candidates, eth_assets)
         best_btc_supply = self._pick_best_supply(lending_candidates, btc_assets)
         best_gho_supply = self._pick_best_supply(lending_candidates, {"GHO"})
-        lowest_stable_borrow = self._pick_lowest_borrow(lending_candidates, stable_assets)
-        lowest_eurc_borrow = self._pick_lowest_borrow(lending_candidates, {"EURC"})
-        lowest_usdc_borrow = self._pick_lowest_borrow(lending_candidates, {"USDC"})
+        lowest_borrow_by_symbol = self._pick_lowest_borrow_by_symbol(lending_candidates, tracked_stables)
+        lowest_stable_borrow = self._pick_lowest_borrow(lending_candidates, tracked_stables)
+        lowest_eurc_borrow = lowest_borrow_by_symbol.get("EURC")
+        lowest_usdc_borrow = lowest_borrow_by_symbol.get("USDC")
 
         return LendingSnapshot(
             best_eth_supply=best_eth_supply,
@@ -52,6 +53,7 @@ class DeFiLlamaClient:
             lowest_stable_borrow=lowest_stable_borrow,
             lowest_eurc_borrow=lowest_eurc_borrow,
             lowest_usdc_borrow=lowest_usdc_borrow,
+            lowest_borrow_by_symbol=lowest_borrow_by_symbol,
         )
 
     async def _fetch_raw_pools(self) -> list[dict]:
@@ -174,6 +176,40 @@ class DeFiLlamaClient:
         stable.update(symbol.upper() for symbol in self.config.token_buckets.stablecoins_eur)
         stable.update(symbol.upper() for symbol in self.config.token_buckets.stablecoins_speculative)
         return stable
+
+    def _lending_report_stable_symbols(self) -> set[str]:
+        stable = self._stable_symbol_set()
+        stable.update({"USDC", "USDT", "DAI", "USDS", "EURC", "GHO"})
+        return stable
+
+    def _pick_lowest_borrow_by_symbol(
+        self,
+        candidates: List[ScoutCandidate],
+        stable_symbols: set[str],
+    ) -> dict[str, LendingSnapshotItem]:
+        best_by_symbol: dict[str, tuple[ScoutCandidate, float]] = {}
+        for candidate in candidates:
+            tokens = self._extract_symbol_tokens(candidate.symbol)
+            if len(tokens) != 1:
+                continue
+            token = next(iter(tokens))
+            if token not in stable_symbols:
+                continue
+            borrow_apr = self._borrow_apr(candidate)
+            if borrow_apr is None or borrow_apr < 0:
+                continue
+            current = best_by_symbol.get(token)
+            if current is None or borrow_apr < current[1]:
+                best_by_symbol[token] = (candidate, borrow_apr)
+
+        return {
+            symbol: LendingSnapshotItem(
+                candidate=item[0],
+                metric_name="borrow_apr",
+                metric_value_pct=float(item[1]),
+            )
+            for symbol, item in best_by_symbol.items()
+        }
 
     @staticmethod
     def _extract_symbol_tokens(symbol: str) -> set[str]:

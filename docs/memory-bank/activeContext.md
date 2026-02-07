@@ -6,6 +6,8 @@ Current Plan: docs/plans/013-freshness-aave-hardening-plan.md
 Active Task: Aave direct freshness hardening package (fallback + counters + safe rollout)
 
 ## Recent Changes
+- 2026-02-07: Expanded `Lending Snapshot` report with per-stable cheapest borrow entries from `lowest_borrow_by_symbol` (e.g., DAI/USDT/USDS/FRAX/others when available), while preserving focused EURC/USDC lines for carry check — 2026-02-07
+- 2026-02-07: Added stable borrow extraction map in snapshot collector (`DeFiLlamaClient`) and covered with notifier/snapshot tests; full suite still green (`87 passed`) — 2026-02-07
 - 2026-02-07: Tightened `Lending Snapshot` intake to lending-only single-asset markets in `DeFiLlamaClient` (excludes DEX-style pair symbols like `WETH-...`/`YOG-WBTC`) to keep snapshot semantics strictly `deposit/borrow` — 2026-02-07
 - 2026-02-07: Added `Carry pre-check` line in Telegram lending section: compares `best GHO supply` vs cheapest `EURC/USDC` borrow and reports spread/coverage for financing viability — 2026-02-07
 - 2026-02-07: Extended lending snapshot signals with market-level carry metrics (`best_gho_supply`, `lowest_eurc_borrow`, `lowest_usdc_borrow`) in `DeFiLlamaClient`, cycle logs, and Telegram `Lending Snapshot` section — 2026-02-07

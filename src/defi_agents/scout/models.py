@@ -152,6 +152,7 @@ class LendingSnapshot(BaseModel):
     lowest_stable_borrow: Optional[LendingSnapshotItem] = None
     lowest_eurc_borrow: Optional[LendingSnapshotItem] = None
     lowest_usdc_borrow: Optional[LendingSnapshotItem] = None
+    lowest_borrow_by_symbol: Dict[str, LendingSnapshotItem] = Field(default_factory=dict)
 
     def has_any(self) -> bool:
         return any(
@@ -162,5 +163,6 @@ class LendingSnapshot(BaseModel):
                 self.lowest_stable_borrow is not None,
                 self.lowest_eurc_borrow is not None,
                 self.lowest_usdc_borrow is not None,
+                bool(self.lowest_borrow_by_symbol),
             ]
         )
