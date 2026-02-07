@@ -6,6 +6,8 @@ Current Plan: docs/plans/013-freshness-aave-hardening-plan.md
 Active Task: Aave direct freshness hardening package (fallback + counters + safe rollout)
 
 ## Recent Changes
+- 2026-02-07: Tightened `Lending Snapshot` intake to lending-only single-asset markets in `DeFiLlamaClient` (excludes DEX-style pair symbols like `WETH-...`/`YOG-WBTC`) to keep snapshot semantics strictly `deposit/borrow` — 2026-02-07
+- 2026-02-07: Added `Carry pre-check` line in Telegram lending section: compares `best GHO supply` vs cheapest `EURC/USDC` borrow and reports spread/coverage for financing viability — 2026-02-07
 - 2026-02-07: Extended lending snapshot signals with market-level carry metrics (`best_gho_supply`, `lowest_eurc_borrow`, `lowest_usdc_borrow`) in `DeFiLlamaClient`, cycle logs, and Telegram `Lending Snapshot` section — 2026-02-07
 - 2026-02-07: Added regression coverage for new lending snapshot metrics in `tests/test_lending_snapshot.py` and `tests/test_notifier.py`; full suite remains green (`87 passed`) — 2026-02-07
 - 2026-02-07: Switched `AaveDirectAdapter` to official AaveKit GraphQL (`https://api.v3.aave.com/graphql`) with `markets(request:{chainIds})` query flow, deterministic underlying-address match, and fail-safe outcomes (`ok/timeout/error/schema_mismatch/addr_mismatch`) — 2026-02-07

@@ -26,6 +26,11 @@ class DeFiLlamaClient:
         candidates = self._build_candidates(pools, apply_min_apy=False)
 
         lending_candidates = [candidate for candidate in candidates if self._is_lending_candidate(candidate)]
+        lending_candidates = [
+            candidate
+            for candidate in lending_candidates
+            if self._is_single_asset_market(candidate.symbol)
+        ]
         if not lending_candidates:
             return LendingSnapshot()
 
@@ -85,16 +90,30 @@ class DeFiLlamaClient:
         return results
 
     def _is_lending_candidate(self, candidate: ScoutCandidate) -> bool:
-        return (
+        if (
             candidate.apy_base_borrow is not None
             or candidate.apy_reward_borrow is not None
             or candidate.total_borrow_usd is not None
-            or "aave" in candidate.project.lower()
-            or "compound" in candidate.project.lower()
-            or "morpho" in candidate.project.lower()
-            or "spark" in candidate.project.lower()
-            or "euler" in candidate.project.lower()
+        ):
+            return True
+
+        project_tokens = self._project_tokens(candidate.project)
+        return (
+            "aave" in project_tokens
+            or "compound" in project_tokens
+            or "morpho" in project_tokens
+            or "spark" in project_tokens
+            or "euler" in project_tokens
+            or "venus" in project_tokens
+            or "moonwell" in project_tokens
         )
+
+    @staticmethod
+    def _project_tokens(project: str) -> set[str]:
+        return {part for part in re.split(r"[^A-Za-z0-9]+", (project or "").lower()) if part}
+
+    def _is_single_asset_market(self, symbol: str) -> bool:
+        return len(self._extract_symbol_tokens(symbol)) == 1
 
     def _pick_best_supply(
         self,

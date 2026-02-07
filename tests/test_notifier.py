@@ -196,6 +196,8 @@ def test_report_includes_lending_snapshot_section():
     assert "Borrow APR 1.90%" in message
     assert "Cheapest USDC borrow" in message
     assert "Borrow APR 2.30%" in message
+    assert "Carry pre-check" in message
+    assert "Spread +3.30pp" in message
     assert "[Pool](https://defillama.com/yields/pool/eth-market)" in message
 
 

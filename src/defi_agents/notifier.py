@@ -199,6 +199,25 @@ class TelegramNotifier:
                 f"`{item.candidate.project}` | Borrow APR {item.metric_value_pct:.2f}% | "
                 f"TVL {self._format_tvl(item.candidate.tvl_usd)} | [Pool]({self._pool_link_from_candidate(item.candidate)})"
             )
+        if lending_snapshot.best_gho_supply:
+            borrow_candidates = [
+                item
+                for item in [lending_snapshot.lowest_eurc_borrow, lending_snapshot.lowest_usdc_borrow]
+                if item is not None
+            ]
+            if borrow_candidates:
+                best_borrow = min(borrow_candidates, key=lambda item: item.metric_value_pct)
+                spread = lending_snapshot.best_gho_supply.metric_value_pct - best_borrow.metric_value_pct
+                coverage = (
+                    (lending_snapshot.best_gho_supply.metric_value_pct / best_borrow.metric_value_pct) * 100.0
+                    if best_borrow.metric_value_pct > 0
+                    else 0.0
+                )
+                lines.append(
+                    f"- Carry pre-check: GHO supply {lending_snapshot.best_gho_supply.metric_value_pct:.2f}% "
+                    f"vs {best_borrow.candidate.symbol} borrow {best_borrow.metric_value_pct:.2f}% | "
+                    f"Spread {spread:+.2f}pp | Coverage {coverage:.0f}%"
+                )
         lines.append("")
 
     def _chunk_message(self, text: str, max_len: int = 3500) -> List[str]:
