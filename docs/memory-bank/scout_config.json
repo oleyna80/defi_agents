@@ -107,7 +107,7 @@
       }
     },
     "inspector": {
-      "enabled": false,
+      "enabled": true,
       "timeout_seconds": 10,
       "output_dir": "docs/memory-bank/cache/inspector",
       "rpc_urls": {
@@ -121,7 +121,22 @@
         "enable_rpc_log_inference": false,
         "rpc_log_inference_block_window": 5000
       },
-      "targets": []
+      "targets": [
+        {
+          "target_id": "altura-hyperevm",
+          "name": "Altura",
+          "chain": "HyperEVM",
+          "chain_id": 999,
+          "defillama_protocol_slug": "altura",
+          "defillama_yield_pool_id": "e3384973-c269-4849-9747-3a8b48897114",
+          "seed_addresses": [
+            "0xd0Ee0CF300DFB598270cd7F4D0c6E0D8F6e13f29"
+          ],
+          "docs_urls": [
+            "https://docs.altura.trade/"
+          ]
+        }
+      ]
     },
     "token_buckets": {
       "stablecoins_usd": [
