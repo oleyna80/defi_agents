@@ -31,6 +31,11 @@
 - Plan 008 (L3 AI-Analyst): production hardening and real provider integration
 
 ## Completed
+- 2026-02-10: Implemented Protocol Inspector v1 MVP (`src/defi_agents/inspector/*`, `inspector_main.py`) with risk-first PARTIAL/WATCHLIST semantics, onchain core checks, dossier persistence, and diff alerts — 2026-02-10
+- 2026-02-10: Added inspector config schema to `ScoutConfig` (`inspector` block) and safe-off defaults in `docs/memory-bank/scout_config.json` — 2026-02-10
+- 2026-02-10: Added focused inspector test suite (`tests/test_protocol_inspector.py`) and revalidated full project tests (`90 passed`) — 2026-02-10
+- 2026-02-10: Approved spec `014-protocol-inspector-v1` and moved track to implementation kickoff state — 2026-02-10
+- 2026-02-10: Drafted Protocol Inspector v1 documentation pack (spec/plan/runbook) for risk-first onchain protocol due diligence — 2026-02-10
 - 2026-02-07: Added multi-stable borrow view to `Lending Snapshot` (`lowest_borrow_by_symbol`) so Telegram can show cheapest borrow per additional stablecoins beyond EURC/USDC — 2026-02-07
 - 2026-02-07: Kept carry logic targeted to `GHO supply` vs `min(EURC/USDC borrow)` while surfacing extra stable borrow rates for manual strategy screening — 2026-02-07
 - 2026-02-07: Hardened lending snapshot source selection to lending-only single-asset markets (no DEX pair leakage), fixing misleading entries in Telegram lending block — 2026-02-07

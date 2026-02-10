@@ -1,11 +1,16 @@
 # Active Context
 
 ## Current Session Focus
-Current Spec: docs/specs/010-freshness-recheck-v1.md
-Current Plan: docs/plans/013-freshness-aave-hardening-plan.md
-Active Task: Aave direct freshness hardening package (fallback + counters + safe rollout)
+Current Spec: docs/specs/014-protocol-inspector-v1.md
+Current Plan: docs/plans/014-protocol-inspector-v1-plan.md
+Active Task: Protocol Inspector v1 MVP local implementation and rollout prep
 
 ## Recent Changes
+- 2026-02-10: Implemented Protocol Inspector v1 MVP module + standalone entrypoint (`inspector_main.py`) with feature-flagged config block (`inspector`) in `ScoutConfig` and `scout_config.json` defaults set to safe OFF — 2026-02-10
+- 2026-02-10: Added onchain checker foundations (RPC connectivity, `eth_getCode`, EIP-1967 proxy/admin detection, owner/paused best-effort checks), dossier storage (`latest/prev`) and high-impact diff detection (`implementation/admin/owner/paused`) — 2026-02-10
+- 2026-02-10: Added inspector reporting (`format_inspector_report`) and notifier helper (`send_markdown_report`) plus focused tests; full suite green (`90 passed`) — 2026-02-10
+- 2026-02-10: Approved `Protocol Inspector v1` spec (`Status: APPROVED`) and marked architecture/user approvals for execution readiness — 2026-02-10
+- 2026-02-10: Drafted Protocol Inspector v1 documentation pack (risk-first, onchain verifiability): spec + technical plan + ops runbook + Roo task — 2026-02-10
 - 2026-02-07: Expanded `Lending Snapshot` report with per-stable cheapest borrow entries from `lowest_borrow_by_symbol` (e.g., DAI/USDT/USDS/FRAX/others when available), while preserving focused EURC/USDC lines for carry check — 2026-02-07
 - 2026-02-07: Added stable borrow extraction map in snapshot collector (`DeFiLlamaClient`) and covered with notifier/snapshot tests; full suite still green (`87 passed`) — 2026-02-07
 - 2026-02-07: Tightened `Lending Snapshot` intake to lending-only single-asset markets in `DeFiLlamaClient` (excludes DEX-style pair symbols like `WETH-...`/`YOG-WBTC`) to keep snapshot semantics strictly `deposit/borrow` — 2026-02-07

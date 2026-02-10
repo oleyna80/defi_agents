@@ -29,6 +29,10 @@ class TelegramNotifier:
     async def send_error(self, text: str) -> None:
         await self._send(f"⚠️ {text}")
 
+    async def send_markdown_report(self, text: str) -> None:
+        for chunk in self._chunk_message(text):
+            await self._send(chunk)
+
     async def _send(self, text: str, retries: int = 3) -> bool:
         if not self.token or not self.chat_id:
             # No credentials configured; fallback to console output.

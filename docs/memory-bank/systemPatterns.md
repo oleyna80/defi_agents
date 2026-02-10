@@ -2,6 +2,16 @@
 
 ## Architecture Decisions
 - YYYY-MM-DD: <Decision> - <Rationale>
+- 2026-02-10: Protocol Inspector runs as a separate service-bot (standalone entrypoint `inspector_main.py`) rather than inside Scout cycle.
+  Rationale: isolate onchain due-diligence runtime (RPC budgets, source failures, diff polling) from yield scouting path and keep blast radius minimal.
+
+- 2026-02-10: Contract verification is implemented as a risk-first dossier pipeline:
+  - Resolve Contract Set from bounded sources (seed/DeFiLlama)
+  - Run onchain checks (`eth_getCode`, EIP-1967 proxy/admin, owner/paused best-effort)
+  - Persist `latest/prev` dossier snapshots and alert on high-impact diffs (`implementation/admin/owner/paused`)
+  - Missing data => `PARTIAL` + `WATCHLIST`; no pass-by-absence.
+  Rationale: decision-grade transparency with explicit uncertainty handling.
+
 - 2026-02-01: Use aggregator APIs as universal adapters:
   - Discovery: DeFiLlama Yields API
   - Monitoring: Debank Cloud

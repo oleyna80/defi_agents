@@ -210,6 +210,36 @@ class DexDiscoveryConfig(BaseModel):
     uniswap_v3_new_pools: UniswapV3NewPoolsConfig = Field(default_factory=UniswapV3NewPoolsConfig)
 
 
+class InspectorTargetConfig(BaseModel):
+    target_id: str
+    name: str = ""
+    chain: str = "Ethereum"
+    chain_id: int | None = None
+    rpc_url: str | None = None
+    explorer_url: str | None = None
+    defillama_protocol_slug: str | None = None
+    defillama_yield_pool_id: str | None = None
+    docs_urls: List[str] = Field(default_factory=list)
+    seed_addresses: List[str] = Field(default_factory=list)
+
+
+class InspectorBudgetsConfig(BaseModel):
+    max_http_requests: int = 20
+    max_rpc_calls: int = 100
+    max_targets_per_run: int = 5
+    enable_rpc_log_inference: bool = False
+    rpc_log_inference_block_window: int = 5000
+
+
+class InspectorConfig(BaseModel):
+    enabled: bool = False
+    timeout_seconds: int = 10
+    output_dir: str = "docs/memory-bank/cache/inspector"
+    rpc_urls: Dict[str, str] = Field(default_factory=dict)
+    budgets: InspectorBudgetsConfig = Field(default_factory=InspectorBudgetsConfig)
+    targets: List[InspectorTargetConfig] = Field(default_factory=list)
+
+
 class ScoutConfig(BaseModel):
     min_tvl_usd: float = 1_000_000
     min_apy: float = 0.0
@@ -222,6 +252,7 @@ class ScoutConfig(BaseModel):
     capacity_guards: CapacityGuards = Field(default_factory=CapacityGuards)
     freshness: FreshnessConfig = Field(default_factory=FreshnessConfig)
     dex_discovery: DexDiscoveryConfig = Field(default_factory=DexDiscoveryConfig)
+    inspector: InspectorConfig = Field(default_factory=InspectorConfig)
     strategy_sim: StrategySimConfig = Field(default_factory=StrategySimConfig)
     token_buckets: TokenBuckets = Field(default_factory=TokenBuckets)
     risk_policy: StableRiskPolicy = Field(default_factory=StableRiskPolicy)
