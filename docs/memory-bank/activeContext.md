@@ -6,6 +6,7 @@ Current Plan: docs/plans/014-protocol-inspector-v1-plan.md
 Active Task: Protocol Inspector v1 MVP local implementation and rollout prep
 
 ## Recent Changes
+- 2026-02-10: Refined Protocol Inspector governance control checks: `owner()` failures now map to low-severity `OWNER_UNAVAILABLE`, with fallback control-address reads via `admin()`, `governor()`, `authority()`; verdict policy now allows `PASS` for low-only informational findings — 2026-02-10
 - 2026-02-10: Implemented Protocol Inspector v1 MVP module + standalone entrypoint (`inspector_main.py`) with feature-flagged config block (`inspector`) in `ScoutConfig` and `scout_config.json` defaults set to safe OFF — 2026-02-10
 - 2026-02-10: Added onchain checker foundations (RPC connectivity, `eth_getCode`, EIP-1967 proxy/admin detection, owner/paused best-effort checks), dossier storage (`latest/prev`) and high-impact diff detection (`implementation/admin/owner/paused`) — 2026-02-10
 - 2026-02-10: Added inspector reporting (`format_inspector_report`) and notifier helper (`send_markdown_report`) plus focused tests; full suite green (`90 passed`) — 2026-02-10

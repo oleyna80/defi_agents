@@ -31,6 +31,7 @@
 - Plan 008 (L3 AI-Analyst): production hardening and real provider integration
 
 ## Completed
+- 2026-02-10: Tuned Protocol Inspector ownership checks to avoid false WATCHLIST on contracts without `owner()`: added fallback reads (`admin/governor/authority`) and low-severity informational findings; updated verdict gate to allow `PASS` for low-only findings — 2026-02-10
 - 2026-02-10: Implemented Protocol Inspector v1 MVP (`src/defi_agents/inspector/*`, `inspector_main.py`) with risk-first PARTIAL/WATCHLIST semantics, onchain core checks, dossier persistence, and diff alerts — 2026-02-10
 - 2026-02-10: Added inspector config schema to `ScoutConfig` (`inspector` block) and safe-off defaults in `docs/memory-bank/scout_config.json` — 2026-02-10
 - 2026-02-10: Added focused inspector test suite (`tests/test_protocol_inspector.py`) and revalidated full project tests (`90 passed`) — 2026-02-10

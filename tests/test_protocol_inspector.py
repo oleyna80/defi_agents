@@ -77,6 +77,15 @@ async def test_inspector_pass_with_seed_and_mocked_rpc(tmp_path, monkeypatch):
         async def read_owner(self, address: str):
             return "0x9999999999999999999999999999999999999999"
 
+        async def read_admin(self, address: str):
+            return None
+
+        async def read_governor(self, address: str):
+            return None
+
+        async def read_authority(self, address: str):
+            return None
+
         async def read_paused(self, address: str):
             return False
 
@@ -112,3 +121,65 @@ async def test_inspector_pass_with_seed_and_mocked_rpc(tmp_path, monkeypatch):
     assert "Protocol Inspector Report" in message
     assert "Verdict `PASS`" in message
 
+
+@pytest.mark.asyncio
+async def test_inspector_owner_unavailable_uses_fallback_and_stays_pass(tmp_path, monkeypatch):
+    class _FakeRpcFallback:
+        def __init__(self, rpc_url: str, timeout_seconds: int = 10) -> None:
+            self.rpc_url = rpc_url
+            self.timeout_seconds = timeout_seconds
+
+        async def chain_id(self) -> int:
+            return 999
+
+        async def block_number(self) -> int:
+            return 54321
+
+        async def get_code(self, address: str) -> str:
+            return "0x60006000"
+
+        async def detect_proxy(self, address: str):
+            return False, None, None
+
+        async def read_owner(self, address: str):
+            raise RuntimeError("owner selector not supported")
+
+        async def read_admin(self, address: str):
+            return "0x7777777777777777777777777777777777777777"
+
+        async def read_governor(self, address: str):
+            return None
+
+        async def read_authority(self, address: str):
+            return None
+
+        async def read_paused(self, address: str):
+            return False
+
+    monkeypatch.setattr("defi_agents.inspector.manager.EvmRpcClient", _FakeRpcFallback)
+
+    config = ScoutConfig.model_validate(
+        {
+            "inspector": {
+                "enabled": True,
+                "output_dir": str(tmp_path),
+                "rpc_urls": {"HyperEVM": "https://rpc.hyperliquid.xyz/evm"},
+                "targets": [
+                    {
+                        "target_id": "altura-hyperevm",
+                        "name": "Altura",
+                        "chain": "HyperEVM",
+                        "seed_addresses": ["0xd0Ee0CF300DFB598270cd7F4D0c6E0D8F6e13f29"],
+                    }
+                ],
+            }
+        }
+    )
+    inspector = ProtocolInspector(config)
+    dossiers = await inspector.inspect()
+    dossier = dossiers[0]
+    assert dossier.status.value == "OK"
+    assert dossier.verdict.value == "PASS"
+    assert dossier.contracts[0].owner == "0x7777777777777777777777777777777777777777"
+    assert any(f.code == "OWNER_UNAVAILABLE" and f.severity.value == "low" for f in dossier.findings)
+    assert any(f.code == "OWNER_FALLBACK_USED" for f in dossier.findings)

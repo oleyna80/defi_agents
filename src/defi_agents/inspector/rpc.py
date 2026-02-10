@@ -110,8 +110,22 @@ class EvmRpcClient:
         result = await self.eth_call(address, "0x8da5cb5b")
         return _decode_address_from_call(result)
 
+    async def read_admin(self, address: str) -> str | None:
+        # admin()
+        result = await self.eth_call(address, "0xf851a440")
+        return _decode_address_from_call(result)
+
+    async def read_governor(self, address: str) -> str | None:
+        # governor()
+        result = await self.eth_call(address, "0x0c340a24")
+        return _decode_address_from_call(result)
+
+    async def read_authority(self, address: str) -> str | None:
+        # authority()
+        result = await self.eth_call(address, "0xbf7e214f")
+        return _decode_address_from_call(result)
+
     async def read_paused(self, address: str) -> bool | None:
         # paused()
         result = await self.eth_call(address, "0x5c975abb")
         return _decode_bool_from_call(result)
-

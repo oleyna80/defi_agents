@@ -147,22 +147,48 @@ class ProtocolInspector:
         try:
             owner = await rpc.read_owner(address)
             contract.owner = owner
-            if owner is None:
+        except Exception as exc:  # noqa: BLE001
+            contract.owner = None
+            findings.append(
+                InspectorFinding(
+                    code="OWNER_UNAVAILABLE",
+                    severity=InspectorSeverity.LOW,
+                    message=f"owner() not available for {address}: {exc.__class__.__name__}",
+                )
+            )
+
+        if contract.owner is None:
+            fallback_owner = None
+            for label, reader in (
+                ("admin()", rpc.read_admin),
+                ("governor()", rpc.read_governor),
+                ("authority()", rpc.read_authority),
+            ):
+                try:
+                    candidate = await reader(address)
+                except Exception:
+                    continue
+                if candidate:
+                    fallback_owner = candidate
+                    findings.append(
+                        InspectorFinding(
+                            code="OWNER_FALLBACK_USED",
+                            severity=InspectorSeverity.LOW,
+                            message=f"Control address resolved via {label} for {address}",
+                            data={"selector": label},
+                        )
+                    )
+                    break
+            if fallback_owner:
+                contract.owner = fallback_owner
+            elif not any(f.code == "OWNER_UNAVAILABLE" for f in findings):
                 findings.append(
                     InspectorFinding(
                         code="OWNER_UNAVAILABLE",
-                        severity=InspectorSeverity.MEDIUM,
-                        message=f"owner() not available or unreadable for {address}",
+                        severity=InspectorSeverity.LOW,
+                        message=f"No owner/admin/governor/authority resolved for {address}",
                     )
                 )
-        except Exception as exc:  # noqa: BLE001
-            findings.append(
-                InspectorFinding(
-                    code="RPC_OWNER_ERROR",
-                    severity=InspectorSeverity.MEDIUM,
-                    message=f"Failed to read owner for {address}: {exc.__class__.__name__}",
-                )
-            )
 
         try:
             paused = await rpc.read_paused(address)
@@ -193,12 +219,19 @@ class ProtocolInspector:
             dossier.status = InspectorStatus.OK
 
         has_critical = any(f.severity == InspectorSeverity.CRITICAL for f in dossier.findings)
+        has_high = any(f.severity == InspectorSeverity.HIGH for f in dossier.findings)
+        has_medium = any(f.severity == InspectorSeverity.MEDIUM for f in dossier.findings)
         if has_critical:
             dossier.verdict = InspectorVerdict.FAIL
             dossier.rationale = "Critical control risk detected."
             return
 
-        if dossier.status == InspectorStatus.PARTIAL or dossier.findings:
+        if dossier.status == InspectorStatus.PARTIAL:
+            dossier.verdict = InspectorVerdict.WATCHLIST
+            dossier.rationale = "Inspection is partial; manual review required."
+            return
+
+        if has_high or has_medium:
             dossier.verdict = InspectorVerdict.WATCHLIST
             dossier.rationale = "Incomplete or non-critical risks detected; manual review required."
             return
