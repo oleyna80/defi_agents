@@ -31,6 +31,8 @@
 - Plan 008 (L3 AI-Analyst): production hardening and real provider integration
 
 ## Completed
+- 2026-02-10: Limited Scout Telegram report universe to `BTC/ETH/stablecoins/XAUT-PAXG` by adding notifier-side token allowlist filtering and regression tests (`tests/test_notifier.py`) to hide non-target symbols from decision output — 2026-02-10
+- 2026-02-10: Added dedicated Protocol Inspector roadmap track (Phase 2.8) in `ROADMAP.md` with current implementation status, rollout gates, and DoD — 2026-02-10
 - 2026-02-10: Tuned Protocol Inspector ownership checks to avoid false WATCHLIST on contracts without `owner()`: added fallback reads (`admin/governor/authority`) and low-severity informational findings; updated verdict gate to allow `PASS` for low-only findings — 2026-02-10
 - 2026-02-10: Implemented Protocol Inspector v1 MVP (`src/defi_agents/inspector/*`, `inspector_main.py`) with risk-first PARTIAL/WATCHLIST semantics, onchain core checks, dossier persistence, and diff alerts — 2026-02-10
 - 2026-02-10: Added inspector config schema to `ScoutConfig` (`inspector` block) and safe-off defaults in `docs/memory-bank/scout_config.json` — 2026-02-10

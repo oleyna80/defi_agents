@@ -12,6 +12,19 @@ from .scout.models import LendingSnapshot, PriorityTier, ScoutCandidate, ScoutRe
 
 
 class TelegramNotifier:
+    _ALLOWED_STABLES = {
+        "USDC", "USDT", "DAI", "USDS", "FRAX", "LUSD", "USDE", "GHO", "PYUSD", "CRVUSD",
+        "EURS", "EURC", "AGEUR", "EURE", "FDUSD", "TUSD", "USDP", "USDD", "USD0", "USD1",
+        "RLUSD", "USDG", "USDY", "SUSDS", "SDAI", "USDBC",
+    }
+    _ALLOWED_BTC = {
+        "BTC", "WBTC", "WBTC.B", "CBBTC", "TBTC", "RENBTC", "SBTC", "BTCB", "LBTC",
+    }
+    _ALLOWED_ETH = {
+        "ETH", "WETH", "STETH", "WSTETH", "RETH", "CBETH", "EETH", "WEETH", "METH", "SETH",
+    }
+    _ALLOWED_GOLD = {"XAUT", "PAXG", "PAXGOLD"}
+
     def __init__(self, include_tags: bool = False) -> None:
         self.token = os.getenv("TELEGRAM_BOT_TOKEN")
         self.chat_id = os.getenv("TELEGRAM_CHAT_ID") or os.getenv("CHAT_ID")
@@ -81,6 +94,7 @@ class TelegramNotifier:
             "",
         ]
         self._append_lending_snapshot(lines, lending_snapshot)
+        results = [item for item in results if self._is_allowed_candidate(item)]
         sections = [
             (PriorityTier.LOW_VOLATILITY, "1) Stable/Stable"),
             (PriorityTier.COIN_STABLE, "2) Token/Stable"),
@@ -297,3 +311,26 @@ class TelegramNotifier:
                 return f"{explorer}{pool_id}"
 
         return f"https://defillama.com/yields/pool/{pool_id}"
+
+    def _is_allowed_candidate(self, result: ScoutResult) -> bool:
+        tokens = self._extract_tokens(result.candidate.symbol)
+        if not tokens:
+            return False
+        return all(self._is_allowed_token(token) for token in tokens)
+
+    def _extract_tokens(self, symbol: str) -> list[str]:
+        parts = re.split(r"[-/\\s]+", symbol or "")
+        return [self._normalize_token(part) for part in parts if part.strip()]
+
+    def _normalize_token(self, token: str) -> str:
+        normalized = token.upper().replace("₮", "T")
+        normalized = re.sub(r"[^A-Z0-9.]", "", normalized)
+        return normalized
+
+    def _is_allowed_token(self, token: str) -> bool:
+        return (
+            token in self._ALLOWED_STABLES
+            or token in self._ALLOWED_BTC
+            or token in self._ALLOWED_ETH
+            or token in self._ALLOWED_GOLD
+        )

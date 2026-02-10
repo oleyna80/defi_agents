@@ -6,6 +6,8 @@ Current Plan: docs/plans/014-protocol-inspector-v1-plan.md
 Active Task: Protocol Inspector v1 MVP local implementation and rollout prep
 
 ## Recent Changes
+- 2026-02-10: Scoped Scout Telegram output to target assets only (`BTC`, `ETH`, stablecoins, `XAUT/PAXG`) by adding symbol allowlist filtering in `TelegramNotifier`; non-target tokens are excluded from report lines without changing scout scoring pipeline — 2026-02-10
+- 2026-02-10: Updated `ROADMAP.md` with dedicated Phase 2.8 track for Protocol Inspector (scope, rollout gates, DoD, and links to spec/plan/runbook) — 2026-02-10
 - 2026-02-10: Refined Protocol Inspector governance control checks: `owner()` failures now map to low-severity `OWNER_UNAVAILABLE`, with fallback control-address reads via `admin()`, `governor()`, `authority()`; verdict policy now allows `PASS` for low-only informational findings — 2026-02-10
 - 2026-02-10: Implemented Protocol Inspector v1 MVP module + standalone entrypoint (`inspector_main.py`) with feature-flagged config block (`inspector`) in `ScoutConfig` and `scout_config.json` defaults set to safe OFF — 2026-02-10
 - 2026-02-10: Added onchain checker foundations (RPC connectivity, `eth_getCode`, EIP-1967 proxy/admin detection, owner/paused best-effort checks), dossier storage (`latest/prev`) and high-impact diff detection (`implementation/admin/owner/paused`) — 2026-02-10

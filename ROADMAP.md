@@ -106,6 +106,32 @@
 
 ---
 
+## 🛡️ Phase 2.8: Protocol Inspector (Новый приоритет: High, IN PROGRESS)
+*Цель: автоматизировать due diligence протоколов (anti-scam / onchain verifiability) как отдельный service-bot, не ломая Scout pipeline.*
+
+- **Spec/Plan/Ops:** `docs/specs/014-protocol-inspector-v1.md`, `docs/plans/014-protocol-inspector-v1-plan.md`, `docs/runbooks/protocol_inspector_v1_ops.md`
+- [x] **Отдельный сервис-бот:**
+    - Реализован отдельный entrypoint `inspector_main.py` и отдельный `systemd --user` oneshot/timer.
+    - Изоляция от Scout: сбои/лимиты инспектора не влияют на цикл `defi-sentinel`.
+- [x] **Risk-first dossier v1:**
+    - Реализованы onchain core-checks (code/proxy/admin/owner/paused best-effort), хранение `latest/prev` и diff по high-impact полям.
+    - Вердикты: `PASS / WATCHLIST / FAIL` без "silent PASS by missing data".
+- [x] **Fail-safe и лог-гигиена:**
+    - Ошибки RPC/API не валят пайплайн; статус деградирует в `PARTIAL/WATCHLIST`.
+    - Санитизация потенциально чувствительных URL/ключей в логах.
+- [x] **Governance fallback hardening:**
+    - `owner()` fallback через `admin()/governor()/authority()`, чтобы убрать ложные `WATCHLIST` на нестандартных контрактах.
+    - Low-only findings допускают `PASS` (информационные, не материальные).
+- [ ] **Rollout-gate для расширения coverage:**
+    - Добавить `Contract Set Builder` v1.1 (poolsOld/docs/campaign/explorer/RPC-inference) для автоматического расширения набора core-адресов.
+    - Добавить чеки timelock/multisig и role-diff alerts в следующий инкремент.
+- [ ] **DoD для фазы 2.8:**
+    - 24h стабильной работы `defi-inspector.timer` без падений и без утечек секретов.
+    - Минимум 1 целевой протокол с детерминированным досье и повторяемым verdict.
+    - Diff-alert срабатывает при изменении `implementation/admin/owner/paused` (где детект возможно).
+
+---
+
 ## 🔵 Phase 3: Reputation System (Traffic Light)
 *Оптимизация расходов на AI и защита от скама на раннем этапе.*
 

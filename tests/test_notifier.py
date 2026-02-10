@@ -96,6 +96,20 @@ def test_report_sorts_by_pair_categories():
     assert message.find("1) Stable/Stable") < message.find("2) Token/Stable") < message.find("3) Token/Token")
 
 
+def test_report_filters_non_target_tokens():
+    notifier = TelegramNotifier()
+    message = notifier._format_report(
+        [
+            _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol="WETH-USDC"),
+            _result(priority=PriorityTier.COIN_COIN, bucket="WARN/SECURITY", symbol="WETH-AERO"),
+            _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol="XAUT-USDC"),
+        ]
+    )
+    assert "`WETH-USDC`" in message
+    assert "`XAUT-USDC`" in message
+    assert "`WETH-AERO`" not in message
+
+
 def test_report_includes_decision_fields_and_colors():
     notifier = TelegramNotifier()
     message = notifier._format_report(
@@ -265,7 +279,7 @@ def test_pool_link_uses_explorer_for_address_like_pool_id():
 def test_report_is_chunked_for_telegram_limits():
     notifier = TelegramNotifier()
     many = [
-        _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol=f"T{i}-USDC", apy=10.0 + i)
+        _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol="WETH-USDC", apy=10.0 + i)
         for i in range(80)
     ]
     message = notifier._format_report(many)
@@ -333,7 +347,7 @@ def test_strategy_fields_hidden_when_not_ok():
         _result(
             priority=PriorityTier.COIN_COIN,
             bucket="WARN/REPUTATION",
-            symbol="WETH-AERO",
+            symbol="WETH-WBTC",
             sim_status="PARTIAL",
             sim_best_strategy="clmm_range_harvest",
             sim_fit_score="0",
@@ -357,7 +371,7 @@ def test_strategy_fields_visible_when_ok():
         _result(
             priority=PriorityTier.COIN_COIN,
             bucket="WARN/REPUTATION",
-            symbol="WETH-AERO",
+            symbol="WETH-WBTC",
             sim_status="OK",
             sim_best_strategy="clmm_range_harvest",
             sim_fit_score="42",
