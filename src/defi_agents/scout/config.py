@@ -10,6 +10,26 @@ from pydantic import BaseModel, Field
 from ..config import CONFIDENCE_PASS, CONFIDENCE_REJECT, CONFIDENCE_WARN
 
 
+class AssetUniverseConfig(BaseModel):
+    """Asset universe filter applied at Scout intake stage (cost/noise control)."""
+    intake_target_assets_only: bool = False
+
+
+class LiquidityGatesConfig(BaseModel):
+    """Liquidity/activity gates for DEX/LP candidates.
+
+    Goal: don't discard high-activity pools with low TVL (common on smaller chains),
+    while still filtering dead/illiquid pools early to save downstream API cost.
+
+    Semantics (when enabled by setting thresholds > 0):
+    - Intake passes if (tvl_usd >= min_tvl_usd) OR (volume_24h_usd >= min_volume_24h_usd).
+    - Optional ratio guard: if both TVL and volume are present, reject when TVL/Vol24h is too high.
+    """
+
+    min_volume_24h_usd: float = 0.0
+    max_tvl_to_volume_24h_ratio: float = 0.0
+
+
 class RiskFilters(BaseModel):
     min_bridge_liquidity: float = 0.0
     max_chain_risk_score: int = 10
@@ -196,7 +216,7 @@ class UniswapV3NewPoolsConfig(BaseModel):
     enabled: bool = False
     timeout_seconds: int = 8
     max_pools: int = 200
-    min_tvl_usd: float = 250_000.0
+    min_tvl_usd: float = Field(default=250_000.0, ge=100_000)
     page_size: int = 50
     max_pages: int = 4
     order_by: str = "createdAtTimestamp"
@@ -241,10 +261,12 @@ class InspectorConfig(BaseModel):
 
 
 class ScoutConfig(BaseModel):
-    min_tvl_usd: float = 1_000_000
+    min_tvl_usd: float = Field(default=1_000_000, ge=100_000)
     min_apy: float = 0.0
     target_chains: Optional[List[str]] = None  # None or [] => all chains
     global_search: bool = True
+    asset_universe: AssetUniverseConfig = Field(default_factory=AssetUniverseConfig)
+    liquidity_gates: LiquidityGatesConfig = Field(default_factory=LiquidityGatesConfig)
     risk_filters: RiskFilters = Field(default_factory=RiskFilters)
     gas_efficiency: GasEfficiency = Field(default_factory=GasEfficiency)
     investor_profile: InvestorProfile = Field(default_factory=InvestorProfile)

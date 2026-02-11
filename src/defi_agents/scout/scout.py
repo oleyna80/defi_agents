@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 import logging
+import re
 from typing import List, Tuple
 
 from .config import ScoutConfig
@@ -16,6 +17,14 @@ logger = logging.getLogger(__name__)
 
 
 class YieldScout:
+    _TARGET_BTC = {
+        "BTC", "WBTC", "WBTC.B", "CBBTC", "TBTC", "RENBTC", "SBTC", "BTCB", "LBTC",
+    }
+    _TARGET_ETH = {
+        "ETH", "WETH", "STETH", "WSTETH", "RETH", "CBETH", "EETH", "WEETH", "METH", "SETH",
+    }
+    _TARGET_GOLD = {"XAUT", "PAXG", "PAXGOLD"}
+
     def __init__(
         self,
         config: ScoutConfig,
@@ -38,7 +47,12 @@ class YieldScout:
             logger.warning("Lending snapshot fetch failed: %s", exc.__class__.__name__)
             self.last_lending_snapshot = LendingSnapshot()
 
-        pools = await self.client.get_pools()
+        try:
+            pools = await self.client.get_pools()
+        except Exception as exc:  # noqa: BLE001
+            # DeFiLlama is an intake source; transient failures should not crash the whole cycle.
+            logger.warning("DeFiLlama pools fetch failed: %s", exc.__class__.__name__)
+            pools = []
         discovery = await self._new_pools_adapter.fetch_new_pools(self.config.target_chains)
         if discovery.candidates:
             pools.extend(discovery.candidates)
@@ -49,7 +63,10 @@ class YieldScout:
 
         new_pool_meta = discovery.metadata_by_pool_id
         raw_count = len(pools)
-        filtered = self._apply_heuristics(pools)
+        filtered, liquidity_filtered = self._apply_heuristics(pools)
+        universe_filtered = 0
+        if self.config.asset_universe.intake_target_assets_only:
+            filtered, universe_filtered = self._apply_asset_universe(filtered)
         heuristics_count = len(filtered)
 
         # Prioritize and select *addressable* candidates for security checks.
@@ -173,7 +190,7 @@ class YieldScout:
         logger.info(
             "Funnel metrics: raw=%s heuristics=%s addressable_selected=%s missing_address=%s missing_chain_id=%s "
             "addressable_total=%s security_counts=%s top_reasons=%s lindy_softened=%s exploration_slots=%s tactical_filtered=%s "
-            "capacity_filtered=%s cost_filtered=%s blacklist_filtered=%s results=%s deduped=%s",
+            "capacity_filtered=%s cost_filtered=%s blacklist_filtered=%s liquidity_filtered=%s universe_filtered=%s results=%s deduped=%s",
             raw_count,
             heuristics_count,
             len(addressable_candidates),
@@ -188,6 +205,8 @@ class YieldScout:
             capacity_filtered,
             cost_filtered,
             blacklist_filtered,
+            liquidity_filtered,
+            universe_filtered,
             len(results),
             len(deduped),
         )
@@ -198,6 +217,67 @@ class YieldScout:
                 dict(pair_class_counts),
             )
         return sorted(deduped, key=lambda x: x.score, reverse=True)
+
+    def _apply_asset_universe(self, pools: List[ScoutCandidate]) -> Tuple[List[ScoutCandidate], int]:
+        """Optional cost/noise control: drop non-target assets before security calls.
+
+        Target universe matches our decision output: BTC/ETH families, stablecoins, and XAUT/PAXG.
+        Default is OFF to avoid changing production behavior without explicit opt-in.
+        """
+        allowed = self._target_asset_symbol_set()
+        kept: List[ScoutCandidate] = []
+        filtered = 0
+        for pool in pools:
+            tokens = self._extract_symbol_tokens(pool.symbol)
+            if not tokens:
+                filtered += 1
+                continue
+            if all(token in allowed for token in tokens):
+                kept.append(pool)
+            else:
+                filtered += 1
+        return kept, filtered
+
+    def _target_asset_symbol_set(self) -> set[str]:
+        buckets = self.config.token_buckets
+        stable = {
+            *(s.upper() for s in buckets.stablecoins_usd),
+            *(s.upper() for s in buckets.stablecoins_eur),
+            *(s.upper() for s in buckets.stablecoins_speculative),
+            *(s.upper() for s in self.config.stable_symbols),
+            # Common stable wrappers seen in lending/curve markets.
+            "SUSDS", "SDAI",
+        }
+        return set(stable) | set(self._TARGET_BTC) | set(self._TARGET_ETH) | set(self._TARGET_GOLD)
+
+    @staticmethod
+    def _extract_symbol_tokens(symbol: str | None) -> list[str]:
+        raw = (symbol or "").upper().strip()
+        if not raw:
+            return []
+        # Split on any non-alphanumeric char (keep dot for variants like WBTC.B).
+        parts = [p for p in re.split(r"[^A-Z0-9\\.]+", raw) if p]
+        # If symbol is a single token (lending), keep it. If it's a pair, keep both.
+        return parts
+
+    def _apply_heuristics(self, pools: List[ScoutCandidate]) -> Tuple[List[ScoutCandidate], int]:
+        candidates: List[ScoutCandidate] = []
+        filtered_by_liquidity = 0
+        for pool in pools:
+            if not self._passes_liquidity_gates(pool):
+                filtered_by_liquidity += 1
+                continue
+            # Yield quality check
+            if pool.yield_quality < self.config.yield_quality_min:
+                continue
+            # Volatility check
+            if self._is_unstable(pool):
+                continue
+            candidates.append(pool)
+
+        # Sort by preliminary score (yield quality * apy)
+        candidates.sort(key=lambda p: (p.yield_quality * (p.apy or 0.0)), reverse=True)
+        return candidates, filtered_by_liquidity
 
     def _prioritize(self, pools: List[ScoutCandidate]) -> List[ScoutCandidate]:
         """Stable-first + addressable-first sorting to use limited audit budget efficiently."""
@@ -455,22 +535,39 @@ class YieldScout:
         )
         return True
 
-    def _apply_heuristics(self, pools: List[ScoutCandidate]) -> List[ScoutCandidate]:
-        candidates: List[ScoutCandidate] = []
-        for pool in pools:
-            if pool.tvl_usd < self.config.min_tvl_usd:
-                continue
-            # Yield quality check
-            if pool.yield_quality < self.config.yield_quality_min:
-                continue
-            # Volatility check
-            if self._is_unstable(pool):
-                continue
-            candidates.append(pool)
+    def _passes_liquidity_gates(self, pool: ScoutCandidate) -> bool:
+        tvl = float(getattr(pool, "tvl_usd", 0.0) or 0.0)
+        if tvl <= 0:
+            return False
 
-        # Sort by preliminary score (yield quality * apy)
-        candidates.sort(key=lambda p: (p.yield_quality * (p.apy or 0.0)), reverse=True)
-        return candidates
+        gates = self.config.liquidity_gates
+        min_vol = float(getattr(gates, "min_volume_24h_usd", 0.0) or 0.0)
+        max_ratio = float(getattr(gates, "max_tvl_to_volume_24h_ratio", 0.0) or 0.0)
+
+        # Default behavior: strict TVL floor (config default is high; schema enforces >=100k).
+        tvl_ok = tvl >= float(self.config.min_tvl_usd)
+
+        vol = getattr(pool, "volume_24h_usd", None)
+        vol_value = float(vol) if isinstance(vol, (int, float)) else None
+        vol_ok = False
+        if min_vol > 0 and vol_value is not None:
+            vol_ok = vol_value >= min_vol
+
+        # If volume gate is configured, accept if either TVL or 24h volume passes.
+        if min_vol > 0:
+            if not (tvl_ok or vol_ok):
+                return False
+        else:
+            if not tvl_ok:
+                return False
+
+        # Optional ratio guard (only when both values are present).
+        if max_ratio > 0 and vol_value is not None and vol_value > 0:
+            ratio = tvl / vol_value
+            if ratio > max_ratio:
+                return False
+
+        return True
 
     def _classify_priority(self, pool: ScoutCandidate) -> PriorityTier:
         # Stablecoin risk policy: FX_STABLE pairs must not be classified as LOW_VOLATILITY

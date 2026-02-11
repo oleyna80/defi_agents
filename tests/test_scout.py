@@ -35,7 +35,7 @@ class _MockAuditor:
         return self._status_map[address]
 
 
-def _candidate(pool, chain, symbol, apy, apy_mean_30d, tvl, age_days=None):
+def _candidate(pool, chain, symbol, apy, apy_mean_30d, tvl, age_days=None, volume_24h_usd=None):
     suffix = pool[-1] if pool and pool[-1].isdigit() else "1"
     candidate = ScoutCandidate.model_validate(
         {
@@ -46,6 +46,7 @@ def _candidate(pool, chain, symbol, apy, apy_mean_30d, tvl, age_days=None):
             "address": "0x" + (suffix * 40),
             "chain_id": 8453,
             "tvlUsd": tvl,
+            "volumeUsd1d": volume_24h_usd,
             "apy": apy,
             "apyBase": apy,
             "apyReward": 0.0,
@@ -61,7 +62,7 @@ def _scout(cfg, pools, status_map):
 
 
 def test_aggregator_dedup():
-    cfg = ScoutConfig(min_tvl_usd=1)
+    cfg = ScoutConfig(min_tvl_usd=100_000)
     pools = [
         _candidate("pool1", "Base", "USDC-USDT", 12, 10, 10_000_000),
         _candidate("pool2", "Base", "USDT-USDC", 10, 9, 12_000_000),
@@ -76,7 +77,7 @@ def test_aggregator_dedup():
 
 
 def test_volatility_trap_filtered():
-    cfg = ScoutConfig(min_tvl_usd=1, apy_anomaly_ratio=2.0)
+    cfg = ScoutConfig(min_tvl_usd=100_000, apy_anomaly_ratio=2.0)
     pools = [
         _candidate("pool1", "Base", "USDC-USDT", 100, 5, 10_000_000),
     ]
@@ -87,7 +88,7 @@ def test_volatility_trap_filtered():
 
 
 def test_security_block_excluded():
-    cfg = ScoutConfig(min_tvl_usd=1)
+    cfg = ScoutConfig(min_tvl_usd=100_000)
     pools = [
         _candidate("pool1", "Base", "USDC-USDT", 20, 18, 10_000_000),
     ]
@@ -100,7 +101,7 @@ def test_security_block_excluded():
 
 
 def test_lindy_softens_missing_audit_block():
-    cfg = ScoutConfig(min_tvl_usd=1, lindy_min_tvl_usd=100_000_000, lindy_min_age_days=180)
+    cfg = ScoutConfig(min_tvl_usd=100_000, lindy_min_tvl_usd=100_000_000, lindy_min_age_days=180)
     pool = _candidate("pool1", "Base", "USDC-USDT", 20, 18, 150_000_000, age_days=365)
     status_map = {
         pool.address: SecurityResult(
@@ -125,7 +126,7 @@ def test_lindy_softens_missing_audit_block():
 
 
 def test_lindy_does_not_override_hidden_owner_block():
-    cfg = ScoutConfig(min_tvl_usd=1, lindy_min_tvl_usd=100_000_000, lindy_min_age_days=180)
+    cfg = ScoutConfig(min_tvl_usd=100_000, lindy_min_tvl_usd=100_000_000, lindy_min_age_days=180)
     pool = _candidate("pool1", "Base", "USDC-USDT", 20, 18, 150_000_000, age_days=365)
     status_map = {
         pool.address: SecurityResult(
@@ -149,7 +150,7 @@ def test_lindy_does_not_override_hidden_owner_block():
 
 def test_net_profit_uses_position_size_and_amortized_gas():
     cfg = ScoutConfig(
-        min_tvl_usd=1,
+        min_tvl_usd=100_000,
         gas_efficiency={
             "position_size_usd": 2500,
             "estimated_roundtrip_gas_usd": 8,
@@ -170,7 +171,7 @@ def test_profile_capacity_micro_passes_while_whale_filtered():
     status_map = {pool.address: SecurityResult.pass_as_tier1()}
 
     micro_cfg = ScoutConfig(
-        min_tvl_usd=1,
+        min_tvl_usd=100_000,
         gas_efficiency={
             "estimated_roundtrip_gas_usd": 1.0,
             "holding_period_days": 60,
@@ -182,7 +183,7 @@ def test_profile_capacity_micro_passes_while_whale_filtered():
         },
     )
     whale_cfg = ScoutConfig(
-        min_tvl_usd=1,
+        min_tvl_usd=100_000,
         gas_efficiency={
             "estimated_roundtrip_gas_usd": 1.0,
             "holding_period_days": 60,
@@ -203,7 +204,7 @@ def test_profile_capacity_micro_passes_while_whale_filtered():
 
 def test_benchmark_tag_is_added_to_metadata():
     cfg = ScoutConfig(
-        min_tvl_usd=1,
+        min_tvl_usd=100_000,
         investor_profile={
             "benchmark_apy": 5.0,
             "benchmark_buffer_apy": 1.0,
@@ -222,9 +223,9 @@ def test_tactical_sleeve_requires_explicit_enable():
     pool = _candidate("pool1", "Base", "USDC-USDT", 150, 100, 1_000_000)
     status_map = {pool.address: SecurityResult.pass_as_tier1()}
 
-    disabled_cfg = ScoutConfig(min_tvl_usd=1)
+    disabled_cfg = ScoutConfig(min_tvl_usd=100_000)
     enabled_cfg = ScoutConfig(
-        min_tvl_usd=1,
+        min_tvl_usd=100_000,
         sleeves={
             "tactical_enabled": True,
             "tactical_min_apy": 100.0,
@@ -242,7 +243,7 @@ def test_tactical_sleeve_requires_explicit_enable():
 
 def test_exploration_quota_includes_high_apy_stable_outside_top_tvl():
     cfg = ScoutConfig(
-        min_tvl_usd=1,
+        min_tvl_usd=100_000,
         max_audit_candidates=4,
         exploration_slots=1,
         exploration_min_apy=20.0,
@@ -274,7 +275,7 @@ def _run(coro):
 
 def test_classify_token_tier_t1():
     """T1 stables (USDC, USDT, DAI, USDS) are classified as T1."""
-    cfg = ScoutConfig(min_tvl_usd=1, risk_policy={"enabled": True})
+    cfg = ScoutConfig(min_tvl_usd=100_000, risk_policy={"enabled": True})
     pool = _candidate("pool1", "Base", "USDC-USDT", 12, 10, 10_000_000)
     status_map = {pool.address: SecurityResult.pass_as_tier1()}
     scout = _scout(cfg, [pool], status_map)
@@ -288,7 +289,7 @@ def test_classify_token_tier_t1():
 
 def test_classify_token_tier_t2():
     """T2 stables (crvUSD, GHO, PYUSD) are classified as T2."""
-    cfg = ScoutConfig(min_tvl_usd=1, risk_policy={"enabled": True})
+    cfg = ScoutConfig(min_tvl_usd=100_000, risk_policy={"enabled": True})
     pool = _candidate("pool1", "Base", "GHO-USDC", 12, 10, 10_000_000)
     status_map = {pool.address: SecurityResult.pass_as_tier1()}
     scout = _scout(cfg, [pool], status_map)
@@ -301,7 +302,7 @@ def test_classify_token_tier_t2():
 
 def test_classify_token_tier_t3():
     """T3 speculative stables (USDe, TUSD, FDUSD) are classified as T3."""
-    cfg = ScoutConfig(min_tvl_usd=1, risk_policy={"enabled": True})
+    cfg = ScoutConfig(min_tvl_usd=100_000, risk_policy={"enabled": True})
     pool = _candidate("pool1", "Base", "USDe-USDC", 12, 10, 10_000_000)
     status_map = {pool.address: SecurityResult.pass_as_tier1()}
     scout = _scout(cfg, [pool], status_map)
@@ -314,7 +315,7 @@ def test_classify_token_tier_t3():
 
 def test_classify_pair_usd_stable_stable():
     """USD-only pair is classified as USD_STABLE_STABLE."""
-    cfg = ScoutConfig(min_tvl_usd=1, risk_policy={"enabled": True})
+    cfg = ScoutConfig(min_tvl_usd=100_000, risk_policy={"enabled": True})
     pool = _candidate("pool1", "Base", "USDC-USDT", 12, 10, 10_000_000)
     status_map = {pool.address: SecurityResult.pass_as_tier1()}
     scout = _scout(cfg, [pool], status_map)
@@ -327,7 +328,7 @@ def test_classify_pair_usd_stable_stable():
 
 def test_classify_pair_fx_stable():
     """USD/EUR mixed pair is classified as FX_STABLE with fx_exposure=True."""
-    cfg = ScoutConfig(min_tvl_usd=1, risk_policy={"enabled": True})
+    cfg = ScoutConfig(min_tvl_usd=100_000, risk_policy={"enabled": True})
     pool = _candidate("pool1", "Base", "EURC-USDC", 12, 10, 10_000_000)
     status_map = {pool.address: SecurityResult.pass_as_tier1()}
     scout = _scout(cfg, [pool], status_map)
@@ -341,7 +342,7 @@ def test_classify_pair_fx_stable():
 def test_blacklist_blocks_by_symbol():
     """Blacklisted symbol is rejected before security calls."""
     cfg = ScoutConfig(
-        min_tvl_usd=1,
+        min_tvl_usd=100_000,
         risk_policy={"enabled": True},
         token_buckets={"exclude_symbols": ["BADTOKEN"]},
     )
@@ -358,7 +359,7 @@ def test_blacklist_blocks_by_address():
     """Blacklisted address is rejected before symbol check."""
     bad_address = "0x" + ("b" * 40)
     cfg = ScoutConfig(
-        min_tvl_usd=1,
+        min_tvl_usd=100_000,
         risk_policy={"enabled": True},
         token_buckets={"exclude_addresses": [bad_address]},
     )
@@ -384,7 +385,7 @@ def test_blacklist_blocks_by_address():
 
 def test_metadata_contains_tier_and_class():
     """Result metadata contains stable_tier, pair_currency_class, and fx_exposure."""
-    cfg = ScoutConfig(min_tvl_usd=1, risk_policy={"enabled": True})
+    cfg = ScoutConfig(min_tvl_usd=100_000, risk_policy={"enabled": True})
     pool = _candidate("pool1", "Base", "USDC-USDT", 12, 10, 10_000_000)
     status_map = {pool.address: SecurityResult.pass_as_tier1()}
     results = _run(_scout(cfg, [pool], status_map).analyze())
@@ -398,7 +399,7 @@ def test_metadata_contains_tier_and_class():
 
 def test_fx_pair_has_fx_exposure_in_metadata():
     """FX pair has fx_exposure=true in metadata."""
-    cfg = ScoutConfig(min_tvl_usd=1, risk_policy={"enabled": True})
+    cfg = ScoutConfig(min_tvl_usd=100_000, risk_policy={"enabled": True})
     pool = _candidate("pool1", "Base", "EURC-USDC", 12, 10, 10_000_000)
     status_map = {pool.address: SecurityResult.pass_as_tier1()}
     results = _run(_scout(cfg, [pool], status_map).analyze())
@@ -414,7 +415,7 @@ def test_fx_stable_priority_not_low_volatility():
     from defi_agents.scout.models import PairCurrencyClass, PriorityTier
 
     cfg = ScoutConfig(
-        min_tvl_usd=1,
+        min_tvl_usd=100_000,
         risk_policy={"enabled": True, "fx_pairs_core_safe_allowed": False},
     )
     pool = _candidate("pool1", "Base", "EURC-USDC", 12, 10, 10_000_000)
@@ -437,7 +438,7 @@ def test_fx_stable_sleeve_routing_when_core_safe_disallowed():
     from defi_agents.security.models import SecurityStatus
 
     cfg = ScoutConfig(
-        min_tvl_usd=1,
+        min_tvl_usd=100_000,
         risk_policy={"enabled": True, "fx_pairs_core_safe_allowed": False},
     )
     pool = _candidate("pool1", "Base", "EURC-USDC", 12, 10, 10_000_000)
@@ -459,7 +460,7 @@ def test_fx_stable_sleeve_routing_when_core_safe_allowed():
     from defi_agents.security.models import SecurityStatus
 
     cfg = ScoutConfig(
-        min_tvl_usd=1,
+        min_tvl_usd=100_000,
         risk_policy={"enabled": True, "fx_pairs_core_safe_allowed": True},
     )
     pool = _candidate("pool1", "Base", "EURC-USDC", 12, 10, 10_000_000)
@@ -474,3 +475,46 @@ def test_fx_stable_sleeve_routing_when_core_safe_allowed():
     sleeve, reason = scout._assign_sleeve(pool, SecurityStatus.TRUSTED)
     assert sleeve == "core_safe"
     assert reason is None
+
+
+def test_asset_universe_filter_defaults_to_all():
+    cfg = ScoutConfig(min_tvl_usd=100_000)
+    pools = [
+        _candidate("pool1", "Base", "WETH-AERO", 12, 10, 10_000_000),
+        _candidate("pool2", "Base", "USDC-USDT", 12, 10, 10_000_000),
+    ]
+    status_map = {pool.address: SecurityResult.pass_as_tier1() for pool in pools}
+    results = _run(_scout(cfg, pools, status_map).analyze())
+    assert {r.candidate.symbol for r in results} == {"WETH-AERO", "USDC-USDT"}
+
+
+def test_asset_universe_filter_target_only_drops_non_target_tokens():
+    cfg = ScoutConfig(min_tvl_usd=100_000, asset_universe={"intake_target_assets_only": True})
+    pools = [
+        _candidate("pool1", "Base", "WETH-USDC", 12, 10, 10_000_000),  # keep
+        _candidate("pool2", "Base", "PAXG-USDC", 12, 10, 10_000_000),  # keep
+        _candidate("pool3", "Base", "WETH-AERO", 12, 10, 10_000_000),  # drop
+        _candidate("pool4", "Base", "USDC-USDT", 12, 10, 10_000_000),  # keep
+    ]
+    status_map = {pool.address: SecurityResult.pass_as_tier1() for pool in pools}
+    results = _run(_scout(cfg, pools, status_map).analyze())
+    symbols = {r.candidate.symbol for r in results}
+    assert "WETH-AERO" not in symbols
+    assert "WETH-USDC" in symbols
+    assert "PAXG-USDC" in symbols
+    assert "USDC-USDT" in symbols
+
+
+def test_liquidity_gate_allows_high_volume_low_tvl_pool():
+    cfg = ScoutConfig(
+        min_tvl_usd=500_000,
+        liquidity_gates={"min_volume_24h_usd": 1_000_000},
+        investor_profile={"initial_capital_usd": 1_000, "risk_profile": "micro", "horizon_days": 30},
+        gas_efficiency={"estimated_roundtrip_gas_usd": 0.0, "holding_period_days": 60},
+    )
+    pools = [
+        _candidate("pool1", "Base", "USDC-USDT", 12, 10, 120_000, volume_24h_usd=2_000_000),
+    ]
+    status_map = {pools[0].address: SecurityResult.pass_as_tier1()}
+    results = _run(_scout(cfg, pools, status_map).analyze())
+    assert len(results) == 1

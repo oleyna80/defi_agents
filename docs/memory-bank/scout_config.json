@@ -4,6 +4,13 @@
     "min_tvl_usd": 500000,
     "min_apy": 8.0,
     "global_search": true,
+    "asset_universe": {
+      "intake_target_assets_only": false
+    },
+    "liquidity_gates": {
+      "min_volume_24h_usd": 0,
+      "max_tvl_to_volume_24h_ratio": 0
+    },
     "risk_filters": {
       "min_bridge_liquidity": 5000000,
       "max_chain_risk_score": 7

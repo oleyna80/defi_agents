@@ -27,6 +27,7 @@ def _result(
     sim_exp_net_apy_max: str | None = None,
     sim_risk_score: str | None = None,
     sim_required_data_missing: str | None = None,
+    volume_24h_usd: float | None = None,
 ) -> ScoutResult:
     candidate = ScoutCandidate.model_validate(
         {
@@ -37,6 +38,7 @@ def _result(
             "address": "0x1111111111111111111111111111111111111111",
             "chain_id": 1,
             "tvlUsd": 10_000_000,
+            "volumeUsd1d": volume_24h_usd,
             "apy": apy,
             "apyBase": apy,
             "apyReward": 0.0,
@@ -108,6 +110,17 @@ def test_report_filters_non_target_tokens():
     assert "`WETH-USDC`" in message
     assert "`XAUT-USDC`" in message
     assert "`WETH-AERO`" not in message
+
+
+def test_report_includes_volume_ratio_when_available():
+    notifier = TelegramNotifier()
+    message = notifier._format_report(
+        [
+            _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol="WETH-USDC", volume_24h_usd=2_000_000),
+        ]
+    )
+    assert "Vol24h" in message
+    assert "TVL/Vol" in message
 
 
 def test_report_includes_decision_fields_and_colors():

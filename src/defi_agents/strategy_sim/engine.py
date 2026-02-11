@@ -149,8 +149,16 @@ class StrategySimEngine:
         return missing
 
     def _has_volume(self, candidate: ScoutCandidate, metadata: Dict[str, str]) -> bool:
-        # Placeholder: check if volume data exists
-        return False
+        vol = getattr(candidate, "volume_24h_usd", None)
+        if isinstance(vol, (int, float)) and float(vol) > 0:
+            return True
+        raw = (metadata.get("volume_24h_usd") or "").strip()
+        if not raw:
+            return False
+        try:
+            return float(raw) > 0
+        except ValueError:
+            return False
 
     def _has_fees(self, candidate: ScoutCandidate, metadata: Dict[str, str]) -> bool:
         return False

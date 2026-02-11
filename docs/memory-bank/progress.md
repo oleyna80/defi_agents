@@ -31,6 +31,12 @@
 - Plan 008 (L3 AI-Analyst): production hardening and real provider integration
 
 ## Completed
+- 2026-02-11: Added Scout liquidity gates to support low-TVL/high-volume pools: `liquidity_gates.min_volume_24h_usd` allows intake via volume, optional `max_tvl_to_volume_24h_ratio`, plus `liquidity_filtered` funnel counter and unit test coverage — 2026-02-11
+- 2026-02-11: Extended DeFiLlama intake to apply optional liquidity ratio guard (`max_tvl_to_volume_24h_ratio`) when volume is present, reducing low-activity noise while preserving volume-aware intake semantics — 2026-02-11
+- 2026-02-11: Prevented Sentinel failures on DeFiLlama timeouts: Scout now logs and continues when DeFiLlama pool fetch fails, so systemd oneshot does not exit non-zero on transient intake outages — 2026-02-11
+- 2026-02-11: Enforced config guardrail `min_tvl_usd >= 100000` (Scout + Uniswap new-pools discovery) via Pydantic schema constraints; updated unit tests accordingly — 2026-02-11
+- 2026-02-11: Added `volumeUsd1d` mapping to `ScoutCandidate.volume_24h_usd` and Telegram report now shows `Vol24h` plus `TVL/Vol` ratio when volume is available; StrategySim `_has_volume` now uses candidate/metadata volume — 2026-02-11
+- 2026-02-11: Added optional Scout intake asset-universe pre-filter (`asset_universe.intake_target_assets_only`) to drop non-target symbols before security calls, with `universe_filtered` funnel counter and unit tests in `tests/test_scout.py` — 2026-02-11
 - 2026-02-10: Limited Scout Telegram report universe to `BTC/ETH/stablecoins/XAUT-PAXG` by adding notifier-side token allowlist filtering and regression tests (`tests/test_notifier.py`) to hide non-target symbols from decision output — 2026-02-10
 - 2026-02-10: Added dedicated Protocol Inspector roadmap track (Phase 2.8) in `ROADMAP.md` with current implementation status, rollout gates, and DoD — 2026-02-10
 - 2026-02-10: Tuned Protocol Inspector ownership checks to avoid false WATCHLIST on contracts without `owner()`: added fallback reads (`admin/governor/authority`) and low-severity informational findings; updated verdict gate to allow `PASS` for low-only findings — 2026-02-10

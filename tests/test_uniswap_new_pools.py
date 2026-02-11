@@ -31,7 +31,7 @@ def test_uniswap_new_pools_adapter_filters_by_tvl_and_maps_metadata(monkeypatch)
         dex_discovery={
             "uniswap_v3_new_pools": {
                 "enabled": True,
-                "min_tvl_usd": 1000,
+                "min_tvl_usd": 100_000,
                 "max_pools": 10,
                 "subgraph_endpoints": {"Ethereum": "https://example.com/graphql"},
             }
@@ -44,14 +44,14 @@ def test_uniswap_new_pools_adapter_filters_by_tvl_and_maps_metadata(monkeypatch)
             {
                 "id": "0x1111111111111111111111111111111111111111",
                 "createdAtTimestamp": "1700000000",
-                "totalValueLockedUSD": "1500",
+                "totalValueLockedUSD": "150000",
                 "token0": {"symbol": "USDC"},
                 "token1": {"symbol": "USDT"},
             },
             {
                 "id": "0x2222222222222222222222222222222222222222",
                 "createdAtTimestamp": "1700000000",
-                "totalValueLockedUSD": "500",
+                "totalValueLockedUSD": "50000",
                 "token0": {"symbol": "DAI"},
                 "token1": {"symbol": "USDC"},
             },

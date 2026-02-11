@@ -117,6 +117,12 @@ class TelegramNotifier:
                 project = r.candidate.project
                 apy = f"{r.candidate.apy:.2f}%"
                 tvl = self._format_tvl(r.candidate.tvl_usd)
+                vol_24h = getattr(r.candidate, "volume_24h_usd", None)
+                vol_str = ""
+                if isinstance(vol_24h, (int, float)) and float(vol_24h) > 0:
+                    ratio = float(r.candidate.tvl_usd) / float(vol_24h) if float(vol_24h) > 0 else None
+                    ratio_str = f"{ratio:.2f}" if ratio is not None else "n/a"
+                    vol_str = f" | Vol24h {self._format_tvl(float(vol_24h))} | TVL/Vol {ratio_str}"
                 bucket = r.metadata.get("bucket", "N/A")
                 sleeve = r.metadata.get("sleeve", "n/a")
                 reason_codes = r.metadata.get("warn_reasons", "-") or "-"
@@ -161,7 +167,7 @@ class TelegramNotifier:
                     f"- {badge} `{chain}` `{sym}` | `{project}` | APY {apy} | TVL {tvl} | "
                     f"Risk `{bucket}`" + (f" | Tags {tags_str}" if tags_str else "") + f" | Sleeve `{sleeve}` | Reasons `{reason_codes}` | "
                     f"Fresh `{freshness}` ({age_m}m) | ΔAPY {d_apy}% ΔTVL {d_tvl}% | "
-                    f"Net@1k ${net_1k}/mo" + (f" | {sim_str}" if sim_str else "") + f" | [Pool]({pool_link})"
+                    f"Net@1k ${net_1k}/mo" + vol_str + (f" | {sim_str}" if sim_str else "") + f" | [Pool]({pool_link})"
                 )
             lines.append("")
         return "\n".join(lines)

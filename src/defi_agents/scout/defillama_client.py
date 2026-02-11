@@ -72,14 +72,38 @@ class DeFiLlamaClient:
             except Exception:
                 continue
 
+            # Best-effort normalize volume fields (DefiLlama uses volumeUsd1d/volumeUsd7d, but some pools may omit).
+            if candidate.volume_24h_usd is None:
+                raw_vol = item.get("volumeUsd24h") or item.get("volumeUSD1d") or item.get("volumeUsd1d")
+                try:
+                    candidate.volume_24h_usd = float(raw_vol) if raw_vol is not None else None
+                except (TypeError, ValueError):
+                    candidate.volume_24h_usd = None
+
             candidate.chain_id = self._resolve_chain_id(item, candidate.chain)
             address, source = self._resolve_address(item, candidate)
             candidate.address = address
             candidate.address_source = source
             candidate.contract_age_days = self._resolve_contract_age_days(item)
 
-            if candidate.tvl_usd < self.config.min_tvl_usd:
-                continue
+            # Liquidity gates: allow intake by either TVL or 24h volume (when configured).
+            tvl_ok = float(candidate.tvl_usd) >= float(self.config.min_tvl_usd)
+            min_vol = float(getattr(self.config.liquidity_gates, "min_volume_24h_usd", 0.0) or 0.0)
+            max_ratio = float(getattr(self.config.liquidity_gates, "max_tvl_to_volume_24h_ratio", 0.0) or 0.0)
+            vol = candidate.volume_24h_usd
+            vol_ok = min_vol > 0 and isinstance(vol, (int, float)) and float(vol) >= min_vol
+            if min_vol > 0:
+                if not (tvl_ok or vol_ok):
+                    continue
+            else:
+                if not tvl_ok:
+                    continue
+
+            # Optional ratio guard: drop low-activity pools when both TVL and volume are available.
+            if max_ratio > 0 and isinstance(vol, (int, float)) and float(vol) > 0:
+                ratio = float(candidate.tvl_usd) / float(vol)
+                if ratio > max_ratio:
+                    continue
 
             if apply_min_apy and candidate.apy is not None and candidate.apy < self.config.min_apy:
                 continue

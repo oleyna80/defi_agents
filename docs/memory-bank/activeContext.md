@@ -6,6 +6,12 @@ Current Plan: docs/plans/014-protocol-inspector-v1-plan.md
 Active Task: Protocol Inspector v1 MVP local implementation and rollout prep
 
 ## Recent Changes
+- 2026-02-11: Added volume-aware liquidity gates for Scout intake: pools can pass heuristics by `TVL >= min_tvl_usd` or `Vol24h >= liquidity_gates.min_volume_24h_usd`, with optional `max_tvl_to_volume_24h_ratio`; added `liquidity_filtered` funnel counter and tests — 2026-02-11
+- 2026-02-11: Applied optional liquidity ratio guard (`max_tvl_to_volume_24h_ratio`) at DeFiLlama intake for cost/noise control, matching Scout liquidity gate semantics; full suite green (`96 passed`) — 2026-02-11
+- 2026-02-11: Hardened Scout cycle against DeFiLlama transient failures: `YieldScout.analyze()` now treats DeFiLlama timeouts/errors as non-fatal (logs warning, continues with any other sources) to avoid systemd service failures — 2026-02-11
+- 2026-02-11: Enforced hard floor `min_tvl_usd >= 100000` (and Uniswap new-pools `min_tvl_usd >= 100000`) at config schema level to prevent low-liquidity pools from entering Scout pipeline by accident — 2026-02-11
+- 2026-02-11: Added 24h volume support (`volumeUsd1d`) to Scout candidates and Telegram report; report now shows `Vol24h` and `TVL/Vol` ratio when available, and StrategySim volume missing-data can be satisfied when volume is present — 2026-02-11
+- 2026-02-11: Added optional Scout intake pre-filter (`asset_universe.intake_target_assets_only`) to drop non-target symbols early (BTC/ETH families, stablecoins, XAUT/PAXG) before security calls; includes funnel counter `universe_filtered` and unit tests — 2026-02-11
 - 2026-02-10: Scoped Scout Telegram output to target assets only (`BTC`, `ETH`, stablecoins, `XAUT/PAXG`) by adding symbol allowlist filtering in `TelegramNotifier`; non-target tokens are excluded from report lines without changing scout scoring pipeline — 2026-02-10
 - 2026-02-10: Updated `ROADMAP.md` with dedicated Phase 2.8 track for Protocol Inspector (scope, rollout gates, DoD, and links to spec/plan/runbook) — 2026-02-10
 - 2026-02-10: Refined Protocol Inspector governance control checks: `owner()` failures now map to low-severity `OWNER_UNAVAILABLE`, with fallback control-address reads via `admin()`, `governor()`, `authority()`; verdict policy now allows `PASS` for low-only informational findings — 2026-02-10

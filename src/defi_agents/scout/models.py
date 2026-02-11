@@ -99,6 +99,8 @@ class ScoutCandidate(BaseModel):
     underlying_tokens: List[str] = Field(alias="underlyingTokens", default_factory=list)
     chain_id: Optional[int] = None
     tvl_usd: float = Field(alias="tvlUsd")
+    volume_24h_usd: Optional[float] = Field(alias="volumeUsd1d", default=None)
+    volume_7d_usd: Optional[float] = Field(alias="volumeUsd7d", default=None)
     apy: float
     apy_base: Optional[float] = Field(alias="apyBase", default=0.0)
     apy_reward: Optional[float] = Field(alias="apyReward", default=0.0)
