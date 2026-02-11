@@ -16,6 +16,7 @@ class DeFiLlamaClient:
     def __init__(self, config: ScoutConfig, timeout_seconds: float = 15.0) -> None:
         self.config = config
         self._timeout = timeout_seconds
+        self._raw_pools_cache: list[dict] | None = None
 
     async def get_pools(self) -> List[ScoutCandidate]:
         pools = await self._fetch_raw_pools()
@@ -56,13 +57,59 @@ class DeFiLlamaClient:
             lowest_borrow_by_symbol=lowest_borrow_by_symbol,
         )
 
+    async def get_turnover_snapshot(self) -> List[ScoutCandidate]:
+        """Return high-turnover DEX/LP candidates for market digest display.
+
+        This is a read-only report helper and does not run security/L3.
+        It is intentionally bounded by config thresholds.
+        """
+        pools = await self._fetch_raw_pools()
+        # Build candidates without min_apy gating; turnover section is about activity.
+        candidates = self._build_candidates(pools, apply_min_apy=False)
+
+        reporting = getattr(self.config, "reporting", None)
+        min_tvl = float(getattr(reporting, "telegram_turnover_min_tvl_usd", 0.0) or 0.0)
+        min_vol = float(getattr(reporting, "telegram_turnover_min_volume_24h_usd", 0.0) or 0.0)
+        min_ratio = float(getattr(reporting, "telegram_turnover_min_vol_to_tvl", 0.0) or 0.0)
+
+        out: list[ScoutCandidate] = []
+        for candidate in candidates:
+            if float(candidate.tvl_usd or 0.0) < min_tvl:
+                continue
+            vol = candidate.volume_24h_usd
+            if not isinstance(vol, (int, float)) or float(vol) <= 0:
+                continue
+            if min_vol > 0 and float(vol) < min_vol:
+                continue
+            ratio = float(vol) / float(candidate.tvl_usd or 1.0)
+            if min_ratio > 0 and ratio < min_ratio:
+                continue
+            # Exclude lending single-asset markets; turnover snapshot is for DEX/LP style pools.
+            if self._is_lending_candidate(candidate):
+                continue
+            out.append(candidate)
+
+        out.sort(
+            key=lambda c: (
+                float(getattr(c, "volume_24h_usd", 0.0) or 0.0) / float(c.tvl_usd or 1.0),
+                float(getattr(c, "volume_24h_usd", 0.0) or 0.0),
+            ),
+            reverse=True,
+        )
+        top_n = int(getattr(reporting, "telegram_turnover_top_n", 0) or 0)
+        return out[:top_n] if top_n > 0 else out
+
     async def _fetch_raw_pools(self) -> list[dict]:
+        if isinstance(self._raw_pools_cache, list):
+            return self._raw_pools_cache
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             resp = await client.get(self.BASE_URL)
             resp.raise_for_status()
             data = resp.json()
         pools = data.get("data", []) if isinstance(data, dict) else []
-        return pools if isinstance(pools, list) else []
+        out = pools if isinstance(pools, list) else []
+        self._raw_pools_cache = out
+        return out
 
     def _build_candidates(self, pools: list[dict], apply_min_apy: bool) -> List[ScoutCandidate]:
         results: List[ScoutCandidate] = []

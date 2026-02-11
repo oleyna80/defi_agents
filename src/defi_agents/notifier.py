@@ -35,8 +35,13 @@ class TelegramNotifier:
         self,
         results: List[ScoutResult],
         lending_snapshot: LendingSnapshot | None = None,
+        turnover_snapshot: List[ScoutCandidate] | None = None,
     ) -> None:
-        message = self._format_report(results, lending_snapshot=lending_snapshot)
+        message = self._format_report(
+            results,
+            lending_snapshot=lending_snapshot,
+            turnover_snapshot=turnover_snapshot,
+        )
         for chunk in self._chunk_message(message):
             await self._send(chunk)
 
@@ -88,6 +93,7 @@ class TelegramNotifier:
         self,
         results: List[ScoutResult],
         lending_snapshot: LendingSnapshot | None = None,
+        turnover_snapshot: List[ScoutCandidate] | None = None,
     ) -> str:
         lines = [
             "*Scout Report — Decision View*",
@@ -95,6 +101,7 @@ class TelegramNotifier:
             "",
         ]
         self._append_lending_snapshot(lines, lending_snapshot)
+        self._append_turnover_snapshot(lines, turnover_snapshot)
         results = [item for item in results if self._is_allowed_candidate(item)]
         sections = [
             (PriorityTier.LOW_VOLATILITY, "1) Stable/Stable"),
@@ -260,6 +267,46 @@ class TelegramNotifier:
                     f"vs {best_borrow.candidate.symbol} borrow {best_borrow.metric_value_pct:.2f}% | "
                     f"Spread {spread:+.2f}pp | Coverage {coverage:.0f}%"
                 )
+        lines.append("")
+
+    def _append_turnover_snapshot(
+        self,
+        lines: List[str],
+        turnover_snapshot: List[ScoutCandidate] | None,
+    ) -> None:
+        if not turnover_snapshot:
+            return
+
+        allowed: list[ScoutCandidate] = []
+        for candidate in turnover_snapshot:
+            fake = ScoutResult(
+                candidate=candidate,
+                security=None,
+                net_apy=0.0,
+                score=0.0,
+                net_profit_usd=0.0,
+                priority=PriorityTier.COIN_COIN,
+                metadata={},
+                flags=[],
+            )
+            if self._is_allowed_candidate(fake):
+                allowed.append(candidate)
+
+        if not allowed:
+            return
+
+        lines.append("*High Turnover (24h) — Market Snapshot*")
+        for candidate in allowed:
+            vol = getattr(candidate, "volume_24h_usd", None)
+            if not isinstance(vol, (int, float)) or float(vol) <= 0:
+                continue
+            tvl_value = float(candidate.tvl_usd or 0.0)
+            ratio = (float(vol) / tvl_value) if tvl_value > 0 else 0.0
+            lines.append(
+                f"- `{candidate.chain}` `{candidate.symbol}` | `{candidate.project}` | "
+                f"TVL {self._format_tvl(float(candidate.tvl_usd))} | Vol24h {self._format_tvl(float(vol))} | "
+                f"Vol/TVL {ratio:.2f} | APY {candidate.apy:.2f}% | [Pool]({self._pool_link_from_candidate(candidate)})"
+            )
         lines.append("")
 
     def _chunk_message(self, text: str, max_len: int = 3500) -> List[str]:

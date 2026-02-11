@@ -6,6 +6,7 @@ Current Plan: docs/plans/014-protocol-inspector-v1-plan.md
 Active Task: Protocol Inspector v1 MVP local implementation and rollout prep
 
 ## Recent Changes
+- 2026-02-11: Added 6h digest `High Turnover (24h)` section (Top Vol/TVL pools) to complement APY-min-gated picks and reduce “single pool” messages for major pairs; uses DeFiLlama `volumeUsd1d` and is config-flagged — 2026-02-11
 - 2026-02-11: Switched Scout Telegram reporting to 6-hour market digest mode (`reporting.telegram_digest_interval_seconds=21600`, `telegram_report_mode=snapshot`) and limited output to Top-10 per section; non-digest cycles suppress Telegram sends — 2026-02-11
 - 2026-02-11: Adjusted Telegram liquidity metric to match Uniswap UI: report now shows `Vol/TVL` (24h volume divided by TVL) instead of inverted `TVL/Vol` — 2026-02-11
 - 2026-02-11: Added hard liquidity guardrail `liquidity_gates.absolute_min_tvl_usd` (default `100000`) so volume-based intake never admits micro-liquidity pools below the absolute floor — 2026-02-11

@@ -7,7 +7,12 @@
     "reporting": {
       "telegram_digest_interval_seconds": 21600,
       "telegram_report_mode": "snapshot",
-      "telegram_top_n_per_section": 10
+      "telegram_top_n_per_section": 10,
+      "telegram_turnover_section_enabled": true,
+      "telegram_turnover_top_n": 10,
+      "telegram_turnover_min_tvl_usd": 100000,
+      "telegram_turnover_min_volume_24h_usd": 0,
+      "telegram_turnover_min_vol_to_tvl": 1.0
     },
     "asset_universe": {
       "intake_target_assets_only": false

@@ -157,6 +157,34 @@ def test_report_includes_decision_fields_and_colors():
     assert "[Pool](https://defillama.com/yields/pool/pool1)" in message
 
 
+def test_report_includes_turnover_snapshot_section():
+    notifier = TelegramNotifier()
+    candidate = ScoutCandidate.model_validate(
+        {
+            "pool": "pool-turnover",
+            "project": "uniswap-v3",
+            "chain": "Ethereum",
+            "symbol": "USDC-USDT",
+            "address": "0x1111111111111111111111111111111111111111",
+            "chain_id": 1,
+            "tvlUsd": 2_000_000,
+            "volumeUsd1d": 5_000_000,
+            "apy": 5.0,
+            "apyBase": 5.0,
+            "apyReward": 0.0,
+        }
+    )
+    message = notifier._format_report(
+        [
+            _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol="WETH-USDC"),
+        ],
+        turnover_snapshot=[candidate],
+    )
+    assert "High Turnover (24h)" in message
+    assert "`USDC-USDT`" in message
+    assert "Vol/TVL" in message
+
+
 def test_report_includes_lending_snapshot_section():
     notifier = TelegramNotifier()
     candidate_eth = ScoutCandidate.model_validate(

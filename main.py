@@ -106,6 +106,7 @@ async def run_sentinel_cycle() -> None:
 
     client = DeFiLlamaClient(config)
     scout = YieldScout(config, client, auditor)
+    turnover_snapshot = None
     try:
         provider = DeepSeekProvider()
         logger.info("DeepSeek provider initialized.")
@@ -125,6 +126,12 @@ async def run_sentinel_cycle() -> None:
     logger.info("Starting Global Scout Cycle (chains: ALL).")
 
     try:
+        if getattr(config.reporting, "telegram_turnover_section_enabled", False):
+            try:
+                turnover_snapshot = await client.get_turnover_snapshot()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Turnover snapshot fetch failed: %s", exc.__class__.__name__)
+                turnover_snapshot = None
         opportunities = await scout.analyze()
         dex_stats = getattr(scout, "last_discovery_stats", None)
         if dex_stats is not None:
@@ -305,7 +312,11 @@ async def run_sentinel_cycle() -> None:
         if report_picks:
             due, interval, remaining = _telegram_digest_due(config)
             if due:
-                await notifier.send_alpha_report(report_picks, lending_snapshot=lending_snapshot)
+                await notifier.send_alpha_report(
+                    report_picks,
+                    lending_snapshot=lending_snapshot,
+                    turnover_snapshot=turnover_snapshot,
+                )
                 _mark_telegram_digest_sent()
                 logger.info(
                     "Reported %s opportunities (safe=%s warn=%s actionable=%s watchlist=%s).",
