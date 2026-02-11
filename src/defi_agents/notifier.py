@@ -120,9 +120,10 @@ class TelegramNotifier:
                 vol_24h = getattr(r.candidate, "volume_24h_usd", None)
                 vol_str = ""
                 if isinstance(vol_24h, (int, float)) and float(vol_24h) > 0:
-                    ratio = float(r.candidate.tvl_usd) / float(vol_24h) if float(vol_24h) > 0 else None
+                    tvl_value = float(r.candidate.tvl_usd)
+                    ratio = (float(vol_24h) / tvl_value) if tvl_value > 0 else None
                     ratio_str = f"{ratio:.2f}" if ratio is not None else "n/a"
-                    vol_str = f" | Vol24h {self._format_tvl(float(vol_24h))} | TVL/Vol {ratio_str}"
+                    vol_str = f" | Vol24h {self._format_tvl(float(vol_24h))} | Vol/TVL {ratio_str}"
                 bucket = r.metadata.get("bucket", "N/A")
                 sleeve = r.metadata.get("sleeve", "n/a")
                 reason_codes = r.metadata.get("warn_reasons", "-") or "-"

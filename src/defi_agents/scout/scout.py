@@ -541,6 +541,9 @@ class YieldScout:
             return False
 
         gates = self.config.liquidity_gates
+        absolute_min_tvl = float(getattr(gates, "absolute_min_tvl_usd", 0.0) or 0.0)
+        if absolute_min_tvl > 0 and tvl < absolute_min_tvl:
+            return False
         min_vol = float(getattr(gates, "min_volume_24h_usd", 0.0) or 0.0)
         max_ratio = float(getattr(gates, "max_tvl_to_volume_24h_ratio", 0.0) or 0.0)
 

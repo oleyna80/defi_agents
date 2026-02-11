@@ -22,10 +22,12 @@ class LiquidityGatesConfig(BaseModel):
     while still filtering dead/illiquid pools early to save downstream API cost.
 
     Semantics (when enabled by setting thresholds > 0):
+    - Absolute floor: reject pools with tvl_usd < absolute_min_tvl_usd (risk-first guardrail).
     - Intake passes if (tvl_usd >= min_tvl_usd) OR (volume_24h_usd >= min_volume_24h_usd).
     - Optional ratio guard: if both TVL and volume are present, reject when TVL/Vol24h is too high.
     """
 
+    absolute_min_tvl_usd: float = Field(default=100_000.0, ge=0.0)
     min_volume_24h_usd: float = 0.0
     max_tvl_to_volume_24h_ratio: float = 0.0
 

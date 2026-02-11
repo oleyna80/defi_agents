@@ -8,6 +8,7 @@
       "intake_target_assets_only": false
     },
     "liquidity_gates": {
+      "absolute_min_tvl_usd": 100000,
       "min_volume_24h_usd": 0,
       "max_tvl_to_volume_24h_ratio": 0
     },

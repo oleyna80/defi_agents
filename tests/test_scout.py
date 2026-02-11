@@ -518,3 +518,18 @@ def test_liquidity_gate_allows_high_volume_low_tvl_pool():
     status_map = {pools[0].address: SecurityResult.pass_as_tier1()}
     results = _run(_scout(cfg, pools, status_map).analyze())
     assert len(results) == 1
+
+
+def test_liquidity_gate_rejects_below_absolute_min_tvl_even_with_volume():
+    cfg = ScoutConfig(
+        min_tvl_usd=500_000,
+        liquidity_gates={"absolute_min_tvl_usd": 100_000, "min_volume_24h_usd": 1_000_000},
+        investor_profile={"initial_capital_usd": 1_000, "risk_profile": "micro", "horizon_days": 30},
+        gas_efficiency={"estimated_roundtrip_gas_usd": 0.0, "holding_period_days": 60},
+    )
+    pools = [
+        _candidate("pool1", "Base", "USDC-USDT", 12, 10, 90_000, volume_24h_usd=2_000_000),
+    ]
+    status_map = {pools[0].address: SecurityResult.pass_as_tier1()}
+    results = _run(_scout(cfg, pools, status_map).analyze())
+    assert len(results) == 0

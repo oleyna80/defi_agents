@@ -120,7 +120,7 @@ def test_report_includes_volume_ratio_when_available():
         ]
     )
     assert "Vol24h" in message
-    assert "TVL/Vol" in message
+    assert "Vol/TVL" in message
 
 
 def test_report_includes_decision_fields_and_colors():
