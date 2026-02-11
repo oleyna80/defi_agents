@@ -10,6 +10,23 @@ from pydantic import BaseModel, Field
 from ..config import CONFIDENCE_PASS, CONFIDENCE_REJECT, CONFIDENCE_WARN
 
 
+class ReportingConfig(BaseModel):
+    """Reporting controls (Telegram output scheduling/shape).
+
+    `telegram_digest_interval_seconds`:
+    - 0 => legacy behavior (send report every cycle when picks exist).
+    - >0 => digest mode: send at most once per interval (market snapshot style).
+
+    `telegram_report_mode`:
+    - snapshot => bypass anti-spam dedupe (still collapse within-run duplicates).
+    - delta => keep anti-spam dedupe behavior.
+    """
+
+    telegram_digest_interval_seconds: int = Field(default=0, ge=0)
+    telegram_report_mode: Literal["delta", "snapshot"] = "delta"
+    telegram_top_n_per_section: int = Field(default=0, ge=0)
+
+
 class AssetUniverseConfig(BaseModel):
     """Asset universe filter applied at Scout intake stage (cost/noise control)."""
     intake_target_assets_only: bool = False
@@ -267,6 +284,7 @@ class ScoutConfig(BaseModel):
     min_apy: float = 0.0
     target_chains: Optional[List[str]] = None  # None or [] => all chains
     global_search: bool = True
+    reporting: ReportingConfig = Field(default_factory=ReportingConfig)
     asset_universe: AssetUniverseConfig = Field(default_factory=AssetUniverseConfig)
     liquidity_gates: LiquidityGatesConfig = Field(default_factory=LiquidityGatesConfig)
     risk_filters: RiskFilters = Field(default_factory=RiskFilters)

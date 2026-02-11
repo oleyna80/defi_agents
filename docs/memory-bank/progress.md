@@ -31,6 +31,7 @@
 - Plan 008 (L3 AI-Analyst): production hardening and real provider integration
 
 ## Completed
+- 2026-02-11: Added Scout 6-hour Telegram digest scheduling (`reporting.telegram_digest_interval_seconds`) with snapshot mode (bypasses anti-spam dedupe) and Top-10 per section to reduce repetitive pool spam — 2026-02-11
 - 2026-02-11: Fixed Telegram liquidity activity ratio to `Vol/TVL` (Uniswap-aligned) and added `liquidity_gates.absolute_min_tvl_usd` to prevent volume-based intake below the hard TVL floor; full suite green (`97 passed`) — 2026-02-11
 - 2026-02-11: Added Scout liquidity gates to support low-TVL/high-volume pools: `liquidity_gates.min_volume_24h_usd` allows intake via volume, optional `max_tvl_to_volume_24h_ratio`, plus `liquidity_filtered` funnel counter and unit test coverage — 2026-02-11
 - 2026-02-11: Extended DeFiLlama intake to apply optional liquidity ratio guard (`max_tvl_to_volume_24h_ratio`) when volume is present, reducing low-activity noise while preserving volume-aware intake semantics — 2026-02-11

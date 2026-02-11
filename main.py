@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+from time import time
 
 ROOT = Path(__file__).resolve().parent
 SRC = ROOT / "src"
@@ -20,6 +21,7 @@ from defi_agents.security.defi_client import DeFiClient
 from defi_agents.security.goplus_client import GoPlusClient
 from defi_agents.security.whitelist import WhitelistProvider
 from defi_agents.notifier import TelegramNotifier
+from defi_agents.cache import CacheController
 from defi_agents.freshness import FreshnessManager, apply_freshness_policy
 from defi_agents.history import save_to_history
 from defi_agents.strategy_sim.engine import StrategySimEngine
@@ -68,6 +70,30 @@ def _is_excluded_by_l3(tag) -> bool:  # noqa: ANN001
     return value in {"AI_REJECT", "PENDING"}
 
 
+def _telegram_digest_due(config: ScoutConfig) -> tuple[bool, int, int]:
+    interval = int(getattr(getattr(config, "reporting", None), "telegram_digest_interval_seconds", 0) or 0)
+    if interval <= 0:
+        return True, 0, 0
+    cache = CacheController(namespace="telegram_digest")
+    last_sent = cache.get("last_sent_at")
+    now = int(time())
+    try:
+        last = int(float(last_sent)) if last_sent is not None else 0
+    except (TypeError, ValueError):
+        last = 0
+    if last <= 0:
+        return True, interval, 0
+    elapsed = now - last
+    remaining = max(0, interval - elapsed)
+    return elapsed >= interval, interval, remaining
+
+
+def _mark_telegram_digest_sent() -> None:
+    cache = CacheController(namespace="telegram_digest")
+    # Keep marker for a long time; it's overwritten on each successful send.
+    cache.set("last_sent_at", int(time()), ttl_seconds=365 * 24 * 3600)
+
+
 async def run_sentinel_cycle() -> None:
     _load_env_file()
     config = ScoutConfig.from_file("docs/memory-bank/scout_config.json")
@@ -91,7 +117,10 @@ async def run_sentinel_cycle() -> None:
             logger.critical("AI init failed and fallback disabled. Stopping startup.")
             raise RuntimeError("Production AI Init Failure") from exc
     l3_manager = L3AnalysisManager(config=config, provider=provider)
-    notifier = TelegramNotifier(include_tags=config.risk_policy.include_tags_in_report)
+    notifier = TelegramNotifier(
+        include_tags=config.risk_policy.include_tags_in_report,
+        top_n_per_section=getattr(config.reporting, "telegram_top_n_per_section", 0),
+    )
 
     logger.info("Starting Global Scout Cycle (chains: ALL).")
 
@@ -274,15 +303,27 @@ async def run_sentinel_cycle() -> None:
         )
         # Report both actionable and watchlist sections with clear labels.
         if report_picks:
-            await notifier.send_alpha_report(report_picks, lending_snapshot=lending_snapshot)
-            logger.info(
-                "Reported %s opportunities (safe=%s warn=%s actionable=%s watchlist=%s).",
-                len(report_picks),
-                len(safe_picks),
-                len(warn_picks),
-                actionable_count,
-                watchlist_count,
-            )
+            due, interval, remaining = _telegram_digest_due(config)
+            if due:
+                await notifier.send_alpha_report(report_picks, lending_snapshot=lending_snapshot)
+                _mark_telegram_digest_sent()
+                logger.info(
+                    "Reported %s opportunities (safe=%s warn=%s actionable=%s watchlist=%s).",
+                    len(report_picks),
+                    len(safe_picks),
+                    len(warn_picks),
+                    actionable_count,
+                    watchlist_count,
+                )
+            else:
+                logger.info(
+                    "Report suppressed by digest schedule: interval=%ss next_in=%ss picks=%s (actionable=%s watchlist=%s).",
+                    interval,
+                    remaining,
+                    len(report_picks),
+                    actionable_count,
+                    watchlist_count,
+                )
         else:
             logger.info("Match not found. High security standards met.")
 

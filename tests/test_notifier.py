@@ -123,6 +123,18 @@ def test_report_includes_volume_ratio_when_available():
     assert "Vol/TVL" in message
 
 
+def test_report_respects_top_n_per_section():
+    notifier = TelegramNotifier(top_n_per_section=1)
+    message = notifier._format_report(
+        [
+            _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol="WETH-USDC", apy=12.0),
+            _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol="WETH-USDT", apy=11.0),
+        ]
+    )
+    assert "`WETH-USDC`" in message
+    assert "`WETH-USDT`" not in message
+
+
 def test_report_includes_decision_fields_and_colors():
     notifier = TelegramNotifier()
     message = notifier._format_report(

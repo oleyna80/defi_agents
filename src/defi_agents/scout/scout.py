@@ -750,6 +750,13 @@ class YieldScout:
             elif res.score > best.score:
                 unique[key] = res
 
+        # Snapshot reporting mode: keep within-run uniqueness, but do not apply
+        # persisted anti-spam (the caller will schedule digest sends).
+        report_mode = getattr(getattr(self.config, "reporting", None), "telegram_report_mode", "delta")
+        digest_interval = getattr(getattr(self.config, "reporting", None), "telegram_digest_interval_seconds", 0) or 0
+        if report_mode == "snapshot" and int(digest_interval) > 0:
+            return list(unique.values())
+
         # Anti-spam: drop items seen recently (unchanged)
         filtered: List[ScoutResult] = []
         for key, res in unique.items():

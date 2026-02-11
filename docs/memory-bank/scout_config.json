@@ -4,6 +4,11 @@
     "min_tvl_usd": 500000,
     "min_apy": 8.0,
     "global_search": true,
+    "reporting": {
+      "telegram_digest_interval_seconds": 21600,
+      "telegram_report_mode": "snapshot",
+      "telegram_top_n_per_section": 10
+    },
     "asset_universe": {
       "intake_target_assets_only": false
     },

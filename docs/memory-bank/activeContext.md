@@ -6,6 +6,7 @@ Current Plan: docs/plans/014-protocol-inspector-v1-plan.md
 Active Task: Protocol Inspector v1 MVP local implementation and rollout prep
 
 ## Recent Changes
+- 2026-02-11: Switched Scout Telegram reporting to 6-hour market digest mode (`reporting.telegram_digest_interval_seconds=21600`, `telegram_report_mode=snapshot`) and limited output to Top-10 per section; non-digest cycles suppress Telegram sends — 2026-02-11
 - 2026-02-11: Adjusted Telegram liquidity metric to match Uniswap UI: report now shows `Vol/TVL` (24h volume divided by TVL) instead of inverted `TVL/Vol` — 2026-02-11
 - 2026-02-11: Added hard liquidity guardrail `liquidity_gates.absolute_min_tvl_usd` (default `100000`) so volume-based intake never admits micro-liquidity pools below the absolute floor — 2026-02-11
 - 2026-02-11: Added volume-aware liquidity gates for Scout intake: pools can pass heuristics by `TVL >= min_tvl_usd` or `Vol24h >= liquidity_gates.min_volume_24h_usd`, with optional `max_tvl_to_volume_24h_ratio`; added `liquidity_filtered` funnel counter and tests — 2026-02-11

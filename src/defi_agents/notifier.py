@@ -25,10 +25,11 @@ class TelegramNotifier:
     }
     _ALLOWED_GOLD = {"XAUT", "PAXG", "PAXGOLD"}
 
-    def __init__(self, include_tags: bool = False) -> None:
+    def __init__(self, include_tags: bool = False, top_n_per_section: int = 0) -> None:
         self.token = os.getenv("TELEGRAM_BOT_TOKEN")
         self.chat_id = os.getenv("TELEGRAM_CHAT_ID") or os.getenv("CHAT_ID")
         self.include_tags = include_tags
+        self.top_n_per_section = int(top_n_per_section) if isinstance(top_n_per_section, int) else 0
 
     async def send_alpha_report(
         self,
@@ -109,6 +110,8 @@ class TelegramNotifier:
                 key=lambda r: (r.candidate.apy or 0.0, r.candidate.tvl_usd or 0.0),
                 reverse=True,
             )
+            if isinstance(self.top_n_per_section, int) and self.top_n_per_section > 0:
+                section_results = section_results[: self.top_n_per_section]
             lines.append(f"*{title}*")
             for r in section_results:
                 badge = self._risk_badge(r.metadata.get("bucket", "N/A"))
