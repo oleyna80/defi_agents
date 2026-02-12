@@ -4,7 +4,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from defi_agents.freshness import apply_freshness_policy
+from defi_agents.freshness import apply_confidence_factors, apply_freshness_policy
 from defi_agents.freshness.policy import map_source_confidence
 from defi_agents.scout.config import FreshnessConfig
 from defi_agents.scout.models import PriorityTier, ScoutCandidate, ScoutResult, SourceConfidence
@@ -194,3 +194,37 @@ def test_apply_freshness_policy_diverges_with_single_metric_present():
     assert result.metadata["report_group"] == "WATCHLIST"
     assert counters["diverged_count"] == 1
     assert counters["downgraded_to_watchlist_count"] == 1
+
+
+def test_apply_confidence_factors_scales_score_and_sets_metadata():
+    result = _make_result(report_group="WATCHLIST", freshness_status="UNVERIFIED")
+    result.score = 10.0
+    result.metadata["source_confidence"] = "DIVERGED"
+    apply_confidence_factors(
+        [result],
+        {
+            "VERIFIED": 1.0,
+            "AGGREGATOR_ONLY": 0.75,
+            "DIVERGED": 0.4,
+            "STALE": 0.2,
+        },
+    )
+    assert result.metadata["score_raw"] == "10.000000"
+    assert result.metadata["confidence_factor"] == "0.4000"
+    assert result.score == 4.0
+
+
+def test_apply_confidence_factors_is_idempotent_and_has_fallback():
+    result = _make_result(report_group="WATCHLIST", freshness_status="UNVERIFIED")
+    result.score = 20.0
+    result.metadata["source_confidence"] = "UNKNOWN"
+    factors = {
+        "VERIFIED": 1.0,
+        "AGGREGATOR_ONLY": 0.75,
+        "DIVERGED": 0.4,
+        "STALE": 0.2,
+    }
+    apply_confidence_factors([result], factors)
+    assert result.score == 15.0
+    apply_confidence_factors([result], factors)
+    assert result.score == 15.0

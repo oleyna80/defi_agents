@@ -31,6 +31,7 @@
 - Plan 008 (L3 AI-Analyst): production hardening and real provider integration
 
 ## Completed
+- 2026-02-12: Implemented Iteration 2 confidence-weighted ranking: final report `score` is now multiplied by configurable `confidence_factors` after freshness mapping (idempotent via `score_raw`), with regression tests for scaling/fallback/idempotency; full suite green (`116 passed`) — 2026-02-12
 - 2026-02-12: Fixed Source Confidence divergence mismatch in freshness policy (single-metric divergence now consistently marks `DIVERGED`, increments divergence counters, and downgrades actionable picks under enforcement); added regression tests; full suite green (`114 passed`) — 2026-02-12
 - 2026-02-12: Introduced Scout `yield_type` SSOT classification and aligned directional Top-10 selection to taxonomy-driven routing (`LP`/`lending_supply`/`staking`); added classification regression test; full suite green (`103 passed`) — 2026-02-12
 - 2026-02-12: Implemented 6h digest directional Top-10 sections (`LP` turnover-first, `lending supply` APY-first, `lending borrow` cheapest APR, `staking` APY-first) as separate Telegram blocks with independent config thresholds; full suite green (`102 passed`) — 2026-02-12
@@ -127,6 +128,7 @@
 - 2026-02-04: Updated deployment/config templates for Graph gateway auth and revalidated full suite (`42 passed`) — 2026-02-04
 
 ## Changelog
+- 2026-02-12: Added confidence-factor score modulation (`VERIFIED > AGGREGATOR_ONLY > DIVERGED > STALE`) to ranking pipeline after freshness policy, enabling conservative ordering without changing raw APY/security calculations — 2026-02-12
 - 2026-02-12: Freshness policy now applies divergence guard consistently for partial re-check data (APY-only or TVL-only), eliminating cases where `source_confidence=DIVERGED` but actionable status remained unchanged — 2026-02-12
 - 2026-02-07: Lending snapshot Telegram output now includes cheapest borrow lines for additional stablecoins when data is available (DAI/USDT/USDS/FRAX/etc.), while preserving focused carry gate for EURC/USDC — 2026-02-07
 - 2026-02-07: Lending snapshot now enforces `deposit/borrow` semantics and includes financing carry pre-check to reduce false-positive strategy signals from DEX-like pairs — 2026-02-07

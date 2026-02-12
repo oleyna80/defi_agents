@@ -6,6 +6,7 @@ Current Plan: docs/plans/014-protocol-inspector-v1-plan.md
 Active Task: Scout yield taxonomy SSOT (`yield_type`) and directional digest hardening
 
 ## Recent Changes
+- 2026-02-12: Implemented Iteration 2 confidence-weighted ranking: post-freshness report scores are now multiplied by `confidence_factors` (`VERIFIED/AGGREGATOR_ONLY/DIVERGED/STALE`) via `apply_confidence_factors()` in `main.py`; added idempotent score metadata (`score_raw`, `confidence_factor`) and policy tests — 2026-02-12
 - 2026-02-12: Fixed Source Confidence divergence consistency in freshness policy: divergence now triggers when either APY or TVL divergence exceeds threshold (even if the other metric is missing), aligned `map_source_confidence()` and actionable downgrade logic; added regression tests in `tests/test_freshness_policy.py` — 2026-02-12
 - 2026-02-12: Added `YieldType` taxonomy SSOT to Scout candidate model (`lp_fees`, `lending_supply`, `staking`, etc.) and centralized classification in `DeFiLlamaClient` intake builders — 2026-02-12
 - 2026-02-12: Switched directional Top-10 digest selection to use `candidate.yield_type` instead of duplicated heuristics; improved consistency between intake and report sections — 2026-02-12

@@ -110,6 +110,26 @@ def apply_freshness_policy(results: List[ScoutResult], config: FreshnessConfig) 
     return counters
 
 
+def apply_confidence_factors(results: List[ScoutResult], factors: Dict[str, float]) -> None:
+    """Apply source-confidence multipliers to report ranking score.
+
+    Idempotent per result: preserves pre-confidence score in metadata["score_raw"].
+    """
+    if not results:
+        return
+    for res in results:
+        meta = res.metadata
+        raw_score = _as_float(meta.get("score_raw"))
+        if raw_score is None:
+            raw_score = float(res.score or 0.0)
+            meta["score_raw"] = f"{raw_score:.6f}"
+
+        confidence = str(meta.get("source_confidence") or "AGGREGATOR_ONLY").upper()
+        factor = _resolve_confidence_factor(confidence, factors)
+        meta["confidence_factor"] = f"{factor:.4f}"
+        res.score = raw_score * factor
+
+
 def _append_reason(meta: dict, code: str) -> None:
     existing = [item.strip() for item in (meta.get("warn_reasons") or "").split(",") if item.strip()]
     if code not in existing:
@@ -131,3 +151,13 @@ def _has_divergence(apy_div: float | None, tvl_div: float | None, config: Freshn
         (apy_div is not None and apy_div > float(config.max_apy_divergence_pct))
         or (tvl_div is not None and tvl_div > float(config.max_tvl_divergence_pct))
     )
+
+
+def _resolve_confidence_factor(confidence: str, factors: Dict[str, float]) -> float:
+    fallback = _as_float(factors.get("AGGREGATOR_ONLY")) if factors else None
+    if fallback is None:
+        fallback = 1.0
+    value = _as_float(factors.get(confidence)) if factors else None
+    if value is None:
+        return fallback
+    return max(0.0, float(value))

@@ -22,7 +22,7 @@ from defi_agents.security.goplus_client import GoPlusClient
 from defi_agents.security.whitelist import WhitelistProvider
 from defi_agents.notifier import TelegramNotifier
 from defi_agents.cache import CacheController
-from defi_agents.freshness import FreshnessManager, apply_freshness_policy
+from defi_agents.freshness import FreshnessManager, apply_confidence_factors, apply_freshness_policy
 from defi_agents.history import save_to_history
 from defi_agents.strategy_sim.engine import StrategySimEngine
 from defi_agents.strategy_sim.models import SimulationCounters
@@ -256,6 +256,7 @@ async def run_sentinel_cycle() -> None:
             await freshness_manager.recheck(report_picks)
 
         freshness_counts = apply_freshness_policy(report_picks, config.freshness)
+        apply_confidence_factors(report_picks, config.confidence_factors)
 
         # --- Strategy Simulation (v1) ---
         sim_counters = SimulationCounters()

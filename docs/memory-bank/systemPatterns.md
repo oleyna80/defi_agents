@@ -5,6 +5,9 @@
 - 2026-02-12: Scout uses explicit `yield_type` taxonomy as SSOT on candidates (`lp_fees`, `lending_supply`, `staking`, etc.) and directional digest routing consumes this field.
   Rationale: removes duplicated classification heuristics across snapshot/report paths and makes future ranking/risk logic composable.
 
+- 2026-02-12: Scout ranking applies post-freshness confidence weighting via configurable `confidence_factors` (`VERIFIED/AGGREGATOR_ONLY/DIVERGED/STALE`) before report sorting.
+  Rationale: keep raw economic/security scoring unchanged while systematically down-weighting lower-confidence data quality outcomes.
+
 - 2026-02-12: Scout digest market view is split into independent directional sections:
   - `Top-10 LP` ranked by `Vol/TVL` (activity-first, low APR allowed)
   - `Top-10 Lending Supply` ranked by supply APY
