@@ -2,6 +2,14 @@
 
 ## Architecture Decisions
 - YYYY-MM-DD: <Decision> - <Rationale>
+- 2026-02-12: Scout digest market view is split into independent directional sections:
+  - `Top-10 LP` ranked by `Vol/TVL` (activity-first, low APR allowed)
+  - `Top-10 Lending Supply` ranked by supply APY
+  - `Top-10 Lending Borrow` ranked by lowest borrow APR
+  - `Top-10 Staking` ranked by APY for single-asset non-lending markets
+  - Each section has separate config thresholds under `reporting.telegram_directional_*`.
+  Rationale: avoid overfitting all opportunities to one metric and make digest decisions comparable across distinct yield mechanisms.
+
 - 2026-02-10: Protocol Inspector runs as a separate service-bot (standalone entrypoint `inspector_main.py`) rather than inside Scout cycle.
   Rationale: isolate onchain due-diligence runtime (RPC budgets, source failures, diff polling) from yield scouting path and keep blast radius minimal.
 

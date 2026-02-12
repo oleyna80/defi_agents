@@ -168,3 +168,20 @@ class LendingSnapshot(BaseModel):
                 bool(self.lowest_borrow_by_symbol),
             ]
         )
+
+
+class YieldDirectionSnapshot(BaseModel):
+    lp_top: List[LendingSnapshotItem] = Field(default_factory=list)
+    lending_supply_top: List[LendingSnapshotItem] = Field(default_factory=list)
+    lending_borrow_top: List[LendingSnapshotItem] = Field(default_factory=list)
+    staking_top: List[LendingSnapshotItem] = Field(default_factory=list)
+
+    def has_any(self) -> bool:
+        return any(
+            [
+                bool(self.lp_top),
+                bool(self.lending_supply_top),
+                bool(self.lending_borrow_top),
+                bool(self.staking_top),
+            ]
+        )

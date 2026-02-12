@@ -31,6 +31,8 @@
 - Plan 008 (L3 AI-Analyst): production hardening and real provider integration
 
 ## Completed
+- 2026-02-12: Implemented 6h digest directional Top-10 sections (`LP` turnover-first, `lending supply` APY-first, `lending borrow` cheapest APR, `staking` APY-first) as separate Telegram blocks with independent config thresholds; full suite green (`102 passed`) — 2026-02-12
+- 2026-02-12: Refactored Scout Telegram sending to be section-aligned (multi-block) instead of relying on raw length chunking; prevents mid-section splits while preserving 6h digest cadence; full suite green (`100 passed`) — 2026-02-12
 - 2026-02-11: Added optional market microstructure section `High Turnover (24h)` (Top `Vol/TVL` pools) to the 6h digest; uses DeFiLlama volume fields and avoids extra HTTP calls via in-memory raw pool caching — 2026-02-11
 - 2026-02-11: Added Scout 6-hour Telegram digest scheduling (`reporting.telegram_digest_interval_seconds`) with snapshot mode (bypasses anti-spam dedupe) and Top-10 per section to reduce repetitive pool spam — 2026-02-11
 - 2026-02-11: Fixed Telegram liquidity activity ratio to `Vol/TVL` (Uniswap-aligned) and added `liquidity_gates.absolute_min_tvl_usd` to prevent volume-based intake below the hard TVL floor; full suite green (`97 passed`) — 2026-02-11

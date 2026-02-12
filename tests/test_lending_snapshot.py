@@ -199,3 +199,92 @@ def test_get_pools_still_applies_min_apy_filter(monkeypatch):
     pools = _run(client.get_pools())
     assert len(pools) == 1
     assert pools[0].pool_id == "high"
+
+
+def test_directional_snapshot_uses_independent_criteria(monkeypatch):
+    cfg = ScoutConfig(min_tvl_usd=500_000, min_apy=20.0)
+    cfg.reporting.telegram_directional_top_n = 10
+    cfg.reporting.telegram_directional_lp_min_tvl_usd = 100_000
+    cfg.reporting.telegram_directional_lp_min_vol_to_tvl = 1.0
+    cfg.reporting.telegram_directional_lending_min_tvl_usd = 100_000
+    cfg.reporting.telegram_directional_staking_min_tvl_usd = 100_000
+    cfg.reporting.telegram_directional_staking_min_apy = 3.0
+    cfg.reporting.telegram_directional_borrow_symbols = ["USDC", "USDT", "EURC"]
+    client = DeFiLlamaClient(cfg)
+
+    async def fake_fetch():
+        return [
+            {
+                "pool": "lp-high-turnover",
+                "project": "aerodrome-slipstream",
+                "chain": "Base",
+                "symbol": "WETH-USDC",
+                "address": "0x1111111111111111111111111111111111111111",
+                "tvlUsd": 150_000,
+                "volumeUsd1d": 2_400_000,
+                "apy": 1.1,
+                "apyBase": 1.1,
+                "apyReward": 0.0,
+            },
+            {
+                "pool": "supply-eth",
+                "project": "aave-v3",
+                "chain": "Ethereum",
+                "symbol": "WETH",
+                "address": "0x2222222222222222222222222222222222222222",
+                "tvlUsd": 5_000_000,
+                "apy": 2.8,
+                "apyBase": 2.8,
+                "apyReward": 0.0,
+                "apyBaseBorrow": 5.0,
+                "apyRewardBorrow": 0.0,
+            },
+            {
+                "pool": "borrow-usdc-cheap",
+                "project": "aave-v3",
+                "chain": "Base",
+                "symbol": "USDC",
+                "address": "0x3333333333333333333333333333333333333333",
+                "tvlUsd": 8_000_000,
+                "apy": 1.8,
+                "apyBase": 1.8,
+                "apyReward": 0.0,
+                "apyBaseBorrow": 1.2,
+                "apyRewardBorrow": 0.1,
+                "totalBorrowUsd": 2_000_000,
+            },
+            {
+                "pool": "borrow-usdt-expensive",
+                "project": "aave-v3",
+                "chain": "Arbitrum",
+                "symbol": "USDT",
+                "address": "0x4444444444444444444444444444444444444444",
+                "tvlUsd": 7_000_000,
+                "apy": 1.7,
+                "apyBase": 1.7,
+                "apyReward": 0.0,
+                "apyBaseBorrow": 2.0,
+                "apyRewardBorrow": 0.0,
+                "totalBorrowUsd": 1_500_000,
+            },
+            {
+                "pool": "staking-wsteth",
+                "project": "lido",
+                "chain": "Ethereum",
+                "symbol": "WSTETH",
+                "address": "0x5555555555555555555555555555555555555555",
+                "tvlUsd": 12_000_000,
+                "apy": 4.1,
+                "apyBase": 4.1,
+                "apyReward": 0.0,
+            },
+        ]
+
+    monkeypatch.setattr(client, "_fetch_raw_pools", fake_fetch)
+
+    snapshot = _run(client.get_directional_snapshot())
+    assert snapshot.has_any()
+    assert snapshot.lp_top and snapshot.lp_top[0].candidate.pool_id == "lp-high-turnover"
+    assert snapshot.lending_supply_top and snapshot.lending_supply_top[0].candidate.pool_id == "supply-eth"
+    assert snapshot.lending_borrow_top and snapshot.lending_borrow_top[0].candidate.pool_id == "borrow-usdc-cheap"
+    assert snapshot.staking_top and snapshot.staking_top[0].candidate.pool_id == "staking-wsteth"

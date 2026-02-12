@@ -30,6 +30,16 @@ class ReportingConfig(BaseModel):
     telegram_turnover_min_tvl_usd: float = Field(default=100_000.0, ge=0.0)
     telegram_turnover_min_volume_24h_usd: float = Field(default=0.0, ge=0.0)
     telegram_turnover_min_vol_to_tvl: float = Field(default=0.0, ge=0.0)
+    telegram_directional_sections_enabled: bool = False
+    telegram_directional_top_n: int = Field(default=10, ge=0)
+    telegram_directional_lp_min_tvl_usd: float = Field(default=100_000.0, ge=0.0)
+    telegram_directional_lp_min_vol_to_tvl: float = Field(default=1.0, ge=0.0)
+    telegram_directional_lending_min_tvl_usd: float = Field(default=100_000.0, ge=0.0)
+    telegram_directional_borrow_symbols: List[str] = Field(
+        default_factory=lambda: ["USDC", "USDT", "DAI", "USDS", "EURC", "GHO", "FRAX", "LUSD"]
+    )
+    telegram_directional_staking_min_tvl_usd: float = Field(default=100_000.0, ge=0.0)
+    telegram_directional_staking_min_apy: float = Field(default=0.0, ge=0.0)
 
 
 class AssetUniverseConfig(BaseModel):

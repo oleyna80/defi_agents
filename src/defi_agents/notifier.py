@@ -8,7 +8,7 @@ from typing import List
 
 import httpx
 
-from .scout.models import LendingSnapshot, PriorityTier, ScoutCandidate, ScoutResult
+from .scout.models import LendingSnapshot, PriorityTier, ScoutCandidate, ScoutResult, YieldDirectionSnapshot
 
 
 class TelegramNotifier:
@@ -36,14 +36,17 @@ class TelegramNotifier:
         results: List[ScoutResult],
         lending_snapshot: LendingSnapshot | None = None,
         turnover_snapshot: List[ScoutCandidate] | None = None,
+        directional_snapshot: YieldDirectionSnapshot | None = None,
     ) -> None:
-        message = self._format_report(
+        blocks = self._format_report_blocks(
             results,
             lending_snapshot=lending_snapshot,
             turnover_snapshot=turnover_snapshot,
+            directional_snapshot=directional_snapshot,
         )
-        for chunk in self._chunk_message(message):
-            await self._send(chunk)
+        for block in blocks:
+            for chunk in self._chunk_message(block):
+                await self._send(chunk)
 
     async def send_error(self, text: str) -> None:
         await self._send(f"⚠️ {text}")
@@ -94,14 +97,17 @@ class TelegramNotifier:
         results: List[ScoutResult],
         lending_snapshot: LendingSnapshot | None = None,
         turnover_snapshot: List[ScoutCandidate] | None = None,
+        directional_snapshot: YieldDirectionSnapshot | None = None,
     ) -> str:
         lines = [
             "*Scout Report — Decision View*",
             "Legend: 🟢 `SAFE` | 🟡 `WARN/REPUTATION`/`LINDY/WARN` | 🟠 `WARN/SECURITY`",
             "",
         ]
-        self._append_lending_snapshot(lines, lending_snapshot)
-        self._append_turnover_snapshot(lines, turnover_snapshot)
+        self._append_directional_snapshot(lines, directional_snapshot)
+        if not (directional_snapshot and directional_snapshot.has_any()):
+            self._append_lending_snapshot(lines, lending_snapshot)
+            self._append_turnover_snapshot(lines, turnover_snapshot)
         results = [item for item in results if self._is_allowed_candidate(item)]
         sections = [
             (PriorityTier.LOW_VOLATILITY, "1) Stable/Stable"),
@@ -121,67 +127,208 @@ class TelegramNotifier:
                 section_results = section_results[: self.top_n_per_section]
             lines.append(f"*{title}*")
             for r in section_results:
-                badge = self._risk_badge(r.metadata.get("bucket", "N/A"))
-                chain = r.candidate.chain
-                sym = r.candidate.symbol
-                project = r.candidate.project
-                apy = f"{r.candidate.apy:.2f}%"
-                tvl = self._format_tvl(r.candidate.tvl_usd)
-                vol_24h = getattr(r.candidate, "volume_24h_usd", None)
-                vol_str = ""
-                if isinstance(vol_24h, (int, float)) and float(vol_24h) > 0:
-                    tvl_value = float(r.candidate.tvl_usd)
-                    ratio = (float(vol_24h) / tvl_value) if tvl_value > 0 else None
-                    ratio_str = f"{ratio:.2f}" if ratio is not None else "n/a"
-                    vol_str = f" | Vol24h {self._format_tvl(float(vol_24h))} | Vol/TVL {ratio_str}"
-                bucket = r.metadata.get("bucket", "N/A")
-                sleeve = r.metadata.get("sleeve", "n/a")
-                reason_codes = r.metadata.get("warn_reasons", "-") or "-"
-                net_1k = r.metadata.get("net_profit_1k_usd", "n/a")
-                freshness = r.metadata.get("freshness_status", "UNVERIFIED")
-                age_m = r.metadata.get("age_minutes", "-") or "-"
-                d_apy = r.metadata.get("apy_divergence_pct", "-") or "-"
-                d_tvl = r.metadata.get("tvl_divergence_pct", "-") or "-"
-                pool_link = self._pool_link(r)
-                tags = []
-                if self.include_tags:
-                    tier = r.metadata.get("stable_tier")
-                    if tier:
-                        tags.append(f"Tier:{tier}")
-                    pair_class = r.metadata.get("pair_currency_class")
-                    if pair_class:
-                        tags.append(f"Class:{pair_class}")
-                    fx = r.metadata.get("fx_exposure")
-                    if fx == "true":
-                        tags.append("FX_RISK")
-                tags_str = " ".join(tags) if tags else ""
-                # Strategy simulation fields
-                sim_fields = []
-                sim_status = r.metadata.get("sim_status")
-                if sim_status == "OK":
-                    best_strat = r.metadata.get("sim_best_strategy")
-                    if best_strat:
-                        sim_fields.append(f"BestStrategy:{best_strat}")
-                    sim_fields.append("SimStatus:OK")
-                    fit_score = r.metadata.get("sim_fit_score")
-                    if fit_score:
-                        sim_fields.append(f"FitScore:{fit_score}")
-                    exp_apy = r.metadata.get("sim_exp_net_apy_min")
-                    if exp_apy:
-                        exp_max = r.metadata.get("sim_exp_net_apy_max", exp_apy)
-                        sim_fields.append(f"ExpNetAPY:{exp_apy}-{exp_max}%")
-                    risk_score = r.metadata.get("sim_risk_score")
-                    if risk_score:
-                        sim_fields.append(f"SimRisk:{risk_score}")
-                sim_str = " ".join(sim_fields) if sim_fields else ""
-                lines.append(
-                    f"- {badge} `{chain}` `{sym}` | `{project}` | APY {apy} | TVL {tvl} | "
-                    f"Risk `{bucket}`" + (f" | Tags {tags_str}" if tags_str else "") + f" | Sleeve `{sleeve}` | Reasons `{reason_codes}` | "
-                    f"Fresh `{freshness}` ({age_m}m) | ΔAPY {d_apy}% ΔTVL {d_tvl}% | "
-                    f"Net@1k ${net_1k}/mo" + vol_str + (f" | {sim_str}" if sim_str else "") + f" | [Pool]({pool_link})"
-                )
+                lines.append(self._format_opportunity_line(r))
             lines.append("")
         return "\n".join(lines)
+
+    def _format_report_blocks(
+        self,
+        results: List[ScoutResult],
+        lending_snapshot: LendingSnapshot | None = None,
+        turnover_snapshot: List[ScoutCandidate] | None = None,
+        directional_snapshot: YieldDirectionSnapshot | None = None,
+        *,
+        max_len: int = 3500,
+    ) -> List[str]:
+        """Format report as deterministic section blocks.
+
+        This avoids arbitrary mid-section splitting when the report exceeds Telegram length limits.
+        """
+        header = [
+            "*Scout Report — Decision View*",
+            "Legend: 🟢 `SAFE` | 🟡 `WARN/REPUTATION`/`LINDY/WARN` | 🟠 `WARN/SECURITY`",
+            "",
+        ]
+        continuation = ["*Scout Report — Decision View* (continued)", ""]
+
+        sections: List[List[str]] = []
+
+        directional_sections = self._format_directional_sections(directional_snapshot)
+        if directional_sections:
+            sections.extend(directional_sections)
+        else:
+            lending_lines: List[str] = []
+            self._append_lending_snapshot(lending_lines, lending_snapshot)
+            if lending_lines:
+                sections.append(lending_lines)
+
+            turnover_lines: List[str] = []
+            self._append_turnover_snapshot(turnover_lines, turnover_snapshot)
+            if turnover_lines:
+                sections.append(turnover_lines)
+
+        sections.extend(self._format_opportunity_section_lines(results, max_len=max_len))
+
+        if not sections:
+            return ["\n".join(header).strip()]
+
+        blocks: List[str] = []
+        for idx, section in enumerate(sections):
+            prefix = header if idx == 0 else continuation
+            blocks.append("\n".join(prefix + section).strip())
+        return blocks
+
+    def _format_opportunity_section_lines(self, results: List[ScoutResult], *, max_len: int) -> List[List[str]]:
+        filtered = [item for item in results if self._is_allowed_candidate(item)]
+        sections = [
+            (PriorityTier.LOW_VOLATILITY, "1) Stable/Stable"),
+            (PriorityTier.COIN_STABLE, "2) Token/Stable"),
+            (PriorityTier.COIN_COIN, "3) Token/Token"),
+        ]
+
+        combined: List[str] = []
+        per_category: List[List[str]] = []
+
+        for priority, title in sections:
+            section_results = [r for r in filtered if r.priority == priority]
+            if not section_results:
+                continue
+            section_results = sorted(
+                section_results,
+                key=lambda r: (r.candidate.apy or 0.0, r.candidate.tvl_usd or 0.0),
+                reverse=True,
+            )
+            if isinstance(self.top_n_per_section, int) and self.top_n_per_section > 0:
+                section_results = section_results[: self.top_n_per_section]
+
+            lines: List[str] = [f"*{title}*"]
+            for r in section_results:
+                lines.append(self._format_opportunity_line(r))
+            lines.append("")
+
+            per_category.append(lines)
+            combined.extend(lines)
+
+        if not combined:
+            return []
+
+        if len("\n".join(combined)) <= max_len:
+            return [combined]
+        return per_category
+
+    def _format_directional_sections(
+        self,
+        directional_snapshot: YieldDirectionSnapshot | None,
+    ) -> List[List[str]]:
+        if directional_snapshot is None or not directional_snapshot.has_any():
+            return []
+
+        sections: List[List[str]] = []
+        mapping = [
+            ("*Top-10 LP (High Turnover)*", directional_snapshot.lp_top, "Vol/TVL"),
+            ("*Top-10 Lending Supply*", directional_snapshot.lending_supply_top, "Supply APY"),
+            ("*Top-10 Lending Borrow (Cheapest)*", directional_snapshot.lending_borrow_top, "Borrow APR"),
+            ("*Top-10 Staking*", directional_snapshot.staking_top, "Staking APY"),
+        ]
+        for title, items, metric_label in mapping:
+            lines: List[str] = [title]
+            shown = 0
+            for item in items:
+                candidate = item.candidate
+                fake = ScoutResult(
+                    candidate=candidate,
+                    security=None,
+                    net_apy=0.0,
+                    score=0.0,
+                    net_profit_usd=0.0,
+                    priority=PriorityTier.COIN_COIN,
+                    metadata={},
+                    flags=[],
+                )
+                if not self._is_allowed_candidate(fake):
+                    continue
+                vol_part = ""
+                if metric_label == "Vol/TVL" and isinstance(candidate.volume_24h_usd, (int, float)):
+                    vol_part = f" | Vol24h {self._format_tvl(float(candidate.volume_24h_usd))}"
+                lines.append(
+                    f"- `{candidate.chain}` `{candidate.symbol}` | `{candidate.project}` | "
+                    f"{metric_label} {item.metric_value_pct:.2f}{'%' if metric_label != 'Vol/TVL' else ''} | "
+                    f"TVL {self._format_tvl(float(candidate.tvl_usd))}{vol_part} | [Pool]({self._pool_link_from_candidate(candidate)})"
+                )
+                shown += 1
+            if shown:
+                lines.append("")
+                sections.append(lines)
+        return sections
+
+    def _append_directional_snapshot(
+        self,
+        lines: List[str],
+        directional_snapshot: YieldDirectionSnapshot | None,
+    ) -> None:
+        for section in self._format_directional_sections(directional_snapshot):
+            lines.extend(section)
+
+    def _format_opportunity_line(self, r: ScoutResult) -> str:
+        badge = self._risk_badge(r.metadata.get("bucket", "N/A"))
+        chain = r.candidate.chain
+        sym = r.candidate.symbol
+        project = r.candidate.project
+        apy = f"{r.candidate.apy:.2f}%"
+        tvl = self._format_tvl(r.candidate.tvl_usd)
+        vol_24h = getattr(r.candidate, "volume_24h_usd", None)
+        vol_str = ""
+        if isinstance(vol_24h, (int, float)) and float(vol_24h) > 0:
+            tvl_value = float(r.candidate.tvl_usd)
+            ratio = (float(vol_24h) / tvl_value) if tvl_value > 0 else None
+            ratio_str = f"{ratio:.2f}" if ratio is not None else "n/a"
+            vol_str = f" | Vol24h {self._format_tvl(float(vol_24h))} | Vol/TVL {ratio_str}"
+        bucket = r.metadata.get("bucket", "N/A")
+        sleeve = r.metadata.get("sleeve", "n/a")
+        reason_codes = r.metadata.get("warn_reasons", "-") or "-"
+        net_1k = r.metadata.get("net_profit_1k_usd", "n/a")
+        freshness = r.metadata.get("freshness_status", "UNVERIFIED")
+        age_m = r.metadata.get("age_minutes", "-") or "-"
+        d_apy = r.metadata.get("apy_divergence_pct", "-") or "-"
+        d_tvl = r.metadata.get("tvl_divergence_pct", "-") or "-"
+        pool_link = self._pool_link(r)
+        tags = []
+        if self.include_tags:
+            tier = r.metadata.get("stable_tier")
+            if tier:
+                tags.append(f"Tier:{tier}")
+            pair_class = r.metadata.get("pair_currency_class")
+            if pair_class:
+                tags.append(f"Class:{pair_class}")
+            fx = r.metadata.get("fx_exposure")
+            if fx == "true":
+                tags.append("FX_RISK")
+        tags_str = " ".join(tags) if tags else ""
+        # Strategy simulation fields
+        sim_fields = []
+        sim_status = r.metadata.get("sim_status")
+        if sim_status == "OK":
+            best_strat = r.metadata.get("sim_best_strategy")
+            if best_strat:
+                sim_fields.append(f"BestStrategy:{best_strat}")
+            sim_fields.append("SimStatus:OK")
+            fit_score = r.metadata.get("sim_fit_score")
+            if fit_score:
+                sim_fields.append(f"FitScore:{fit_score}")
+            exp_apy = r.metadata.get("sim_exp_net_apy_min")
+            if exp_apy:
+                exp_max = r.metadata.get("sim_exp_net_apy_max", exp_apy)
+                sim_fields.append(f"ExpNetAPY:{exp_apy}-{exp_max}%")
+            risk_score = r.metadata.get("sim_risk_score")
+            if risk_score:
+                sim_fields.append(f"SimRisk:{risk_score}")
+        sim_str = " ".join(sim_fields) if sim_fields else ""
+        return (
+            f"- {badge} `{chain}` `{sym}` | `{project}` | APY {apy} | TVL {tvl} | "
+            f"Risk `{bucket}`" + (f" | Tags {tags_str}" if tags_str else "") + f" | Sleeve `{sleeve}` | Reasons `{reason_codes}` | "
+            f"Fresh `{freshness}` ({age_m}m) | ΔAPY {d_apy}% ΔTVL {d_tvl}% | "
+            f"Net@1k ${net_1k}/mo" + vol_str + (f" | {sim_str}" if sim_str else "") + f" | [Pool]({pool_link})"
+        )
 
     def _append_lending_snapshot(
         self,

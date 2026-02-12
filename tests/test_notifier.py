@@ -5,7 +5,14 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from defi_agents.notifier import TelegramNotifier
-from defi_agents.scout.models import LendingSnapshot, LendingSnapshotItem, PriorityTier, ScoutCandidate, ScoutResult
+from defi_agents.scout.models import (
+    LendingSnapshot,
+    LendingSnapshotItem,
+    PriorityTier,
+    ScoutCandidate,
+    ScoutResult,
+    YieldDirectionSnapshot,
+)
 from defi_agents.security.models import SecurityResult, SecurityStatus
 
 
@@ -183,6 +190,78 @@ def test_report_includes_turnover_snapshot_section():
     assert "High Turnover (24h)" in message
     assert "`USDC-USDT`" in message
     assert "Vol/TVL" in message
+
+
+def test_report_blocks_are_section_aligned():
+    notifier = TelegramNotifier()
+    turnover_candidate = ScoutCandidate.model_validate(
+        {
+            "pool": "pool-turnover",
+            "project": "uniswap-v3",
+            "chain": "Ethereum",
+            "symbol": "USDC-USDT",
+            "address": "0x1111111111111111111111111111111111111111",
+            "chain_id": 1,
+            "tvlUsd": 2_000_000,
+            "volumeUsd1d": 5_000_000,
+            "apy": 5.0,
+            "apyBase": 5.0,
+            "apyReward": 0.0,
+        }
+    )
+    blocks = notifier._format_report_blocks(
+        [
+            _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol="WETH-USDC"),
+        ],
+        turnover_snapshot=[turnover_candidate],
+    )
+    assert blocks
+    assert "Legend:" in blocks[0]
+    assert "High Turnover (24h)" in "\n".join(blocks)
+    assert "(continued)" in "\n".join(blocks[1:])
+
+
+def test_report_blocks_include_directional_sections():
+    notifier = TelegramNotifier()
+    lp_candidate = ScoutCandidate.model_validate(
+        {
+            "pool": "pool-lp",
+            "project": "aerodrome-slipstream",
+            "chain": "Base",
+            "symbol": "WETH-USDC",
+            "address": "0x1111111111111111111111111111111111111111",
+            "chain_id": 8453,
+            "tvlUsd": 2_000_000,
+            "volumeUsd1d": 6_000_000,
+            "apy": 9.0,
+            "apyBase": 9.0,
+            "apyReward": 0.0,
+        }
+    )
+    supply_candidate = ScoutCandidate.model_validate(
+        {
+            "pool": "pool-supply",
+            "project": "aave-v3",
+            "chain": "Ethereum",
+            "symbol": "WETH",
+            "address": "0x2222222222222222222222222222222222222222",
+            "chain_id": 1,
+            "tvlUsd": 10_000_000,
+            "apy": 3.4,
+            "apyBase": 3.4,
+            "apyReward": 0.0,
+        }
+    )
+    snapshot = YieldDirectionSnapshot(
+        lp_top=[LendingSnapshotItem(candidate=lp_candidate, metric_name="vol_to_tvl", metric_value_pct=3.0)],
+        lending_supply_top=[LendingSnapshotItem(candidate=supply_candidate, metric_name="supply_apy", metric_value_pct=3.4)],
+    )
+    blocks = notifier._format_report_blocks([], directional_snapshot=snapshot)
+    joined = "\n".join(blocks)
+    assert "Top-10 LP (High Turnover)" in joined
+    assert "Top-10 Lending Supply" in joined
+    assert "High Turnover (24h)" not in joined
+    assert "Lending Snapshot" not in joined
 
 
 def test_report_includes_lending_snapshot_section():

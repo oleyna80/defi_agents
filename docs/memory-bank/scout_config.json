@@ -12,7 +12,24 @@
       "telegram_turnover_top_n": 10,
       "telegram_turnover_min_tvl_usd": 100000,
       "telegram_turnover_min_volume_24h_usd": 0,
-      "telegram_turnover_min_vol_to_tvl": 1.0
+      "telegram_turnover_min_vol_to_tvl": 1.0,
+      "telegram_directional_sections_enabled": true,
+      "telegram_directional_top_n": 10,
+      "telegram_directional_lp_min_tvl_usd": 100000,
+      "telegram_directional_lp_min_vol_to_tvl": 1.0,
+      "telegram_directional_lending_min_tvl_usd": 100000,
+      "telegram_directional_borrow_symbols": [
+        "USDC",
+        "USDT",
+        "DAI",
+        "USDS",
+        "EURC",
+        "GHO",
+        "FRAX",
+        "LUSD"
+      ],
+      "telegram_directional_staking_min_tvl_usd": 100000,
+      "telegram_directional_staking_min_apy": 0.0
     },
     "asset_universe": {
       "intake_target_assets_only": false

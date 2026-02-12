@@ -7,7 +7,7 @@ from typing import List
 import httpx
 
 from .config import ScoutConfig
-from .models import LendingSnapshot, LendingSnapshotItem, ScoutCandidate
+from .models import LendingSnapshot, LendingSnapshotItem, ScoutCandidate, YieldDirectionSnapshot
 
 
 class DeFiLlamaClient:
@@ -99,6 +99,101 @@ class DeFiLlamaClient:
         top_n = int(getattr(reporting, "telegram_turnover_top_n", 0) or 0)
         return out[:top_n] if top_n > 0 else out
 
+    async def get_directional_snapshot(self) -> YieldDirectionSnapshot:
+        pools = await self._fetch_raw_pools()
+        reporting = getattr(self.config, "reporting", None)
+        top_n = int(getattr(reporting, "telegram_directional_top_n", 0) or 0)
+        if top_n <= 0:
+            return YieldDirectionSnapshot()
+
+        absolute_floor = float(getattr(self.config.liquidity_gates, "absolute_min_tvl_usd", 0.0) or 0.0)
+        candidates = self._build_reporting_candidates(pools, min_tvl_floor=absolute_floor)
+        if not candidates:
+            return YieldDirectionSnapshot()
+
+        lp_min_tvl = float(getattr(reporting, "telegram_directional_lp_min_tvl_usd", 0.0) or 0.0)
+        lp_min_ratio = float(getattr(reporting, "telegram_directional_lp_min_vol_to_tvl", 0.0) or 0.0)
+        lending_min_tvl = float(getattr(reporting, "telegram_directional_lending_min_tvl_usd", 0.0) or 0.0)
+        staking_min_tvl = float(getattr(reporting, "telegram_directional_staking_min_tvl_usd", 0.0) or 0.0)
+        staking_min_apy = float(getattr(reporting, "telegram_directional_staking_min_apy", 0.0) or 0.0)
+        borrow_symbols = {
+            str(symbol).upper()
+            for symbol in (getattr(reporting, "telegram_directional_borrow_symbols", []) or [])
+            if str(symbol).strip()
+        }
+        if not borrow_symbols:
+            borrow_symbols = self._lending_report_stable_symbols()
+
+        lp_scored: list[tuple[ScoutCandidate, float]] = []
+        lending_supply: list[ScoutCandidate] = []
+        lending_borrow_scored: list[tuple[ScoutCandidate, float]] = []
+        staking_candidates: list[ScoutCandidate] = []
+
+        for candidate in candidates:
+            tvl = float(candidate.tvl_usd or 0.0)
+            vol = candidate.volume_24h_usd
+            is_lending = self._is_lending_candidate(candidate)
+
+            if not is_lending:
+                if isinstance(vol, (int, float)) and float(vol) > 0 and tvl >= lp_min_tvl:
+                    ratio = float(vol) / tvl if tvl > 0 else 0.0
+                    if ratio >= lp_min_ratio:
+                        lp_scored.append((candidate, ratio))
+                if self._is_single_asset_market(candidate.symbol) and tvl >= staking_min_tvl and float(candidate.apy or 0.0) >= staking_min_apy:
+                    staking_candidates.append(candidate)
+                continue
+
+            if not self._is_single_asset_market(candidate.symbol):
+                continue
+
+            if tvl >= lending_min_tvl:
+                lending_supply.append(candidate)
+
+            token_set = self._extract_symbol_tokens(candidate.symbol)
+            if len(token_set) == 1 and next(iter(token_set)) in borrow_symbols:
+                borrow_apr = self._borrow_apr(candidate)
+                if borrow_apr is not None and borrow_apr >= 0:
+                    lending_borrow_scored.append((candidate, float(borrow_apr)))
+
+        lp_scored.sort(
+            key=lambda item: (
+                item[1],
+                float(item[0].volume_24h_usd or 0.0),
+                float(item[0].tvl_usd or 0.0),
+            ),
+            reverse=True,
+        )
+        lending_supply.sort(
+            key=lambda candidate: (float(candidate.apy or 0.0), float(candidate.tvl_usd or 0.0)),
+            reverse=True,
+        )
+        lending_borrow_scored.sort(
+            key=lambda item: (item[1], -float(item[0].tvl_usd or 0.0))
+        )
+        staking_candidates.sort(
+            key=lambda candidate: (float(candidate.apy or 0.0), float(candidate.tvl_usd or 0.0)),
+            reverse=True,
+        )
+
+        return YieldDirectionSnapshot(
+            lp_top=[
+                LendingSnapshotItem(candidate=candidate, metric_name="vol_to_tvl", metric_value_pct=ratio)
+                for candidate, ratio in lp_scored[:top_n]
+            ],
+            lending_supply_top=[
+                LendingSnapshotItem(candidate=candidate, metric_name="supply_apy", metric_value_pct=float(candidate.apy or 0.0))
+                for candidate in lending_supply[:top_n]
+            ],
+            lending_borrow_top=[
+                LendingSnapshotItem(candidate=candidate, metric_name="borrow_apr", metric_value_pct=borrow_apr)
+                for candidate, borrow_apr in lending_borrow_scored[:top_n]
+            ],
+            staking_top=[
+                LendingSnapshotItem(candidate=candidate, metric_name="staking_apy", metric_value_pct=float(candidate.apy or 0.0))
+                for candidate in staking_candidates[:top_n]
+            ],
+        )
+
     async def _fetch_raw_pools(self) -> list[dict]:
         if isinstance(self._raw_pools_cache, list):
             return self._raw_pools_cache
@@ -160,6 +255,32 @@ class DeFiLlamaClient:
 
             results.append(candidate)
 
+        return results
+
+    def _build_reporting_candidates(self, pools: list[dict], min_tvl_floor: float) -> List[ScoutCandidate]:
+        results: List[ScoutCandidate] = []
+        for item in pools:
+            try:
+                candidate = ScoutCandidate.model_validate(item)
+            except Exception:
+                continue
+
+            if candidate.volume_24h_usd is None:
+                raw_vol = item.get("volumeUsd24h") or item.get("volumeUSD1d") or item.get("volumeUsd1d")
+                try:
+                    candidate.volume_24h_usd = float(raw_vol) if raw_vol is not None else None
+                except (TypeError, ValueError):
+                    candidate.volume_24h_usd = None
+
+            candidate.chain_id = self._resolve_chain_id(item, candidate.chain)
+            address, source = self._resolve_address(item, candidate)
+            candidate.address = address
+            candidate.address_source = source
+            candidate.contract_age_days = self._resolve_contract_age_days(item)
+
+            if float(candidate.tvl_usd or 0.0) < float(min_tvl_floor):
+                continue
+            results.append(candidate)
         return results
 
     def _is_lending_candidate(self, candidate: ScoutCandidate) -> bool:

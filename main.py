@@ -107,6 +107,7 @@ async def run_sentinel_cycle() -> None:
     client = DeFiLlamaClient(config)
     scout = YieldScout(config, client, auditor)
     turnover_snapshot = None
+    directional_snapshot = None
     try:
         provider = DeepSeekProvider()
         logger.info("DeepSeek provider initialized.")
@@ -126,6 +127,12 @@ async def run_sentinel_cycle() -> None:
     logger.info("Starting Global Scout Cycle (chains: ALL).")
 
     try:
+        if getattr(config.reporting, "telegram_directional_sections_enabled", False):
+            try:
+                directional_snapshot = await client.get_directional_snapshot()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Directional snapshot fetch failed: %s", exc.__class__.__name__)
+                directional_snapshot = None
         if getattr(config.reporting, "telegram_turnover_section_enabled", False):
             try:
                 turnover_snapshot = await client.get_turnover_snapshot()
@@ -316,6 +323,7 @@ async def run_sentinel_cycle() -> None:
                     report_picks,
                     lending_snapshot=lending_snapshot,
                     turnover_snapshot=turnover_snapshot,
+                    directional_snapshot=directional_snapshot,
                 )
                 _mark_telegram_digest_sent()
                 logger.info(

@@ -3,9 +3,13 @@
 ## Current Session Focus
 Current Spec: docs/specs/014-protocol-inspector-v1.md
 Current Plan: docs/plans/014-protocol-inspector-v1-plan.md
-Active Task: Protocol Inspector v1 MVP local implementation and rollout prep
+Active Task: Scout 6h digest directional Top-10 blocks (LP/supply/borrow/staking)
 
 ## Recent Changes
+- 2026-02-12: Added directional market snapshot in Scout (`Top-10 LP`, `Top-10 Lending Supply`, `Top-10 Lending Borrow`, `Top-10 Staking`) with independent thresholds and ranking criteria; wired into `main.py` digest send path and `TelegramNotifier` section blocks — 2026-02-12
+- 2026-02-12: Added `reporting.telegram_directional_*` config controls (feature flag, top_n, per-direction TVL/ratio/APY thresholds, borrow symbol universe) and enabled them in `docs/memory-bank/scout_config.json` — 2026-02-12
+- 2026-02-12: Added regression coverage for directional snapshot and block rendering (`tests/test_lending_snapshot.py`, `tests/test_notifier.py`); full suite green (`102 passed`) — 2026-02-12
+- 2026-02-12: Split 6h Scout Telegram digest into deterministic section blocks (header + lending/turnover/opportunities) to avoid arbitrary mid-section chunking when hitting Telegram size limits; added focused test coverage — 2026-02-12
 - 2026-02-11: Added 6h digest `High Turnover (24h)` section (Top Vol/TVL pools) to complement APY-min-gated picks and reduce “single pool” messages for major pairs; uses DeFiLlama `volumeUsd1d` and is config-flagged — 2026-02-11
 - 2026-02-11: Switched Scout Telegram reporting to 6-hour market digest mode (`reporting.telegram_digest_interval_seconds=21600`, `telegram_report_mode=snapshot`) and limited output to Top-10 per section; non-digest cycles suppress Telegram sends — 2026-02-11
 - 2026-02-11: Adjusted Telegram liquidity metric to match Uniswap UI: report now shows `Vol/TVL` (24h volume divided by TVL) instead of inverted `TVL/Vol` — 2026-02-11
