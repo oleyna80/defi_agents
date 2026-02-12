@@ -3,7 +3,29 @@ from __future__ import annotations
 from typing import Dict, List
 
 from ..scout.config import FreshnessConfig
-from ..scout.models import ScoutResult
+from ..scout.models import ScoutResult, SourceConfidence
+
+
+def map_source_confidence(meta: dict, config: FreshnessConfig) -> SourceConfidence:
+    """Pure mapper: freshness metadata → SourceConfidence.
+
+    Guardrail: unknown/empty freshness_status always returns AGGREGATOR_ONLY.
+    VERIFIED requires explicit FRESH status AND divergence within configured limits.
+    """
+    status = (meta.get("freshness_status") or "").upper()
+    if status == "STALE":
+        return SourceConfidence.STALE
+    if status != "FRESH":
+        # Unknown, empty, UNVERIFIED, or any unexpected value → safe default.
+        return SourceConfidence.AGGREGATOR_ONLY
+
+    # FRESH — check divergence thresholds before promoting to VERIFIED.
+    apy_div = _as_float(meta.get("apy_divergence_pct"))
+    tvl_div = _as_float(meta.get("tvl_divergence_pct"))
+    if _has_divergence(apy_div, tvl_div, config):
+        return SourceConfidence.DIVERGED
+
+    return SourceConfidence.VERIFIED
 
 
 def apply_freshness_policy(results: List[ScoutResult], config: FreshnessConfig) -> Dict[str, int]:
@@ -65,14 +87,7 @@ def apply_freshness_policy(results: List[ScoutResult], config: FreshnessConfig) 
 
         apy_div = _as_float(meta.get("apy_divergence_pct"))
         tvl_div = _as_float(meta.get("tvl_divergence_pct"))
-        has_divergence = (
-            apy_div is not None
-            and tvl_div is not None
-            and (
-                apy_div > float(config.max_apy_divergence_pct)
-                or tvl_div > float(config.max_tvl_divergence_pct)
-            )
-        )
+        has_divergence = _has_divergence(apy_div, tvl_div, config)
         if has_divergence:
             counters["diverged_count"] += 1
             _append_reason(meta, "DIVERGENCE_HIGH")
@@ -86,6 +101,11 @@ def apply_freshness_policy(results: List[ScoutResult], config: FreshnessConfig) 
         if should_downgrade:
             meta["report_group"] = "WATCHLIST"
             counters["downgraded_to_watchlist_count"] += 1
+
+        # Compute and set source confidence on candidate + metadata.
+        confidence = map_source_confidence(meta, config)
+        res.candidate.source_confidence = confidence
+        meta["source_confidence"] = confidence.value
 
     return counters
 
@@ -104,3 +124,10 @@ def _as_float(value: object) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _has_divergence(apy_div: float | None, tvl_div: float | None, config: FreshnessConfig) -> bool:
+    return (
+        (apy_div is not None and apy_div > float(config.max_apy_divergence_pct))
+        or (tvl_div is not None and tvl_div > float(config.max_tvl_divergence_pct))
+    )

@@ -40,6 +40,7 @@ class ReportingConfig(BaseModel):
     )
     telegram_directional_staking_min_tvl_usd: float = Field(default=100_000.0, ge=0.0)
     telegram_directional_staking_min_apy: float = Field(default=0.0, ge=0.0)
+    telegram_show_source_confidence: bool = True
 
 
 class AssetUniverseConfig(BaseModel):
@@ -313,6 +314,14 @@ class ScoutConfig(BaseModel):
     strategy_sim: StrategySimConfig = Field(default_factory=StrategySimConfig)
     token_buckets: TokenBuckets = Field(default_factory=TokenBuckets)
     risk_policy: StableRiskPolicy = Field(default_factory=StableRiskPolicy)
+    confidence_factors: Dict[str, float] = Field(
+        default_factory=lambda: {
+            "VERIFIED": 1.0,
+            "AGGREGATOR_ONLY": 0.75,
+            "DIVERGED": 0.4,
+            "STALE": 0.2,
+        }
+    )
     stable_symbols: List[str] = Field(
         default_factory=lambda: [
             "USDC",

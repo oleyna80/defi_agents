@@ -31,6 +31,8 @@
 - Plan 008 (L3 AI-Analyst): production hardening and real provider integration
 
 ## Completed
+- 2026-02-12: Fixed Source Confidence divergence mismatch in freshness policy (single-metric divergence now consistently marks `DIVERGED`, increments divergence counters, and downgrades actionable picks under enforcement); added regression tests; full suite green (`114 passed`) — 2026-02-12
+- 2026-02-12: Introduced Scout `yield_type` SSOT classification and aligned directional Top-10 selection to taxonomy-driven routing (`LP`/`lending_supply`/`staking`); added classification regression test; full suite green (`103 passed`) — 2026-02-12
 - 2026-02-12: Implemented 6h digest directional Top-10 sections (`LP` turnover-first, `lending supply` APY-first, `lending borrow` cheapest APR, `staking` APY-first) as separate Telegram blocks with independent config thresholds; full suite green (`102 passed`) — 2026-02-12
 - 2026-02-12: Refactored Scout Telegram sending to be section-aligned (multi-block) instead of relying on raw length chunking; prevents mid-section splits while preserving 6h digest cadence; full suite green (`100 passed`) — 2026-02-12
 - 2026-02-11: Added optional market microstructure section `High Turnover (24h)` (Top `Vol/TVL` pools) to the 6h digest; uses DeFiLlama volume fields and avoids extra HTTP calls via in-memory raw pool caching — 2026-02-11
@@ -125,6 +127,7 @@
 - 2026-02-04: Updated deployment/config templates for Graph gateway auth and revalidated full suite (`42 passed`) — 2026-02-04
 
 ## Changelog
+- 2026-02-12: Freshness policy now applies divergence guard consistently for partial re-check data (APY-only or TVL-only), eliminating cases where `source_confidence=DIVERGED` but actionable status remained unchanged — 2026-02-12
 - 2026-02-07: Lending snapshot Telegram output now includes cheapest borrow lines for additional stablecoins when data is available (DAI/USDT/USDS/FRAX/etc.), while preserving focused carry gate for EURC/USDC — 2026-02-07
 - 2026-02-07: Lending snapshot now enforces `deposit/borrow` semantics and includes financing carry pre-check to reduce false-positive strategy signals from DEX-like pairs — 2026-02-07
 - 2026-02-07: Added Scout lending carry snapshot fields for `GHO/EURC/USDC` and integrated them into logs + Telegram decision view without changing filter/scoring logic — 2026-02-07

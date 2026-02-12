@@ -25,11 +25,12 @@ class TelegramNotifier:
     }
     _ALLOWED_GOLD = {"XAUT", "PAXG", "PAXGOLD"}
 
-    def __init__(self, include_tags: bool = False, top_n_per_section: int = 0) -> None:
+    def __init__(self, include_tags: bool = False, top_n_per_section: int = 0, show_source_confidence: bool = True) -> None:
         self.token = os.getenv("TELEGRAM_BOT_TOKEN")
         self.chat_id = os.getenv("TELEGRAM_CHAT_ID") or os.getenv("CHAT_ID")
         self.include_tags = include_tags
         self.top_n_per_section = int(top_n_per_section) if isinstance(top_n_per_section, int) else 0
+        self.show_source_confidence = show_source_confidence
 
     async def send_alpha_report(
         self,
@@ -250,10 +251,14 @@ class TelegramNotifier:
                 vol_part = ""
                 if metric_label == "Vol/TVL" and isinstance(candidate.volume_24h_usd, (int, float)):
                     vol_part = f" | Vol24h {self._format_tvl(float(candidate.volume_24h_usd))}"
+                conf_part = ""
+                if self.show_source_confidence:
+                    conf_val = candidate.source_confidence.value if hasattr(candidate.source_confidence, 'value') else str(candidate.source_confidence)
+                    conf_part = f" | {self._confidence_badge(conf_val)} Conf `{conf_val}`"
                 lines.append(
                     f"- `{candidate.chain}` `{candidate.symbol}` | `{candidate.project}` | "
                     f"{metric_label} {item.metric_value_pct:.2f}{'%' if metric_label != 'Vol/TVL' else ''} | "
-                    f"TVL {self._format_tvl(float(candidate.tvl_usd))}{vol_part} | [Pool]({self._pool_link_from_candidate(candidate)})"
+                    f"TVL {self._format_tvl(float(candidate.tvl_usd))}{vol_part}{conf_part} | [Pool]({self._pool_link_from_candidate(candidate)})"
                 )
                 shown += 1
             if shown:
@@ -323,10 +328,14 @@ class TelegramNotifier:
             if risk_score:
                 sim_fields.append(f"SimRisk:{risk_score}")
         sim_str = " ".join(sim_fields) if sim_fields else ""
+        conf_str = ""
+        if self.show_source_confidence:
+            confidence = r.metadata.get("source_confidence", "AGGREGATOR_ONLY")
+            conf_str = f" | {self._confidence_badge(confidence)} Conf `{confidence}`"
         return (
             f"- {badge} `{chain}` `{sym}` | `{project}` | APY {apy} | TVL {tvl} | "
             f"Risk `{bucket}`" + (f" | Tags {tags_str}" if tags_str else "") + f" | Sleeve `{sleeve}` | Reasons `{reason_codes}` | "
-            f"Fresh `{freshness}` ({age_m}m) | ΔAPY {d_apy}% ΔTVL {d_tvl}% | "
+            f"Fresh `{freshness}` ({age_m}m){conf_str} | ΔAPY {d_apy}% ΔTVL {d_tvl}% | "
             f"Net@1k ${net_1k}/mo" + vol_str + (f" | {sim_str}" if sim_str else "") + f" | [Pool]({pool_link})"
         )
 
@@ -481,6 +490,9 @@ class TelegramNotifier:
         if bucket in {"WARN/REPUTATION", "LINDY/WARN"}:
             return "🟡"
         return "🟠"
+
+    def _confidence_badge(self, conf: str) -> str:
+        return {"VERIFIED": "✅", "AGGREGATOR_ONLY": "⚪", "DIVERGED": "⚠️", "STALE": "🔴"}.get(conf, "⚪")
 
     def _format_tvl(self, value: float) -> str:
         if value >= 1_000_000_000:

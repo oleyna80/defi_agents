@@ -6,6 +6,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from defi_agents.scout.config import ScoutConfig
 from defi_agents.scout.defillama_client import DeFiLlamaClient
+from defi_agents.scout.models import YieldType
 
 
 def _run(coro):
@@ -288,3 +289,47 @@ def test_directional_snapshot_uses_independent_criteria(monkeypatch):
     assert snapshot.lending_supply_top and snapshot.lending_supply_top[0].candidate.pool_id == "supply-eth"
     assert snapshot.lending_borrow_top and snapshot.lending_borrow_top[0].candidate.pool_id == "borrow-usdc-cheap"
     assert snapshot.staking_top and snapshot.staking_top[0].candidate.pool_id == "staking-wsteth"
+
+
+def test_candidate_yield_type_classification_ssot():
+    cfg = ScoutConfig(min_tvl_usd=100_000, min_apy=0.0)
+    client = DeFiLlamaClient(cfg)
+    pools = [
+        {
+            "pool": "lp-1",
+            "project": "uniswap-v3",
+            "chain": "Ethereum",
+            "symbol": "WETH-USDC",
+            "tvlUsd": 2_000_000,
+            "apy": 7.0,
+            "apyBase": 7.0,
+            "apyReward": 0.0,
+        },
+        {
+            "pool": "lend-1",
+            "project": "aave-v3",
+            "chain": "Ethereum",
+            "symbol": "USDC",
+            "tvlUsd": 9_000_000,
+            "apy": 2.0,
+            "apyBase": 2.0,
+            "apyReward": 0.0,
+            "apyBaseBorrow": 3.1,
+            "apyRewardBorrow": 0.0,
+        },
+        {
+            "pool": "stake-1",
+            "project": "lido",
+            "chain": "Ethereum",
+            "symbol": "WSTETH",
+            "tvlUsd": 15_000_000,
+            "apy": 4.0,
+            "apyBase": 4.0,
+            "apyReward": 0.0,
+        },
+    ]
+    candidates = client._build_reporting_candidates(pools, min_tvl_floor=0.0)
+    by_pool = {candidate.pool_id: candidate.yield_type for candidate in candidates}
+    assert by_pool["lp-1"] == YieldType.LP_FEES
+    assert by_pool["lend-1"] == YieldType.LENDING_SUPPLY
+    assert by_pool["stake-1"] == YieldType.STAKING

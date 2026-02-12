@@ -517,3 +517,45 @@ def test_strategy_fields_visible_when_ok():
     assert "FitScore:42" in message
     assert "ExpNetAPY:5.00-9.00%" in message
     assert "SimRisk:25" in message
+
+
+def test_report_includes_confidence_tag():
+    notifier = TelegramNotifier(show_source_confidence=True)
+    message = notifier._format_report([
+        _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol="WETH-USDC"),
+    ])
+    assert "Conf `AGGREGATOR_ONLY`" in message
+    assert "⚪" in message
+
+
+def test_confidence_tag_hidden_when_disabled():
+    notifier = TelegramNotifier(show_source_confidence=False)
+    message = notifier._format_report([
+        _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol="WETH-USDC"),
+    ])
+    assert "Conf" not in message
+
+
+def test_directional_section_includes_confidence():
+    notifier = TelegramNotifier(show_source_confidence=True)
+    supply_candidate = ScoutCandidate.model_validate(
+        {
+            "pool": "pool-supply",
+            "project": "aave-v3",
+            "chain": "Ethereum",
+            "symbol": "WETH",
+            "address": "0x2222222222222222222222222222222222222222",
+            "chain_id": 1,
+            "tvlUsd": 10_000_000,
+            "apy": 3.4,
+            "apyBase": 3.4,
+            "apyReward": 0.0,
+        }
+    )
+    snapshot = YieldDirectionSnapshot(
+        lending_supply_top=[LendingSnapshotItem(candidate=supply_candidate, metric_name="supply_apy", metric_value_pct=3.4)],
+    )
+    blocks = notifier._format_report_blocks([], directional_snapshot=snapshot)
+    joined = "\n".join(blocks)
+    assert "Conf `AGGREGATOR_ONLY`" in joined
+    assert "⚪" in joined

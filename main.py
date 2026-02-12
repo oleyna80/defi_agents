@@ -122,6 +122,7 @@ async def run_sentinel_cycle() -> None:
     notifier = TelegramNotifier(
         include_tags=config.risk_policy.include_tags_in_report,
         top_n_per_section=getattr(config.reporting, "telegram_top_n_per_section", 0),
+        show_source_confidence=getattr(config.reporting, "telegram_show_source_confidence", True),
     )
 
     logger.info("Starting Global Scout Cycle (chains: ALL).")

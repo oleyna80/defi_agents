@@ -3,9 +3,13 @@
 ## Current Session Focus
 Current Spec: docs/specs/014-protocol-inspector-v1.md
 Current Plan: docs/plans/014-protocol-inspector-v1-plan.md
-Active Task: Scout 6h digest directional Top-10 blocks (LP/supply/borrow/staking)
+Active Task: Scout yield taxonomy SSOT (`yield_type`) and directional digest hardening
 
 ## Recent Changes
+- 2026-02-12: Fixed Source Confidence divergence consistency in freshness policy: divergence now triggers when either APY or TVL divergence exceeds threshold (even if the other metric is missing), aligned `map_source_confidence()` and actionable downgrade logic; added regression tests in `tests/test_freshness_policy.py` — 2026-02-12
+- 2026-02-12: Added `YieldType` taxonomy SSOT to Scout candidate model (`lp_fees`, `lending_supply`, `staking`, etc.) and centralized classification in `DeFiLlamaClient` intake builders — 2026-02-12
+- 2026-02-12: Switched directional Top-10 digest selection to use `candidate.yield_type` instead of duplicated heuristics; improved consistency between intake and report sections — 2026-02-12
+- 2026-02-12: Added regression test for yield-type classification contract in `tests/test_lending_snapshot.py`; full suite green (`103 passed`) — 2026-02-12
 - 2026-02-12: Added directional market snapshot in Scout (`Top-10 LP`, `Top-10 Lending Supply`, `Top-10 Lending Borrow`, `Top-10 Staking`) with independent thresholds and ranking criteria; wired into `main.py` digest send path and `TelegramNotifier` section blocks — 2026-02-12
 - 2026-02-12: Added `reporting.telegram_directional_*` config controls (feature flag, top_n, per-direction TVL/ratio/APY thresholds, borrow symbol universe) and enabled them in `docs/memory-bank/scout_config.json` — 2026-02-12
 - 2026-02-12: Added regression coverage for directional snapshot and block rendering (`tests/test_lending_snapshot.py`, `tests/test_notifier.py`); full suite green (`102 passed`) — 2026-02-12

@@ -29,7 +29,8 @@
         "LUSD"
       ],
       "telegram_directional_staking_min_tvl_usd": 100000,
-      "telegram_directional_staking_min_apy": 0.0
+      "telegram_directional_staking_min_apy": 0.0,
+      "telegram_show_source_confidence": true
     },
     "asset_universe": {
       "intake_target_assets_only": false
@@ -226,6 +227,12 @@
       },
       "min_data_completeness_pct": 80.0
     },
-    "min_warn_score": 0.0
+    "min_warn_score": 0.0,
+    "confidence_factors": {
+      "VERIFIED": 1.0,
+      "AGGREGATOR_ONLY": 0.75,
+      "DIVERGED": 0.4,
+      "STALE": 0.2
+    }
   }
 }

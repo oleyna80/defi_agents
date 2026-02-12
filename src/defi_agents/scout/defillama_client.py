@@ -7,7 +7,7 @@ from typing import List
 import httpx
 
 from .config import ScoutConfig
-from .models import LendingSnapshot, LendingSnapshotItem, ScoutCandidate, YieldDirectionSnapshot
+from .models import LendingSnapshot, LendingSnapshotItem, ScoutCandidate, YieldDirectionSnapshot, YieldType
 
 
 class DeFiLlamaClient:
@@ -132,15 +132,19 @@ class DeFiLlamaClient:
         for candidate in candidates:
             tvl = float(candidate.tvl_usd or 0.0)
             vol = candidate.volume_24h_usd
-            is_lending = self._is_lending_candidate(candidate)
-
-            if not is_lending:
+            if candidate.yield_type == YieldType.LP_FEES:
                 if isinstance(vol, (int, float)) and float(vol) > 0 and tvl >= lp_min_tvl:
                     ratio = float(vol) / tvl if tvl > 0 else 0.0
                     if ratio >= lp_min_ratio:
                         lp_scored.append((candidate, ratio))
-                if self._is_single_asset_market(candidate.symbol) and tvl >= staking_min_tvl and float(candidate.apy or 0.0) >= staking_min_apy:
+                continue
+
+            if candidate.yield_type == YieldType.STAKING:
+                if tvl >= staking_min_tvl and float(candidate.apy or 0.0) >= staking_min_apy:
                     staking_candidates.append(candidate)
+                continue
+
+            if candidate.yield_type != YieldType.LENDING_SUPPLY:
                 continue
 
             if not self._is_single_asset_market(candidate.symbol):
@@ -227,6 +231,7 @@ class DeFiLlamaClient:
             candidate.address = address
             candidate.address_source = source
             candidate.contract_age_days = self._resolve_contract_age_days(item)
+            candidate.yield_type = self._classify_yield_type(candidate)
 
             # Liquidity gates: allow intake by either TVL or 24h volume (when configured).
             tvl_ok = float(candidate.tvl_usd) >= float(self.config.min_tvl_usd)
@@ -277,6 +282,7 @@ class DeFiLlamaClient:
             candidate.address = address
             candidate.address_source = source
             candidate.contract_age_days = self._resolve_contract_age_days(item)
+            candidate.yield_type = self._classify_yield_type(candidate)
 
             if float(candidate.tvl_usd or 0.0) < float(min_tvl_floor):
                 continue
@@ -301,6 +307,16 @@ class DeFiLlamaClient:
             or "venus" in project_tokens
             or "moonwell" in project_tokens
         )
+
+    def _classify_yield_type(self, candidate: ScoutCandidate) -> YieldType:
+        if self._is_lending_candidate(candidate):
+            return YieldType.LENDING_SUPPLY
+        if self._is_single_asset_market(candidate.symbol):
+            return YieldType.STAKING
+        tokens = self._extract_symbol_tokens(candidate.symbol)
+        if len(tokens) >= 2:
+            return YieldType.LP_FEES
+        return YieldType.UNKNOWN
 
     @staticmethod
     def _project_tokens(project: str) -> set[str]:

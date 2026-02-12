@@ -54,6 +54,27 @@ class PairCurrencyClass(str, Enum):
     TOKEN_TOKEN = "TOKEN_TOKEN"
 
 
+class YieldType(str, Enum):
+    LP_FEES = "lp_fees"
+    LENDING_SUPPLY = "lending_supply"
+    LENDING_BORROW = "lending_borrow"
+    STAKING = "staking"
+    INCENTIVES = "incentives"
+    FUNDING_CARRY = "funding_carry"
+    BASIS = "basis"
+    OPTIONS_PREMIUM = "options_premium"
+    RWA = "rwa"
+    UNKNOWN = "unknown"
+
+
+class SourceConfidence(str, Enum):
+    """Data quality signal based on freshness re-check outcome."""
+    VERIFIED = "VERIFIED"              # FRESH + within divergence limits
+    AGGREGATOR_ONLY = "AGGREGATOR_ONLY"  # no re-check or UNVERIFIED
+    DIVERGED = "DIVERGED"              # re-checked but divergence exceeded
+    STALE = "STALE"                    # re-checked but data too old
+
+
 class EvidenceItem(BaseModel):
     point: str
     source_type: str  # docs | github | social | onchain
@@ -116,6 +137,8 @@ class ScoutCandidate(BaseModel):
     l3_status: Optional[FinalTag] = None
     l3_data: Optional[L3Result] = None
     ai_security_factor: float = 1.0
+    yield_type: YieldType = YieldType.UNKNOWN
+    source_confidence: SourceConfidence = SourceConfidence.AGGREGATOR_ONLY
 
     @property
     def yield_quality(self) -> float:
