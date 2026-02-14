@@ -31,6 +31,7 @@
 - Plan 008 (L3 AI-Analyst): production hardening and real provider integration
 
 ## Completed
+- 2026-02-14: Closed pending code integration for provider/monitor features: landed `src/defi_agents/data/*` provider layer, Scout monitor wiring (`my_pools_monitor` + notifier/main hooks), and regression coverage (`test_defillama_provider`, `test_my_pools_monitor`, notifier/scout updates); validation green (`136 passed`) — 2026-02-14
 - 2026-02-14: Reframed `ROADMAP.md` product direction for Scout: priority moved from “find external pools” to “select networks/projects/tokens for creating own pools”, and added explicit stage-1 asset scope limit (top tokens + stablecoins only) — 2026-02-14
 - 2026-02-14: Synced docs contour for ongoing Scout initiatives: landed `015/016` spec+plan files, updated `docs/specs/INDEX.md` and `docs/plans/INDEX.md`, refreshed `ROADMAP.md` Phase 2.6 section, and recorded monitor/provider architecture decisions in `docs/memory-bank/systemPatterns.md` — 2026-02-14
 - 2026-02-14: Closed RFC comments in `ai-monitoring.md` (resolved reviewer inline remarks, removed stale follow-up ask) and synced `docs/specs/lp-decision-engine-v1.md` final wording/version to `1.0.2` for implementation handoff — 2026-02-14

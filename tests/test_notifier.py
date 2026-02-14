@@ -8,9 +8,13 @@ from defi_agents.notifier import TelegramNotifier
 from defi_agents.scout.models import (
     LendingSnapshot,
     LendingSnapshotItem,
+    MonitoredPoolSnapshot,
+    MyPoolsMonitorReport,
+    PoolHealthTag,
     PriorityTier,
     ScoutCandidate,
     ScoutResult,
+    SourceConfidence,
     YieldDirectionSnapshot,
 )
 from defi_agents.security.models import SecurityResult, SecurityStatus
@@ -35,6 +39,7 @@ def _result(
     sim_risk_score: str | None = None,
     sim_required_data_missing: str | None = None,
     volume_24h_usd: float | None = None,
+    metadata_overrides: dict[str, str] | None = None,
 ) -> ScoutResult:
     candidate = ScoutCandidate.model_validate(
         {
@@ -81,6 +86,8 @@ def _result(
         metadata["sim_risk_score"] = sim_risk_score
     if sim_required_data_missing is not None:
         metadata["sim_required_data_missing"] = sim_required_data_missing
+    if metadata_overrides:
+        metadata.update(metadata_overrides)
     return ScoutResult(
         candidate=candidate,
         security=SecurityResult(status=SecurityStatus.WARN, score=70),
@@ -559,3 +566,135 @@ def test_directional_section_includes_confidence():
     joined = "\n".join(blocks)
     assert "Conf `AGGREGATOR_ONLY`" in joined
     assert "⚪" in joined
+
+
+def test_market_signals_hidden_when_disabled():
+    notifier = TelegramNotifier(show_market_signals=False)
+    message = notifier._format_report([
+        _result(
+            priority=PriorityTier.COIN_STABLE,
+            bucket="WARN/REPUTATION",
+            symbol="WETH-USDC",
+            metadata_overrides={
+                "apy_vs_mean_30d_pct": "33.33",
+                "stability_factor": "0.9000",
+                "stability_signals": "OUTLIER,APY_VS_30D_HIGH",
+            },
+        ),
+    ])
+    assert "APYvs30d" not in message
+    assert "StabF" not in message
+    assert "Flags:" not in message
+
+
+def test_market_signals_visible_when_enabled():
+    notifier = TelegramNotifier(show_market_signals=True)
+    message = notifier._format_report([
+        _result(
+            priority=PriorityTier.COIN_STABLE,
+            bucket="WARN/REPUTATION",
+            symbol="WETH-USDC",
+            metadata_overrides={
+                "apy_vs_mean_30d_pct": "33.33",
+                "stability_factor": "0.9000",
+                "stability_signals": "OUTLIER,APY_VS_30D_HIGH",
+            },
+        ),
+    ])
+    assert "APYvs30d:+33.3%" in message
+    assert "StabF:0.9000" in message
+    assert "Flags:OUTLIER,APY_VS_30D_HIGH" in message
+
+
+def test_report_includes_my_pools_health_and_alert_blocks():
+    notifier = TelegramNotifier(show_source_confidence=True)
+    my_pools_report = MyPoolsMonitorReport(
+        healthy_count=1,
+        watch_count=1,
+        unverified_count=1,
+        show_health=True,
+        show_alerts=True,
+        top_n=10,
+        snapshots=[
+            MonitoredPoolSnapshot(
+                pool_ref="pool-healthy",
+                label="Healthy pool",
+                chain="Base",
+                project="aerodrome-slipstream",
+                symbol="USDC-USDT",
+                tvl_usd=1_000_000,
+                volume_24h_usd=2_000_000,
+                vol_to_tvl_24h=2.0,
+                apy=8.0,
+                freshness_status="UNVERIFIED",
+                source_confidence=SourceConfidence.AGGREGATOR_ONLY,
+                health_tags=[PoolHealthTag.HEALTHY],
+                pool_url="https://defillama.com/yields/pool/pool-healthy",
+            ),
+            MonitoredPoolSnapshot(
+                pool_ref="pool-watch",
+                label="Watch pool",
+                chain="Base",
+                project="aerodrome-slipstream",
+                symbol="WETH-USDC",
+                tvl_usd=1_000_000,
+                volume_24h_usd=100_000,
+                vol_to_tvl_24h=0.1,
+                apy=4.0,
+                freshness_status="UNVERIFIED",
+                source_confidence=SourceConfidence.AGGREGATOR_ONLY,
+                health_tags=[PoolHealthTag.WATCH_VOLUME, PoolHealthTag.WATCH_APY_DRIFT],
+                alert_reasons=["LOW_VOL_TO_TVL", "APY_DROP_24H"],
+                pool_url="https://defillama.com/yields/pool/pool-watch",
+            ),
+            MonitoredPoolSnapshot(
+                pool_ref="pool-missing",
+                label="Missing pool",
+                chain="Base",
+                freshness_status="UNVERIFIED",
+                source_confidence=SourceConfidence.AGGREGATOR_ONLY,
+                health_tags=[PoolHealthTag.DATA_UNVERIFIED],
+                alert_reasons=["POOL_NOT_FOUND"],
+            ),
+        ],
+    )
+    blocks = notifier._format_report_blocks([], my_pools_report=my_pools_report)
+    joined = "\n".join(blocks)
+    assert "My Pools — Health" in joined
+    assert "Pools: 3 | Healthy 1 | Watch 1 | Unverified 1" in joined
+    assert "My Pools — Alerts" in joined
+    assert "LOW_VOL_TO_TVL,APY_DROP_24H" in joined
+    assert "POOL_NOT_FOUND" in joined
+    assert "Conf `AGGREGATOR_ONLY`" in joined
+
+
+def test_report_hides_my_pools_alerts_when_disabled():
+    notifier = TelegramNotifier()
+    my_pools_report = MyPoolsMonitorReport(
+        healthy_count=0,
+        watch_count=1,
+        unverified_count=0,
+        show_health=True,
+        show_alerts=False,
+        snapshots=[
+            MonitoredPoolSnapshot(
+                pool_ref="pool-watch",
+                label="Watch pool",
+                chain="Base",
+                project="aerodrome-slipstream",
+                symbol="WETH-USDC",
+                tvl_usd=1_000_000,
+                volume_24h_usd=100_000,
+                vol_to_tvl_24h=0.1,
+                apy=4.0,
+                freshness_status="UNVERIFIED",
+                source_confidence=SourceConfidence.AGGREGATOR_ONLY,
+                health_tags=[PoolHealthTag.WATCH_VOLUME],
+                alert_reasons=["LOW_VOL_TO_TVL"],
+            ),
+        ],
+    )
+    blocks = notifier._format_report_blocks([], my_pools_report=my_pools_report)
+    joined = "\n".join(blocks)
+    assert "My Pools — Health" in joined
+    assert "My Pools — Alerts" not in joined

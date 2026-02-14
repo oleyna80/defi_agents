@@ -219,6 +219,98 @@ def test_benchmark_tag_is_added_to_metadata():
     assert float(results[0].metadata["benchmark_delta_apy"]) == pytest.approx(3.0, rel=1e-2)
 
 
+def test_defillama_stability_fields_are_threaded_to_metadata():
+    cfg = ScoutConfig(min_tvl_usd=100_000)
+    pool = ScoutCandidate.model_validate(
+        {
+            "pool": "pool-stability",
+            "project": "uniswap-v3",
+            "chain": "Ethereum",
+            "symbol": "USDC-USDT",
+            "address": "0x" + ("1" * 40),
+            "chain_id": 1,
+            "tvlUsd": 5_000_000,
+            "apy": 12.0,
+            "apyBase": 11.0,
+            "apyReward": 1.0,
+            "apyMean30d": 9.0,
+            "apyPct30D": 15.5,
+            "apyPct7D": 4.2,
+            "apyPct1D": 0.9,
+            "apyBase7d": 10.7,
+            "il7d": 0.3,
+            "ilRisk": "no",
+            "outlier": False,
+            "mu": 11.5,
+            "sigma": 2.1,
+            "exposure": "multi",
+        }
+    )
+    status_map = {pool.address: SecurityResult.pass_as_tier1()}
+    results = _run(_scout(cfg, [pool], status_map).analyze())
+
+    assert len(results) == 1
+    meta = results[0].metadata
+    assert meta["apy_mean_30d"] == "9.00"
+    assert meta["apy_pct_30d"] == "15.50"
+    assert meta["apy_pct_7d"] == "4.20"
+    assert meta["apy_pct_1d"] == "0.90"
+    assert meta["apy_base_7d"] == "10.70"
+    assert meta["il_7d"] == "0.30"
+    assert meta["il_risk"] == "no"
+    assert meta["outlier"] == "false"
+    assert meta["mu"] == "11.50"
+    assert meta["sigma"] == "2.10"
+    assert meta["exposure"] == "multi"
+    assert float(meta["apy_vs_mean_30d_pct"]) == pytest.approx(33.33, rel=1e-2)
+
+
+def test_stability_scoring_applies_soft_penalty_without_hard_gate_changes():
+    pool = ScoutCandidate.model_validate(
+        {
+            "pool": "pool-stability-penalty",
+            "project": "uniswap-v3",
+            "chain": "Base",
+            "symbol": "USDC-USDT",
+            "address": "0x" + ("2" * 40),
+            "chain_id": 8453,
+            "tvlUsd": 8_000_000,
+            "apy": 10.0,
+            "apyBase": 10.0,
+            "apyReward": 0.0,
+            "apyMean30d": 6.0,
+            "outlier": True,
+            "mu": 6.0,
+            "sigma": 4.8,
+            "ilRisk": "yes",
+        }
+    )
+    status_map = {pool.address: SecurityResult.pass_as_tier1()}
+
+    cfg_disabled = ScoutConfig(min_tvl_usd=100_000)
+    cfg_enabled = ScoutConfig(
+        min_tvl_usd=100_000,
+        defillama_provider={
+            "enable_stability_scoring": True,
+            "stability_outlier_factor": 0.5,
+            "stability_apy_mean_deviation_pct": 50.0,
+            "stability_apy_deviation_factor": 0.8,
+            "stability_sigma_to_mu_threshold": 0.6,
+            "stability_sigma_factor": 0.8,
+            "stability_il_risk_factor": 0.9,
+        },
+    )
+
+    res_disabled = _run(_scout(cfg_disabled, [pool], status_map).analyze())
+    res_enabled = _run(_scout(cfg_enabled, [pool], status_map).analyze())
+
+    assert len(res_disabled) == 1
+    assert len(res_enabled) == 1
+    assert res_enabled[0].score < res_disabled[0].score
+    assert res_enabled[0].metadata["stability_signals"] == "OUTLIER,APY_VS_30D_HIGH,SIGMA_TO_MU_HIGH,IL_RISK"
+    assert float(res_enabled[0].metadata["stability_factor"]) == pytest.approx(0.288, rel=1e-3)
+
+
 def test_tactical_sleeve_requires_explicit_enable():
     pool = _candidate("pool1", "Base", "USDC-USDT", 150, 100, 1_000_000)
     status_map = {pool.address: SecurityResult.pass_as_tier1()}

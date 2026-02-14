@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Literal
 from typing import List, Optional, Dict
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from ..config import CONFIDENCE_PASS, CONFIDENCE_REJECT, CONFIDENCE_WARN
 
@@ -41,6 +41,35 @@ class ReportingConfig(BaseModel):
     telegram_directional_staking_min_tvl_usd: float = Field(default=100_000.0, ge=0.0)
     telegram_directional_staking_min_apy: float = Field(default=0.0, ge=0.0)
     telegram_show_source_confidence: bool = True
+    telegram_show_market_signals: bool = False
+
+
+class MyPoolTargetConfig(BaseModel):
+    pool_id: Optional[str] = None
+    chain: Optional[str] = None
+    address: Optional[str] = None
+    label: str = ""
+
+    @model_validator(mode="after")
+    def _validate_target(self) -> "MyPoolTargetConfig":
+        has_pool_id = bool((self.pool_id or "").strip())
+        has_chain_address = bool((self.chain or "").strip()) and bool((self.address or "").strip())
+        if not has_pool_id and not has_chain_address:
+            raise ValueError("my_pools_monitor.pools[] requires `pool_id` or (`chain` + `address`)")
+        return self
+
+
+class MyPoolsMonitorConfig(BaseModel):
+    enabled: bool = False
+    pools: List[MyPoolTargetConfig] = Field(default_factory=list)
+    min_tvl_usd: float = Field(default=100_000.0, ge=0.0)
+    min_vol_to_tvl_24h: float = Field(default=0.0, ge=0.0)
+    max_apy_drop_pct_24h: float = Field(default=25.0, ge=0.0)
+    max_tvl_drop_pct_24h: float = Field(default=20.0, ge=0.0)
+    show_health: bool = True
+    show_alerts: bool = True
+    show_market_gap: bool = False
+    top_n: int = Field(default=10, ge=0)
 
 
 class AssetUniverseConfig(BaseModel):
@@ -295,12 +324,40 @@ class InspectorConfig(BaseModel):
     targets: List[InspectorTargetConfig] = Field(default_factory=list)
 
 
+class DeFiLlamaProviderConfig(BaseModel):
+    enabled: bool = True
+    timeout_seconds: int = Field(default=8, ge=1)
+    retry_attempts: int = Field(default=2, ge=0)
+    cache_ttl_seconds: Dict[str, int] = Field(
+        default_factory=lambda: {
+            "yields_pools": 300,
+            "yields_pools_old": 900,
+            "yields_chart": 900,
+            "overview": 1800,
+            "summary": 1800,
+            "stablecoins_snapshot": 3600,
+            "bridges_snapshot": 1800,
+            "prices_current": 120,
+            "prices_historical": 86400,
+        }
+    )
+    enable_optional_market_surfaces: bool = False
+    enable_stability_scoring: bool = False
+    stability_outlier_factor: float = Field(default=0.90, ge=0.0, le=1.0)
+    stability_apy_mean_deviation_pct: float = Field(default=50.0, ge=0.0)
+    stability_apy_deviation_factor: float = Field(default=0.92, ge=0.0, le=1.0)
+    stability_sigma_to_mu_threshold: float = Field(default=0.60, ge=0.0)
+    stability_sigma_factor: float = Field(default=0.92, ge=0.0, le=1.0)
+    stability_il_risk_factor: float = Field(default=0.95, ge=0.0, le=1.0)
+
+
 class ScoutConfig(BaseModel):
     min_tvl_usd: float = Field(default=1_000_000, ge=100_000)
     min_apy: float = 0.0
     target_chains: Optional[List[str]] = None  # None or [] => all chains
     global_search: bool = True
     reporting: ReportingConfig = Field(default_factory=ReportingConfig)
+    my_pools_monitor: MyPoolsMonitorConfig = Field(default_factory=MyPoolsMonitorConfig)
     asset_universe: AssetUniverseConfig = Field(default_factory=AssetUniverseConfig)
     liquidity_gates: LiquidityGatesConfig = Field(default_factory=LiquidityGatesConfig)
     risk_filters: RiskFilters = Field(default_factory=RiskFilters)
@@ -311,6 +368,7 @@ class ScoutConfig(BaseModel):
     freshness: FreshnessConfig = Field(default_factory=FreshnessConfig)
     dex_discovery: DexDiscoveryConfig = Field(default_factory=DexDiscoveryConfig)
     inspector: InspectorConfig = Field(default_factory=InspectorConfig)
+    defillama_provider: DeFiLlamaProviderConfig = Field(default_factory=DeFiLlamaProviderConfig)
     strategy_sim: StrategySimConfig = Field(default_factory=StrategySimConfig)
     token_buckets: TokenBuckets = Field(default_factory=TokenBuckets)
     risk_policy: StableRiskPolicy = Field(default_factory=StableRiskPolicy)

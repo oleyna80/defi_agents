@@ -8,7 +8,15 @@ from typing import List, Tuple
 from .config import ScoutConfig
 from .defillama_client import DeFiLlamaClient
 from .cache import ScoutDeduper
-from .models import LendingSnapshot, PairCurrencyClass, PriorityTier, ScoutCandidate, ScoutResult, StableTier
+from .models import (
+    LendingSnapshot,
+    MyPoolsMonitorReport,
+    PairCurrencyClass,
+    PriorityTier,
+    ScoutCandidate,
+    ScoutResult,
+    StableTier,
+)
 from .uniswap_v3_new_pools import DexDiscoveryStats, UniswapV3NewPoolsAdapter
 from ..security.auditor import SecurityAuditor
 from ..security.models import SecurityReason, SecuritySeverity, SecuritySource, SecurityStatus
@@ -39,8 +47,18 @@ class YieldScout:
         self._new_pools_adapter = UniswapV3NewPoolsAdapter(config)
         self.last_discovery_stats = DexDiscoveryStats()
         self.last_lending_snapshot = LendingSnapshot()
+        self.last_my_pools_report = MyPoolsMonitorReport()
 
     async def analyze(self) -> List[ScoutResult]:
+        if self.config.my_pools_monitor.enabled:
+            try:
+                self.last_my_pools_report = await self.client.get_my_pools_monitor_report()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("My Pools monitor fetch failed: %s", exc.__class__.__name__)
+                self.last_my_pools_report = MyPoolsMonitorReport()
+        else:
+            self.last_my_pools_report = MyPoolsMonitorReport()
+
         try:
             self.last_lending_snapshot = await self.client.get_lending_snapshot()
         except Exception as exc:  # noqa: BLE001
@@ -152,7 +170,8 @@ class YieldScout:
                     continue
 
                 above_benchmark, benchmark_delta, benchmark_threshold = self._benchmark_status(net_apy)
-                score = self._calculate_score(pool, sec, position_pct_tvl, above_benchmark)
+                stability_factor, stability_signals = self._stability_adjustments(pool)
+                score = self._calculate_score(pool, sec, position_pct_tvl, above_benchmark, stability_factor)
                 reason_codes = self._reason_codes(sec)
                 results.append(
                     ScoutResult(
@@ -175,6 +194,21 @@ class YieldScout:
                             "benchmark_delta_apy": f"{benchmark_delta:.2f}",
                             "benchmark_threshold_apy": f"{benchmark_threshold:.2f}",
                             "warn_reasons": ",".join(reason_codes[:3]),
+                            "stability_factor": f"{stability_factor:.4f}",
+                            "stability_signals": ",".join(stability_signals),
+                            # DeFiLlama stability/microstructure context (Phase B).
+                            "apy_mean_30d": self._fmt_optional_float(pool.apy_mean_30d),
+                            "apy_pct_30d": self._fmt_optional_float(pool.apy_pct_30d),
+                            "apy_pct_7d": self._fmt_optional_float(pool.apy_pct_7d),
+                            "apy_pct_1d": self._fmt_optional_float(pool.apy_pct_1d),
+                            "apy_base_7d": self._fmt_optional_float(pool.apy_base_7d),
+                            "apy_vs_mean_30d_pct": self._fmt_optional_float(self._apy_vs_mean_30d_pct(pool)),
+                            "il_7d": self._fmt_optional_float(pool.il_7d),
+                            "il_risk": (pool.il_risk or ""),
+                            "outlier": self._fmt_optional_bool(pool.outlier),
+                            "mu": self._fmt_optional_float(pool.mu),
+                            "sigma": self._fmt_optional_float(pool.sigma),
+                            "exposure": (pool.exposure or ""),
                             # Stablecoin risk policy classification
                             "stable_tier": pool_tier.value,
                             "pair_currency_class": pair_class.value,
@@ -605,6 +639,7 @@ class YieldScout:
         security,  # noqa: ANN001
         position_pct_tvl: float,
         above_benchmark: bool,
+        stability_factor: float = 1.0,
     ) -> float:
         # Combine yield quality and security status
         base = (pool.apy or 0.0) * pool.yield_quality
@@ -619,7 +654,7 @@ class YieldScout:
         utilization = min(1.0, position_pct_tvl / max_pct_tvl)
         capacity_factor = 1.0 - (0.2 * utilization)
         benchmark_factor = 1.05 if above_benchmark else 0.9
-        return base * sec_factor * capacity_factor * benchmark_factor
+        return base * sec_factor * capacity_factor * benchmark_factor * max(0.0, float(stability_factor))
 
     def _estimate_monthly_profit_usd(self, net_apy: float, position_size: float) -> float:
         # net_apy is annual percentage; estimate monthly profit on position size,
@@ -627,6 +662,55 @@ class YieldScout:
         gross_monthly = position_size * (net_apy / 100.0) / 12.0
         gas_cost = self.config.gas_efficiency.monthly_gas_cost_usd
         return gross_monthly - gas_cost
+
+    @staticmethod
+    def _apy_vs_mean_30d_pct(pool: ScoutCandidate) -> float | None:
+        mean = pool.apy_mean_30d
+        if mean is None or abs(float(mean)) < 1e-9:
+            return None
+        return ((float(pool.apy or 0.0) - float(mean)) / abs(float(mean))) * 100.0
+
+    @staticmethod
+    def _fmt_optional_float(value: float | None) -> str:
+        if value is None:
+            return ""
+        return f"{float(value):.2f}"
+
+    @staticmethod
+    def _fmt_optional_bool(value: bool | None) -> str:
+        if value is None:
+            return ""
+        return "true" if value else "false"
+
+    def _stability_adjustments(self, pool: ScoutCandidate) -> tuple[float, list[str]]:
+        cfg = self.config.defillama_provider
+        if not bool(getattr(cfg, "enable_stability_scoring", False)):
+            return 1.0, []
+
+        factor = 1.0
+        signals: list[str] = []
+
+        if pool.outlier is True:
+            factor *= float(cfg.stability_outlier_factor)
+            signals.append("OUTLIER")
+
+        apy_dev = self._apy_vs_mean_30d_pct(pool)
+        if apy_dev is not None and abs(float(apy_dev)) >= float(cfg.stability_apy_mean_deviation_pct):
+            factor *= float(cfg.stability_apy_deviation_factor)
+            signals.append("APY_VS_30D_HIGH")
+
+        if pool.mu is not None and pool.sigma is not None and abs(float(pool.mu)) > 1e-9:
+            sigma_to_mu = abs(float(pool.sigma)) / abs(float(pool.mu))
+            if sigma_to_mu >= float(cfg.stability_sigma_to_mu_threshold):
+                factor *= float(cfg.stability_sigma_factor)
+                signals.append("SIGMA_TO_MU_HIGH")
+
+        il_risk = (pool.il_risk or "").strip().lower()
+        if il_risk and il_risk not in {"no", "none", "low"}:
+            factor *= float(cfg.stability_il_risk_factor)
+            signals.append("IL_RISK")
+
+        return max(0.0, factor), signals
 
     def _assign_sleeve(
         self,

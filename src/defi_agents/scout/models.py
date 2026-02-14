@@ -131,6 +131,16 @@ class ScoutCandidate(BaseModel):
     total_borrow_usd: Optional[float] = Field(alias="totalBorrowUsd", default=None)
     reward_tokens: List[str] = Field(alias="rewardTokens", default_factory=list)
     apy_mean_30d: Optional[float] = Field(alias="apyMean30d", default=None)
+    apy_pct_30d: Optional[float] = Field(alias="apyPct30D", default=None)
+    apy_pct_7d: Optional[float] = Field(alias="apyPct7D", default=None)
+    apy_pct_1d: Optional[float] = Field(alias="apyPct1D", default=None)
+    apy_base_7d: Optional[float] = Field(alias="apyBase7d", default=None)
+    il_7d: Optional[float] = Field(alias="il7d", default=None)
+    il_risk: Optional[str] = Field(alias="ilRisk", default=None)
+    outlier: Optional[bool] = Field(alias="outlier", default=None)
+    mu: Optional[float] = None
+    sigma: Optional[float] = None
+    exposure: Optional[str] = Field(alias="exposure", default=None)
     stablecoin: Optional[bool] = Field(alias="stablecoin", default=None)
     timestamp: Optional[int] = None
     contract_age_days: Optional[int] = None
@@ -208,3 +218,47 @@ class YieldDirectionSnapshot(BaseModel):
                 bool(self.staking_top),
             ]
         )
+
+
+class PoolHealthTag(str, Enum):
+    HEALTHY = "HEALTHY"
+    WATCH_VOLUME = "WATCH_VOLUME"
+    WATCH_APY_DRIFT = "WATCH_APY_DRIFT"
+    WATCH_TVL_DRAIN = "WATCH_TVL_DRAIN"
+    DATA_UNVERIFIED = "DATA_UNVERIFIED"
+
+
+class MonitoredPoolSnapshot(BaseModel):
+    pool_ref: str
+    label: str = ""
+    chain: Optional[str] = None
+    project: Optional[str] = None
+    symbol: Optional[str] = None
+    tvl_usd: Optional[float] = None
+    volume_24h_usd: Optional[float] = None
+    vol_to_tvl_24h: Optional[float] = None
+    apy: Optional[float] = None
+    apy_base: Optional[float] = None
+    apy_reward: Optional[float] = None
+    apy_mean_30d: Optional[float] = None
+    apy_vs_mean_30d_pct: Optional[float] = None
+    freshness_status: str = "UNVERIFIED"
+    source_confidence: SourceConfidence = SourceConfidence.AGGREGATOR_ONLY
+    health_tags: List[PoolHealthTag] = Field(default_factory=list)
+    alert_reasons: List[str] = Field(default_factory=list)
+    pool_url: Optional[str] = None
+
+
+class MyPoolsMonitorReport(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    healthy_count: int = 0
+    watch_count: int = 0
+    unverified_count: int = 0
+    show_health: bool = True
+    show_alerts: bool = True
+    top_n: int = 10
+    snapshots: List[MonitoredPoolSnapshot] = Field(default_factory=list)
+    market_gap: List[MonitoredPoolSnapshot] = Field(default_factory=list)
+
+    def has_any(self) -> bool:
+        return bool(self.snapshots) or bool(self.market_gap)

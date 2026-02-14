@@ -123,6 +123,7 @@ async def run_sentinel_cycle() -> None:
         include_tags=config.risk_policy.include_tags_in_report,
         top_n_per_section=getattr(config.reporting, "telegram_top_n_per_section", 0),
         show_source_confidence=getattr(config.reporting, "telegram_show_source_confidence", True),
+        show_market_signals=getattr(config.reporting, "telegram_show_market_signals", False),
     )
 
     logger.info("Starting Global Scout Cycle (chains: ALL).")
@@ -152,6 +153,18 @@ async def run_sentinel_cycle() -> None:
                 dex_stats.dex_timeout_count,
                 dex_stats.dex_discovery_total,
                 config.dex_discovery.uniswap_v3_new_pools.enabled,
+            )
+        provider_stats = getattr(client, "last_provider_counters", {}) or {}
+        pools_stats = provider_stats.get("yields_pools", {})
+        if pools_stats:
+            logger.info(
+                "DeFiLlama provider: pools requests=%s success=%s timeouts=%s errors=%s parse_errors=%s cache_hits=%s",
+                pools_stats.get("request_count", 0),
+                pools_stats.get("success_count", 0),
+                pools_stats.get("timeout_count", 0),
+                pools_stats.get("error_count", 0),
+                pools_stats.get("parse_error_count", 0),
+                pools_stats.get("cache_hit_count", 0),
             )
         lending_snapshot = getattr(scout, "last_lending_snapshot", None)
         if lending_snapshot is not None and lending_snapshot.has_any():
@@ -194,6 +207,16 @@ async def run_sentinel_cycle() -> None:
                 stable_borrow,
                 eurc_borrow,
                 usdc_borrow,
+            )
+        my_pools_report = getattr(scout, "last_my_pools_report", None)
+        if config.my_pools_monitor.enabled and my_pools_report is not None:
+            logger.info(
+                "My Pools monitor: configured=%s snapshots=%s healthy=%s watch=%s unverified=%s",
+                len(config.my_pools_monitor.pools),
+                len(getattr(my_pools_report, "snapshots", []) or []),
+                int(getattr(my_pools_report, "healthy_count", 0) or 0),
+                int(getattr(my_pools_report, "watch_count", 0) or 0),
+                int(getattr(my_pools_report, "unverified_count", 0) or 0),
             )
         opportunities = await l3_manager.process_batch(opportunities)
 
@@ -326,6 +349,7 @@ async def run_sentinel_cycle() -> None:
                     lending_snapshot=lending_snapshot,
                     turnover_snapshot=turnover_snapshot,
                     directional_snapshot=directional_snapshot,
+                    my_pools_report=my_pools_report,
                 )
                 _mark_telegram_digest_sent()
                 logger.info(

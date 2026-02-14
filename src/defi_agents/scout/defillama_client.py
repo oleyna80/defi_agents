@@ -6,8 +6,19 @@ from typing import List
 
 import httpx
 
+from ..data.defillama_provider import DeFiLlamaDataProvider
 from .config import ScoutConfig
-from .models import LendingSnapshot, LendingSnapshotItem, ScoutCandidate, YieldDirectionSnapshot, YieldType
+from .models import (
+    LendingSnapshot,
+    LendingSnapshotItem,
+    MonitoredPoolSnapshot,
+    MyPoolsMonitorReport,
+    PoolHealthTag,
+    ScoutCandidate,
+    SourceConfidence,
+    YieldDirectionSnapshot,
+    YieldType,
+)
 
 
 class DeFiLlamaClient:
@@ -15,8 +26,18 @@ class DeFiLlamaClient:
 
     def __init__(self, config: ScoutConfig, timeout_seconds: float = 15.0) -> None:
         self.config = config
-        self._timeout = timeout_seconds
+        provider_cfg = getattr(config, "defillama_provider", None)
+        self._timeout = float(getattr(provider_cfg, "timeout_seconds", timeout_seconds) or timeout_seconds)
+        self._provider = DeFiLlamaDataProvider(
+            timeout_seconds=self._timeout,
+            retry_attempts=int(getattr(provider_cfg, "retry_attempts", 2) or 0),
+            cache_ttl_seconds=dict(getattr(provider_cfg, "cache_ttl_seconds", {}) or {}),
+            enable_optional_market_surfaces=bool(
+                getattr(provider_cfg, "enable_optional_market_surfaces", False)
+            ),
+        )
         self._raw_pools_cache: list[dict] | None = None
+        self.last_provider_counters: dict[str, dict[str, int]] = {}
 
     async def get_pools(self) -> List[ScoutCandidate]:
         pools = await self._fetch_raw_pools()
@@ -198,17 +219,79 @@ class DeFiLlamaClient:
             ],
         )
 
+    async def get_my_pools_monitor_report(self) -> MyPoolsMonitorReport:
+        monitor_cfg = getattr(self.config, "my_pools_monitor", None)
+        if monitor_cfg is None or not bool(getattr(monitor_cfg, "enabled", False)):
+            return MyPoolsMonitorReport()
+
+        pools = await self._fetch_raw_pools()
+        candidates = self._build_reporting_candidates(pools, min_tvl_floor=0.0)
+        by_pool_id: dict[str, ScoutCandidate] = {candidate.pool_id: candidate for candidate in candidates}
+        by_chain_address: dict[tuple[str, str], ScoutCandidate] = {}
+        for candidate in candidates:
+            if candidate.chain and candidate.address:
+                by_chain_address[(candidate.chain.lower(), candidate.address.lower())] = candidate
+
+        snapshots: list[MonitoredPoolSnapshot] = []
+        for target in monitor_cfg.pools:
+            pool_ref = (target.pool_id or f"{target.chain}:{(target.address or '').lower()}").strip(":")
+            candidate: ScoutCandidate | None = None
+            if target.pool_id:
+                candidate = by_pool_id.get(target.pool_id)
+            if candidate is None and target.chain and target.address:
+                candidate = by_chain_address.get((target.chain.lower(), target.address.lower()))
+
+            if candidate is None:
+                snapshots.append(
+                    MonitoredPoolSnapshot(
+                        pool_ref=pool_ref,
+                        label=target.label,
+                        chain=target.chain,
+                        freshness_status="UNVERIFIED",
+                        source_confidence=SourceConfidence.AGGREGATOR_ONLY,
+                        health_tags=[PoolHealthTag.DATA_UNVERIFIED],
+                        alert_reasons=["POOL_NOT_FOUND"],
+                    )
+                )
+                continue
+
+            snapshots.append(await self._build_monitored_pool_snapshot(target.label, candidate))
+
+        healthy_count = sum(1 for snap in snapshots if snap.health_tags == [PoolHealthTag.HEALTHY])
+        unverified_count = sum(1 for snap in snapshots if PoolHealthTag.DATA_UNVERIFIED in snap.health_tags)
+        watch_count = max(0, len(snapshots) - healthy_count)
+        return MyPoolsMonitorReport(
+            healthy_count=healthy_count,
+            watch_count=watch_count,
+            unverified_count=unverified_count,
+            show_health=bool(monitor_cfg.show_health),
+            show_alerts=bool(monitor_cfg.show_alerts),
+            top_n=int(monitor_cfg.top_n or 0),
+            snapshots=snapshots,
+        )
+
     async def _fetch_raw_pools(self) -> list[dict]:
         if isinstance(self._raw_pools_cache, list):
             return self._raw_pools_cache
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            resp = await client.get(self.BASE_URL)
-            resp.raise_for_status()
-            data = resp.json()
-        pools = data.get("data", []) if isinstance(data, dict) else []
-        out = pools if isinstance(pools, list) else []
+        provider_enabled = bool(getattr(self.config.defillama_provider, "enabled", True))
+        if provider_enabled:
+            out = await self._provider.get_yield_pools_raw()
+            self.last_provider_counters = self._provider.get_counters()
+        else:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.get(self.BASE_URL)
+                resp.raise_for_status()
+                data = resp.json()
+            pools = data.get("data", []) if isinstance(data, dict) else []
+            out = pools if isinstance(pools, list) else []
+            self.last_provider_counters = {}
         self._raw_pools_cache = out
         return out
+
+    async def get_pool_history(self, pool_id: str) -> list[dict]:
+        history_rows = await self._provider.get_yield_pool_history_raw(pool_id)
+        self.last_provider_counters = self._provider.get_counters()
+        return history_rows
 
     def _build_candidates(self, pools: list[dict], apply_min_apy: bool) -> List[ScoutCandidate]:
         results: List[ScoutCandidate] = []
@@ -467,3 +550,124 @@ class DeFiLlamaClient:
         if re.fullmatch(r"0x[a-fA-F0-9]{40}", addr):
             return addr.lower()
         return None
+
+    async def _build_monitored_pool_snapshot(
+        self,
+        label: str,
+        candidate: ScoutCandidate,
+    ) -> MonitoredPoolSnapshot:
+        monitor_cfg = self.config.my_pools_monitor
+        tvl = float(candidate.tvl_usd or 0.0)
+        vol = float(candidate.volume_24h_usd) if isinstance(candidate.volume_24h_usd, (int, float)) else None
+        vol_to_tvl = (vol / tvl) if (vol is not None and tvl > 0) else None
+        apy_vs_mean_30d_pct = self._apy_vs_mean_30d_pct(candidate)
+
+        tags: list[PoolHealthTag] = []
+        reasons: list[str] = []
+
+        min_ratio = float(getattr(monitor_cfg, "min_vol_to_tvl_24h", 0.0) or 0.0)
+        if min_ratio > 0:
+            if vol_to_tvl is None:
+                tags.append(PoolHealthTag.WATCH_VOLUME)
+                reasons.append("MISSING_VOLUME")
+            elif vol_to_tvl < min_ratio:
+                tags.append(PoolHealthTag.WATCH_VOLUME)
+                reasons.append("LOW_VOL_TO_TVL")
+
+        pool_id = candidate.pool_id
+        if pool_id:
+            history_rows = await self.get_pool_history(pool_id)
+            apy_drop_pct, tvl_drop_pct = self._compute_24h_drop_pct(history_rows, candidate)
+            apy_drop_threshold = float(monitor_cfg.max_apy_drop_pct_24h)
+            tvl_drop_threshold = float(monitor_cfg.max_tvl_drop_pct_24h)
+            if apy_drop_threshold > 0 and apy_drop_pct is not None and apy_drop_pct >= apy_drop_threshold:
+                tags.append(PoolHealthTag.WATCH_APY_DRIFT)
+                reasons.append("APY_DROP_24H")
+            if tvl_drop_threshold > 0 and tvl_drop_pct is not None and tvl_drop_pct >= tvl_drop_threshold:
+                tags.append(PoolHealthTag.WATCH_TVL_DRAIN)
+                reasons.append("TVL_DROP_24H")
+
+        if not tags:
+            tags = [PoolHealthTag.HEALTHY]
+
+        return MonitoredPoolSnapshot(
+            pool_ref=pool_id,
+            label=label,
+            chain=candidate.chain,
+            project=candidate.project,
+            symbol=candidate.symbol,
+            tvl_usd=tvl,
+            volume_24h_usd=vol,
+            vol_to_tvl_24h=vol_to_tvl,
+            apy=float(candidate.apy or 0.0),
+            apy_base=float(candidate.apy_base or 0.0),
+            apy_reward=float(candidate.apy_reward or 0.0),
+            apy_mean_30d=candidate.apy_mean_30d,
+            apy_vs_mean_30d_pct=apy_vs_mean_30d_pct,
+            freshness_status="UNVERIFIED",
+            source_confidence=SourceConfidence.AGGREGATOR_ONLY,
+            health_tags=tags,
+            alert_reasons=reasons,
+            pool_url=f"https://defillama.com/yields/pool/{pool_id}",
+        )
+
+    @staticmethod
+    def _apy_vs_mean_30d_pct(candidate: ScoutCandidate) -> float | None:
+        mean = candidate.apy_mean_30d
+        if mean is None or abs(float(mean)) < 1e-9:
+            return None
+        return ((float(candidate.apy or 0.0) - float(mean)) / abs(float(mean))) * 100.0
+
+    @staticmethod
+    def _compute_24h_drop_pct(history_rows: list[dict], candidate: ScoutCandidate) -> tuple[float | None, float | None]:
+        if len(history_rows) < 2:
+            return None, None
+        sorted_rows = sorted(
+            [row for row in history_rows if isinstance(row, dict)],
+            key=lambda row: DeFiLlamaClient._timestamp_to_epoch(row.get("timestamp")),
+        )
+        if len(sorted_rows) < 2:
+            return None, None
+
+        current = sorted_rows[-1]
+        previous = sorted_rows[-2]
+
+        current_apy = DeFiLlamaClient._to_float(current.get("apy"), default=float(candidate.apy or 0.0))
+        previous_apy = DeFiLlamaClient._to_float(previous.get("apy"))
+        current_tvl = DeFiLlamaClient._to_float(current.get("tvlUsd"), default=float(candidate.tvl_usd or 0.0))
+        previous_tvl = DeFiLlamaClient._to_float(previous.get("tvlUsd"))
+
+        apy_drop = DeFiLlamaClient._drop_pct(previous_apy, current_apy)
+        tvl_drop = DeFiLlamaClient._drop_pct(previous_tvl, current_tvl)
+        return apy_drop, tvl_drop
+
+    @staticmethod
+    def _drop_pct(previous: float | None, current: float | None) -> float | None:
+        if previous is None or current is None or previous <= 0:
+            return None
+        if current >= previous:
+            return 0.0
+        return ((previous - current) / previous) * 100.0
+
+    @staticmethod
+    def _to_float(value: object, default: float | None = None) -> float | None:
+        if value is None:
+            return default
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    @staticmethod
+    def _timestamp_to_epoch(value: object) -> float:
+        if value is None:
+            return 0.0
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            # DeFiLlama history may return ISO8601 strings on some endpoints.
+            try:
+                return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+            except ValueError:
+                return 0.0
+        return 0.0

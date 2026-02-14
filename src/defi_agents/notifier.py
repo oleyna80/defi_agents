@@ -8,7 +8,16 @@ from typing import List
 
 import httpx
 
-from .scout.models import LendingSnapshot, PriorityTier, ScoutCandidate, ScoutResult, YieldDirectionSnapshot
+from .scout.models import (
+    LendingSnapshot,
+    MonitoredPoolSnapshot,
+    MyPoolsMonitorReport,
+    PoolHealthTag,
+    PriorityTier,
+    ScoutCandidate,
+    ScoutResult,
+    YieldDirectionSnapshot,
+)
 
 
 class TelegramNotifier:
@@ -25,12 +34,19 @@ class TelegramNotifier:
     }
     _ALLOWED_GOLD = {"XAUT", "PAXG", "PAXGOLD"}
 
-    def __init__(self, include_tags: bool = False, top_n_per_section: int = 0, show_source_confidence: bool = True) -> None:
+    def __init__(
+        self,
+        include_tags: bool = False,
+        top_n_per_section: int = 0,
+        show_source_confidence: bool = True,
+        show_market_signals: bool = False,
+    ) -> None:
         self.token = os.getenv("TELEGRAM_BOT_TOKEN")
         self.chat_id = os.getenv("TELEGRAM_CHAT_ID") or os.getenv("CHAT_ID")
         self.include_tags = include_tags
         self.top_n_per_section = int(top_n_per_section) if isinstance(top_n_per_section, int) else 0
         self.show_source_confidence = show_source_confidence
+        self.show_market_signals = show_market_signals
 
     async def send_alpha_report(
         self,
@@ -38,12 +54,14 @@ class TelegramNotifier:
         lending_snapshot: LendingSnapshot | None = None,
         turnover_snapshot: List[ScoutCandidate] | None = None,
         directional_snapshot: YieldDirectionSnapshot | None = None,
+        my_pools_report: MyPoolsMonitorReport | None = None,
     ) -> None:
         blocks = self._format_report_blocks(
             results,
             lending_snapshot=lending_snapshot,
             turnover_snapshot=turnover_snapshot,
             directional_snapshot=directional_snapshot,
+            my_pools_report=my_pools_report,
         )
         for block in blocks:
             for chunk in self._chunk_message(block):
@@ -99,12 +117,14 @@ class TelegramNotifier:
         lending_snapshot: LendingSnapshot | None = None,
         turnover_snapshot: List[ScoutCandidate] | None = None,
         directional_snapshot: YieldDirectionSnapshot | None = None,
+        my_pools_report: MyPoolsMonitorReport | None = None,
     ) -> str:
         lines = [
             "*Scout Report — Decision View*",
             "Legend: 🟢 `SAFE` | 🟡 `WARN/REPUTATION`/`LINDY/WARN` | 🟠 `WARN/SECURITY`",
             "",
         ]
+        self._append_my_pools_sections(lines, my_pools_report)
         self._append_directional_snapshot(lines, directional_snapshot)
         if not (directional_snapshot and directional_snapshot.has_any()):
             self._append_lending_snapshot(lines, lending_snapshot)
@@ -138,6 +158,7 @@ class TelegramNotifier:
         lending_snapshot: LendingSnapshot | None = None,
         turnover_snapshot: List[ScoutCandidate] | None = None,
         directional_snapshot: YieldDirectionSnapshot | None = None,
+        my_pools_report: MyPoolsMonitorReport | None = None,
         *,
         max_len: int = 3500,
     ) -> List[str]:
@@ -153,6 +174,10 @@ class TelegramNotifier:
         continuation = ["*Scout Report — Decision View* (continued)", ""]
 
         sections: List[List[str]] = []
+
+        my_pools_sections = self._format_my_pools_sections(my_pools_report)
+        if my_pools_sections:
+            sections.extend(my_pools_sections)
 
         directional_sections = self._format_directional_sections(directional_snapshot)
         if directional_sections:
@@ -178,6 +203,46 @@ class TelegramNotifier:
             prefix = header if idx == 0 else continuation
             blocks.append("\n".join(prefix + section).strip())
         return blocks
+
+    def _format_my_pools_sections(
+        self,
+        my_pools_report: MyPoolsMonitorReport | None,
+    ) -> List[List[str]]:
+        if my_pools_report is None or not my_pools_report.has_any():
+            return []
+
+        snapshots = [snap for snap in my_pools_report.snapshots if self._is_allowed_snapshot(snap)]
+        if not snapshots:
+            return []
+
+        top_n = int(getattr(my_pools_report, "top_n", 0) or 0)
+        if top_n > 0:
+            snapshots = snapshots[:top_n]
+
+        sections: List[List[str]] = []
+        if bool(getattr(my_pools_report, "show_health", True)):
+            health_lines: List[str] = ["*My Pools — Health*"]
+            health_lines.append(
+                f"- Pools: {len(my_pools_report.snapshots)} | "
+                f"Healthy {int(my_pools_report.healthy_count)} | "
+                f"Watch {int(my_pools_report.watch_count)} | "
+                f"Unverified {int(my_pools_report.unverified_count)}"
+            )
+            for snap in snapshots:
+                health_lines.append(self._format_my_pool_health_line(snap))
+            health_lines.append("")
+            sections.append(health_lines)
+
+        if bool(getattr(my_pools_report, "show_alerts", True)):
+            alerts = [snap for snap in snapshots if PoolHealthTag.HEALTHY not in snap.health_tags]
+            if alerts:
+                alert_lines: List[str] = ["*My Pools — Alerts*"]
+                for snap in alerts:
+                    alert_lines.append(self._format_my_pool_alert_line(snap))
+                alert_lines.append("")
+                sections.append(alert_lines)
+
+        return sections
 
     def _format_opportunity_section_lines(self, results: List[ScoutResult], *, max_len: int) -> List[List[str]]:
         filtered = [item for item in results if self._is_allowed_candidate(item)]
@@ -274,6 +339,40 @@ class TelegramNotifier:
         for section in self._format_directional_sections(directional_snapshot):
             lines.extend(section)
 
+    def _append_my_pools_sections(
+        self,
+        lines: List[str],
+        my_pools_report: MyPoolsMonitorReport | None,
+    ) -> None:
+        for section in self._format_my_pools_sections(my_pools_report):
+            lines.extend(section)
+
+    def _format_my_pool_health_line(self, snap: MonitoredPoolSnapshot) -> str:
+        tags = ",".join(tag.value for tag in snap.health_tags) if snap.health_tags else "HEALTHY"
+        label = snap.label or snap.symbol or snap.pool_ref
+        conf_part = ""
+        if self.show_source_confidence:
+            conf_val = snap.source_confidence.value if hasattr(snap.source_confidence, "value") else str(snap.source_confidence)
+            conf_part = f" | {self._confidence_badge(conf_val)} Conf `{conf_val}`"
+        apy = f"{float(snap.apy):.2f}%" if isinstance(snap.apy, (int, float)) else "n/a"
+        tvl = self._format_tvl(float(snap.tvl_usd or 0.0))
+        vol = self._format_tvl(float(snap.volume_24h_usd or 0.0)) if isinstance(snap.volume_24h_usd, (int, float)) else "n/a"
+        ratio = f"{float(snap.vol_to_tvl_24h):.2f}" if isinstance(snap.vol_to_tvl_24h, (int, float)) else "n/a"
+        return (
+            f"- {self._pool_health_badge(snap)} `{snap.chain or 'n/a'}` `{label}` | "
+            f"`{snap.project or 'n/a'}` | APY {apy} | TVL {tvl} | Vol24h {vol} | Vol/TVL {ratio} | "
+            f"Fresh `{snap.freshness_status}`{conf_part} | Tags `{tags}` | [Pool]({snap.pool_url or 'https://defillama.com/yields'})"
+        )
+
+    def _format_my_pool_alert_line(self, snap: MonitoredPoolSnapshot) -> str:
+        label = snap.label or snap.symbol or snap.pool_ref
+        reasons = ",".join(snap.alert_reasons) if snap.alert_reasons else "NO_REASON"
+        tags = ",".join(tag.value for tag in snap.health_tags) if snap.health_tags else "DATA_UNVERIFIED"
+        return (
+            f"- {self._pool_health_badge(snap)} `{snap.chain or 'n/a'}` `{label}` | "
+            f"Alerts `{reasons}` | Tags `{tags}` | [Pool]({snap.pool_url or 'https://defillama.com/yields'})"
+        )
+
     def _format_opportunity_line(self, r: ScoutResult) -> str:
         badge = self._risk_badge(r.metadata.get("bucket", "N/A"))
         chain = r.candidate.chain
@@ -332,11 +431,28 @@ class TelegramNotifier:
         if self.show_source_confidence:
             confidence = r.metadata.get("source_confidence", "AGGREGATOR_ONLY")
             conf_str = f" | {self._confidence_badge(confidence)} Conf `{confidence}`"
+        signal_str = ""
+        if self.show_market_signals:
+            signals: list[str] = []
+            apy_vs_30d = r.metadata.get("apy_vs_mean_30d_pct", "")
+            if apy_vs_30d not in {"", "-"}:
+                try:
+                    signals.append(f"APYvs30d:{float(apy_vs_30d):+.1f}%")
+                except (TypeError, ValueError):
+                    pass
+            stability_factor = r.metadata.get("stability_factor", "")
+            if stability_factor not in {"", "-"}:
+                signals.append(f"StabF:{stability_factor}")
+            raw_signals = r.metadata.get("stability_signals", "")
+            if raw_signals:
+                signals.append(f"Flags:{raw_signals}")
+            if signals:
+                signal_str = " | " + " ".join(signals)
         return (
             f"- {badge} `{chain}` `{sym}` | `{project}` | APY {apy} | TVL {tvl} | "
             f"Risk `{bucket}`" + (f" | Tags {tags_str}" if tags_str else "") + f" | Sleeve `{sleeve}` | Reasons `{reason_codes}` | "
             f"Fresh `{freshness}` ({age_m}m){conf_str} | ΔAPY {d_apy}% ΔTVL {d_tvl}% | "
-            f"Net@1k ${net_1k}/mo" + vol_str + (f" | {sim_str}" if sim_str else "") + f" | [Pool]({pool_link})"
+            f"Net@1k ${net_1k}/mo" + vol_str + signal_str + (f" | {sim_str}" if sim_str else "") + f" | [Pool]({pool_link})"
         )
 
     def _append_lending_snapshot(
@@ -494,6 +610,13 @@ class TelegramNotifier:
     def _confidence_badge(self, conf: str) -> str:
         return {"VERIFIED": "✅", "AGGREGATOR_ONLY": "⚪", "DIVERGED": "⚠️", "STALE": "🔴"}.get(conf, "⚪")
 
+    def _pool_health_badge(self, snap: MonitoredPoolSnapshot) -> str:
+        if PoolHealthTag.DATA_UNVERIFIED in snap.health_tags:
+            return "⚪"
+        if any(tag in snap.health_tags for tag in (PoolHealthTag.WATCH_VOLUME, PoolHealthTag.WATCH_APY_DRIFT, PoolHealthTag.WATCH_TVL_DRAIN)):
+            return "🟡"
+        return "🟢"
+
     def _format_tvl(self, value: float) -> str:
         if value >= 1_000_000_000:
             return f"${value / 1_000_000_000:.2f}B"
@@ -532,6 +655,14 @@ class TelegramNotifier:
         tokens = self._extract_tokens(result.candidate.symbol)
         if not tokens:
             return False
+        return all(self._is_allowed_token(token) for token in tokens)
+
+    def _is_allowed_snapshot(self, snapshot: MonitoredPoolSnapshot) -> bool:
+        if not snapshot.symbol:
+            return True
+        tokens = self._extract_tokens(snapshot.symbol)
+        if not tokens:
+            return True
         return all(self._is_allowed_token(token) for token in tokens)
 
     def _extract_tokens(self, symbol: str) -> list[str]:
