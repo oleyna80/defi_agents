@@ -13,4 +13,6 @@
 - 013-freshness-aave-hardening-roo-task.md
 - 014-protocol-inspector-v1-plan.md
 - 014-protocol-inspector-v1-roo-task.md
+- 015-defillama-data-provider-v1-plan.md
+- 016-scout-my-pools-monitor-v1-plan.md
 - (add plans here)

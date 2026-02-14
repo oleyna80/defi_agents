@@ -2,11 +2,44 @@
 
 ## Architecture Decisions
 - YYYY-MM-DD: <Decision> - <Rationale>
+- 2026-02-13: Operator monitoring output is rendered as dedicated Telegram sections (`My Pools — Health` and `My Pools — Alerts`) and injected before directional market sections in section-block mode.
+  Rationale: own-pool operational status must remain readable and independent from market discovery rankings; block-level rendering prevents mixed/partial sections under Telegram length limits.
+
+- 2026-02-13: `My Pools Monitor` uses deterministic dual-key pool identity resolution:
+  - Primary key: `pool_id`.
+  - Fallback key: `(chain, address)` normalized to lowercase.
+  - Unresolved targets become explicit snapshots (`DATA_UNVERIFIED`, `POOL_NOT_FOUND`) instead of silent drops.
+  Rationale: operator watchlists must be complete and fail-safe; every configured pool must appear in report/state even when upstream mapping is partial.
+
+- 2026-02-13: Monitor health signals are computed as additive, non-blocking tags on snapshots:
+  - turnover (`WATCH_VOLUME`) from `Vol/TVL`,
+  - APY drift (`WATCH_APY_DRIFT`) and TVL drain (`WATCH_TVL_DRAIN`) from last 24h history points,
+  - default `HEALTHY` when no watch conditions trigger.
+  Rationale: keep operator monitoring explainable and deterministic without introducing new hard gates into core Scout candidate filtering.
+
+- 2026-02-13: Scout introduces an explicit operator-mode pattern (`My Pools Monitor`) alongside market-discovery mode:
+  - Market mode keeps directional Top-10 discovery.
+  - Operator mode tracks a configured watchlist of owned pools with health/alert tags (`Vol/TVL`, APY drift, TVL drain, confidence/freshness).
+  - Reporting uses dedicated Telegram blocks (`My Pools — Health/Alerts`) and does not merge with market ranking sections.
+  Rationale: users managing self-created pools need operational monitoring of a fixed set, not only external opportunity discovery.
+
 - 2026-02-12: Scout uses explicit `yield_type` taxonomy as SSOT on candidates (`lp_fees`, `lending_supply`, `staking`, etc.) and directional digest routing consumes this field.
   Rationale: removes duplicated classification heuristics across snapshot/report paths and makes future ranking/risk logic composable.
 
 - 2026-02-12: Scout ranking applies post-freshness confidence weighting via configurable `confidence_factors` (`VERIFIED/AGGREGATOR_ONLY/DIVERGED/STALE`) before report sorting.
   Rationale: keep raw economic/security scoring unchanged while systematically down-weighting lower-confidence data quality outcomes.
+
+- 2026-02-12: DeFiLlama ingestion is being formalized behind a dedicated provider layer (`DeFiLlamaDataProvider`) with typed normalized facts and endpoint-specific cache/retry guards.
+  Rationale: remove raw-endpoint coupling from Scout logic, improve schema-drift resilience, and make market/risk context reusable across modules.
+
+- 2026-02-12: Optional DeFiLlama market-context surfaces (`overview/summary/stablecoins/bridges/prices`) are collected in shadow mode under an explicit feature flag and never block Scout intake.
+  Rationale: upstream reliability differs by endpoint family; optional context must be additive and non-fatal until ranking/report policies are validated.
+
+- 2026-02-12: Stability-aware ranking is implemented as a soft multiplier only (no hard-gate changes), controlled by `defillama_provider.enable_stability_scoring` and explicit factor thresholds.
+  Rationale: improve ordering quality while preserving existing anti-scam and fail-safe gating semantics.
+
+- 2026-02-12: Telegram market-context signals are opt-in (`telegram_show_market_signals`) and read from computed metadata (`stability_factor`, `stability_signals`, `apy_vs_mean_30d_pct`).
+  Rationale: keep default report concise and production-safe while enabling richer operator diagnostics when needed.
 
 - 2026-02-12: Scout digest market view is split into independent directional sections:
   - `Top-10 LP` ranked by `Vol/TVL` (activity-first, low APR allowed)

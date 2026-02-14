@@ -31,6 +31,7 @@
 - Plan 008 (L3 AI-Analyst): production hardening and real provider integration
 
 ## Completed
+- 2026-02-14: Synced docs contour for ongoing Scout initiatives: landed `015/016` spec+plan files, updated `docs/specs/INDEX.md` and `docs/plans/INDEX.md`, refreshed `ROADMAP.md` Phase 2.6 section, and recorded monitor/provider architecture decisions in `docs/memory-bank/systemPatterns.md` — 2026-02-14
 - 2026-02-14: Closed RFC comments in `ai-monitoring.md` (resolved reviewer inline remarks, removed stale follow-up ask) and synced `docs/specs/lp-decision-engine-v1.md` final wording/version to `1.0.2` for implementation handoff — 2026-02-14
 - 2026-02-14: Completed cross-review of finalized RFC/spec pair (`ai-monitoring.md` + `docs/specs/lp-decision-engine-v1.md`) and added `VS Code ChatGPT` inline comments for residual alignment issues: v1 service-split semantics, approval status wording with open CO-items, per-candidate graceful degradation, package-path consistency, and monitor enhancement wording — 2026-02-14
 - 2026-02-14: Added final reconciliation comments in `ai-monitoring.md` (prefixed `VS Code ChatGPT`) to close residual ambiguities: clarified v1 single-service vs split-service rollout, replaced global TVL hard-block with configurable per-chain/per-pair gating, constrained LLM to advisory evidence, and required `DOWN` source visibility via watchlist telemetry — 2026-02-14

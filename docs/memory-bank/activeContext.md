@@ -6,6 +6,7 @@ Current Plan: docs/plans/016-scout-my-pools-monitor-v1-plan.md
 Active Task: `My Pools Monitor` Phase D implementation (Telegram Health/Alerts blocks)
 
 ## Recent Changes
+- 2026-02-14: Synchronized documentation contour for Scout tracks: added spec/plan index entries and repository files for `015-defillama-data-provider-v1` + `016-scout-my-pools-monitor-v1`, updated roadmap phase 2.6 section, and aligned system patterns/config examples with monitor/provider rollout state — 2026-02-14
 - 2026-02-14: Closed RFC comment cycle in `ai-monitoring.md` (removed resolved `VS Code ChatGPT` inline remarks and stale follow-up prompt) and finalized spec text alignment in `docs/specs/lp-decision-engine-v1.md` (`Status: APPROVED`, `Version: 1.0.2`, package-path consistency) — 2026-02-14
 - 2026-02-14: Ran consistency review on final `ai-monitoring.md` + `docs/specs/lp-decision-engine-v1.md`; added `VS Code ChatGPT` comments to resolve remaining ambiguities (logical-vs-physical service split in v1, spec status vs open CO-gaps, per-candidate degradation scope, model path alignment with current repo, and “enhance vs rebuild” wording for My Pools Monitor) — 2026-02-14
 - 2026-02-14: Performed final consistency pass on `ai-monitoring.md`: identified remaining implementation-level ambiguities (service split timing, global TVL hard-block wording, LLM role boundaries, DOWN-source visibility) and added inline `VS Code ChatGPT` clarifications with explicit `Согласен` rationale and rollout-safe constraints — 2026-02-14

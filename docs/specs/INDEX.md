@@ -14,4 +14,6 @@
 - 011-strategy-simulator-v1.md
 - 012-defi-coverage-mvp-dex-lp.md
 - 014-protocol-inspector-v1.md
+- 015-defillama-data-provider-v1.md
+- 016-scout-my-pools-monitor-v1.md
 - (add specs here)
