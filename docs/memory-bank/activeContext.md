@@ -1,11 +1,45 @@
 # Active Context
 
 ## Current Session Focus
-Current Spec: docs/specs/014-protocol-inspector-v1.md
-Current Plan: docs/plans/014-protocol-inspector-v1-plan.md
-Active Task: Scout yield taxonomy SSOT (`yield_type`) and directional digest hardening
+Current Spec: docs/specs/016-scout-my-pools-monitor-v1.md
+Current Plan: docs/plans/016-scout-my-pools-monitor-v1-plan.md
+Active Task: `My Pools Monitor` Phase D implementation (Telegram Health/Alerts blocks)
 
 ## Recent Changes
+- 2026-02-14: Closed RFC comment cycle in `ai-monitoring.md` (removed resolved `VS Code ChatGPT` inline remarks and stale follow-up prompt) and finalized spec text alignment in `docs/specs/lp-decision-engine-v1.md` (`Status: APPROVED`, `Version: 1.0.2`, package-path consistency) — 2026-02-14
+- 2026-02-14: Ran consistency review on final `ai-monitoring.md` + `docs/specs/lp-decision-engine-v1.md`; added `VS Code ChatGPT` comments to resolve remaining ambiguities (logical-vs-physical service split in v1, spec status vs open CO-gaps, per-candidate degradation scope, model path alignment with current repo, and “enhance vs rebuild” wording for My Pools Monitor) — 2026-02-14
+- 2026-02-14: Performed final consistency pass on `ai-monitoring.md`: identified remaining implementation-level ambiguities (service split timing, global TVL hard-block wording, LLM role boundaries, DOWN-source visibility) and added inline `VS Code ChatGPT` clarifications with explicit `Согласен` rationale and rollout-safe constraints — 2026-02-14
+- 2026-02-14: Added third-pass inline comments in `ai-monitoring.md` (prefixed `VS Code ChatGPT`) after multi-agent updates: explicit agreement notes with rationale on static-liquidity MVP guardrails, rebalance alert debounce, benchmark normalization (`per-chain/per-asset` risk-free), model split path alignment to `src/defi_agents/...`, ATR-regime cooldown, and v1 rollout constraints (`manual-only`, `one-chain/one-DEX`, degraded->watchlist) — 2026-02-14
+- 2026-02-14: Added second-pass inline review notes in `ai-monitoring.md` (prefixed `VS Code ChatGPT`) after external-agent comments: clarified gold-token assumption handling, identified already-implemented Scout fields vs missing LP fields, proposed unified `data_quality` block for degraded modes, refined phased `PositionPnL` rollout, and corrected practical P0 scope/timeline — 2026-02-14
+- 2026-02-14: Annotated `ai-monitoring.md` inline with architecture recommendations under `VS Code ChatGPT` markers (mode split `Market Discovery` vs `My Pools`, deterministic scoring guardrails, data-contract compatibility fields, confidence/inspector score factors, endpoint failover metadata, phased rollout order) — 2026-02-14
+- 2026-02-14: Reviewed `ai-monitoring.md` against current Scout/Inspector architecture and produced integration guidance for LP Decision Engine v1 (`discovery -> direct re-check -> range planning`), including required data-contract alignment (`PoolRef/PoolSnapshot/Opportunity/PositionState`) and rollout sequencing without breaking existing 6h digest/monitor modes — 2026-02-14
+- 2026-02-13: Fixed `My Pools Monitor` runtime issue on live DeFiLlama history payloads: ISO8601 `timestamp` values are now parsed safely in `_compute_24h_drop_pct` (no `ValueError`, no monitor fallback to empty report) — 2026-02-13
+- 2026-02-13: Started VPS shadow rollout for monitor mode by enabling `my_pools_monitor` with 3 Base pools in `docs/memory-bank/scout_config.json`; runtime logs now show stable counters (`configured=3 snapshots=3 healthy=2 watch=1 unverified=0`) — 2026-02-13
+- 2026-02-13: Implemented `My Pools` Telegram section rendering in `TelegramNotifier`: separate blocks `My Pools — Health` and `My Pools — Alerts` with deterministic formatting and digest-safe section packing — 2026-02-13
+- 2026-02-13: Wired monitor report into send path (`main.py` -> `send_alpha_report(..., my_pools_report=...)`) and extended notifier API to accept monitor payload — 2026-02-13
+- 2026-02-13: Added notifier regression coverage for monitor blocks/flags (`tests/test_notifier.py`), full suite green (`135 passed`) — 2026-02-13
+- 2026-02-13: Implemented `My Pools Monitor` resolver in `DeFiLlamaClient`: watchlist matching by `pool_id` with fallback `chain+address`, plus fail-safe unresolved handling (`DATA_UNVERIFIED`, `POOL_NOT_FOUND`) without cycle failures — 2026-02-13
+- 2026-02-13: Implemented pool health-tag engine for monitor snapshots: `WATCH_VOLUME` (`Vol/TVL`), `WATCH_APY_DRIFT` (24h APY drop from history), `WATCH_TVL_DRAIN` (24h TVL drop), else `HEALTHY`; outputs typed `MyPoolsMonitorReport` — 2026-02-13
+- 2026-02-13: Wired monitor observability into runtime (`YieldScout.last_my_pools_report`, cycle log counters in `main.py`) and added regression coverage in `tests/test_my_pools_monitor.py`; full suite green (`133 passed`) — 2026-02-13
+- 2026-02-13: Implemented Phase A config schema in `ScoutConfig`: added `my_pools_monitor` block with target validation (`pool_id` OR `chain+address`), thresholds, and report toggles; default is safe OFF — 2026-02-13
+- 2026-02-13: Added Phase A typed contracts in `src/defi_agents/scout/models.py`: `PoolHealthTag`, `MonitoredPoolSnapshot`, `MyPoolsMonitorReport` (`has_any`) — 2026-02-13
+- 2026-02-13: Added config/model regression tests (`tests/test_my_pools_monitor.py`) and revalidated full suite (`132 passed`) plus config JSON validity — 2026-02-13
+- 2026-02-13: Drafted Scout operator-mode spec `016-scout-my-pools-monitor-v1` for watchlist-based monitoring of own DEX pools (health, alerts, market-gap context) with fail-safe behavior and backward-compatible OFF default — 2026-02-13
+- 2026-02-13: Drafted technical plan `016-scout-my-pools-monitor-v1-plan` with phased delivery (config/models, resolver, health tags, Telegram sections, rollout/tests) — 2026-02-13
+- 2026-02-13: Updated `ROADMAP.md` with dedicated Phase 2.6 (`Scout My Pools Monitor`) and linked spec/plan/DoD for implementation tracking — 2026-02-13
+- 2026-02-12: Enabled Telegram market-signal display in shadow mode (`reporting.telegram_show_market_signals=true`) in `docs/memory-bank/scout_config.json`; stability scoring remains OFF for controlled rollout (`defillama_provider.enable_stability_scoring=false`) — 2026-02-12
+- 2026-02-12: Implemented DeFiLlama Phase D soft ranking integration: Scout score now applies optional stability factor (`outlier`, `apy vs 30d mean`, `sigma/mu`, `ilRisk`) via config-gated multipliers; no new hard blocks introduced — 2026-02-12
+- 2026-02-12: Added optional Telegram market-signal rendering (`reporting.telegram_show_market_signals`) and surfaced stability metadata (`stability_factor`, `stability_signals`, `apy_vs_mean_30d_pct`) in opportunity lines when enabled — 2026-02-12
+- 2026-02-12: Extended provider/scout/notifier tests for Phase D and optional surfaces; full suite green (`128 passed`) — 2026-02-12
+- 2026-02-12: Implemented DeFiLlama provider optional market surfaces (Phase C): `overview/summary`, stablecoins snapshot, bridges snapshot, and current/historical prices with typed parsers and non-fatal behavior gated by `defillama_provider.enable_optional_market_surfaces` — 2026-02-12
+- 2026-02-12: Extended provider tests to cover optional-surface OFF no-op mode and enabled parsing paths for market/stablecoin/bridge/price endpoints; full suite green (`125 passed`) — 2026-02-12
+- 2026-02-12: Implemented Phase B field propagation: ScoutCandidate now carries DeFiLlama stability/microstructure fields (`apyPct*`, `apyBase7d`, `il7d`, `ilRisk`, `outlier`, `mu`, `sigma`, `exposure`) and Scout result metadata now includes normalized values + derived `apy_vs_mean_30d_pct` for downstream ranking/reporting use — 2026-02-12
+- 2026-02-12: Extended provider typed model coverage for stability fields and added regression tests in `tests/test_defillama_provider.py` and `tests/test_scout.py`; full suite green (`122 passed`) — 2026-02-12
+- 2026-02-12: Implemented DeFiLlamaDataProvider foundation (`src/defi_agents/data/*`) with bounded retry/timeout/cache and typed yield models; added fail-safe parsing and endpoint counters for `yields_pools`, `yields_pools_old`, `yields_chart` — 2026-02-12
+- 2026-02-12: Wired Scout `DeFiLlamaClient` to provider path (feature flag `defillama_provider.enabled`), added provider counters log line in `main.py`, and exposed `get_pool_history()` bridge for historical chart data — 2026-02-12
+- 2026-02-12: Added provider config block in `ScoutConfig` + `docs/memory-bank/scout_config.json` (`timeout`, `retry_attempts`, `cache_ttl_seconds`, optional surfaces flag) and new tests `tests/test_defillama_provider.py`; full suite green (`120 passed`) — 2026-02-12
+- 2026-02-12: Drafted spec `015-defillama-data-provider-v1` describing provider scope, endpoint families, normalized data contracts, fail-safe requirements, and acceptance criteria — 2026-02-12
+- 2026-02-12: Drafted technical plan `015-defillama-data-provider-v1-plan` with phased rollout (A-D), config/testing/rollout gates, and integration boundaries for Scout — 2026-02-12
 - 2026-02-12: Implemented Iteration 2 confidence-weighted ranking: post-freshness report scores are now multiplied by `confidence_factors` (`VERIFIED/AGGREGATOR_ONLY/DIVERGED/STALE`) via `apply_confidence_factors()` in `main.py`; added idempotent score metadata (`score_raw`, `confidence_factor`) and policy tests — 2026-02-12
 - 2026-02-12: Fixed Source Confidence divergence consistency in freshness policy: divergence now triggers when either APY or TVL divergence exceeds threshold (even if the other metric is missing), aligned `map_source_confidence()` and actionable downgrade logic; added regression tests in `tests/test_freshness_policy.py` — 2026-02-12
 - 2026-02-12: Added `YieldType` taxonomy SSOT to Scout candidate model (`lp_fees`, `lending_supply`, `staking`, etc.) and centralized classification in `DeFiLlamaClient` intake builders — 2026-02-12
@@ -175,9 +209,7 @@ Active Task: Scout yield taxonomy SSOT (`yield_type`) and directional digest har
   - `docs/memory-bank/security/whitelist.json` (tokens + protocols)
 
 ## Next Steps
-1. Run VPS shadow rollout for AaveKit path (`aave_direct_enabled=true`, strict OFF) and collect 24h counters (`aave_ok`, `aave_timeout`, `aave_schema_mismatch`, `aave_addr_mismatch`)
-2. Validate chain coverage by extending `aave_direct_reserve_symbols` for Arbitrum/Base/Avalanche stable and core assets
-3. Promote to strict freshness gating only after threshold pass (`aave_ok / aave_checked >= 0.70` and no sustained timeout/error streaks)
-4. Rotate Telegram bot token on VPS (old token appeared in historical logs before hardening) and restart user service
-5. Implement explicit Non-EVM unsupported reporting path (per-chain counters/tags, not only missing-chain totals)
-6. Add heartbeat (daily "no opportunities" message) for healthy-but-silent cycles
+1. Continue 24h VPS shadow rollout for enabled `my_pools_monitor` and collect stability/noise metrics per cycle
+2. Calibrate `my_pools_monitor` thresholds (`min_vol_to_tvl_24h`, `max_apy_drop_pct_24h`, `max_tvl_drop_pct_24h`) from live alerts
+3. Replace seed pools in watchlist with your production pools (or add by `chain+address` where `pool_id` is unstable)
+4. Implement optional `My Pools — Market Gap` block (Phase E) against directional market baselines
