@@ -42,6 +42,9 @@ class ReportingConfig(BaseModel):
     telegram_directional_staking_min_apy: float = Field(default=0.0, ge=0.0)
     telegram_show_source_confidence: bool = True
     telegram_show_market_signals: bool = False
+    # Daily liveness signal when no candidates pass report gates.
+    telegram_no_opportunities_heartbeat_enabled: bool = True
+    telegram_no_opportunities_heartbeat_interval_seconds: int = Field(default=86_400, ge=0)
 
 
 class MyPoolTargetConfig(BaseModel):

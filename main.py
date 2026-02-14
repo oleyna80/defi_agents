@@ -94,6 +94,31 @@ def _mark_telegram_digest_sent() -> None:
     cache.set("last_sent_at", int(time()), ttl_seconds=365 * 24 * 3600)
 
 
+def _telegram_no_opps_heartbeat_due(config: ScoutConfig) -> tuple[bool, int, int]:
+    reporting = getattr(config, "reporting", None)
+    enabled = bool(getattr(reporting, "telegram_no_opportunities_heartbeat_enabled", False))
+    interval = int(getattr(reporting, "telegram_no_opportunities_heartbeat_interval_seconds", 0) or 0)
+    if not enabled or interval <= 0:
+        return False, interval, 0
+    cache = CacheController(namespace="telegram_no_opps_heartbeat")
+    last_sent = cache.get("last_sent_at")
+    now = int(time())
+    try:
+        last = int(float(last_sent)) if last_sent is not None else 0
+    except (TypeError, ValueError):
+        last = 0
+    if last <= 0:
+        return True, interval, 0
+    elapsed = now - last
+    remaining = max(0, interval - elapsed)
+    return elapsed >= interval, interval, remaining
+
+
+def _mark_telegram_no_opps_heartbeat_sent() -> None:
+    cache = CacheController(namespace="telegram_no_opps_heartbeat")
+    cache.set("last_sent_at", int(time()), ttl_seconds=365 * 24 * 3600)
+
+
 async def run_sentinel_cycle() -> None:
     _load_env_file()
     config = ScoutConfig.from_file("docs/memory-bank/scout_config.json")
@@ -370,7 +395,30 @@ async def run_sentinel_cycle() -> None:
                     watchlist_count,
                 )
         else:
-            logger.info("Match not found. High security standards met.")
+            due, interval, remaining = _telegram_no_opps_heartbeat_due(config)
+            if due:
+                heartbeat_lines = [
+                    "*Scout Heartbeat*",
+                    "No opportunities found in current cycle.",
+                    f"- Eligible after L3: {len(eligible)}",
+                    f"- Safe picks: {len(safe_picks)} | Warn picks: {len(warn_picks)}",
+                    f"- Freshness recheck enabled: {config.freshness.recheck_enabled}",
+                ]
+                if config.my_pools_monitor.enabled and my_pools_report is not None:
+                    heartbeat_lines.append(
+                        f"- My Pools: configured={len(config.my_pools_monitor.pools)} "
+                        f"snapshots={len(getattr(my_pools_report, 'snapshots', []) or [])} "
+                        f"watch={int(getattr(my_pools_report, 'watch_count', 0) or 0)}"
+                    )
+                await notifier.send_markdown_report("\n".join(heartbeat_lines))
+                _mark_telegram_no_opps_heartbeat_sent()
+                logger.info("No-op heartbeat sent (interval=%ss).", interval)
+            else:
+                logger.info(
+                    "Match not found. No-op heartbeat suppressed by schedule: interval=%ss next_in=%ss.",
+                    interval,
+                    remaining,
+                )
 
     except Exception as exc:  # noqa: BLE001
         logger.exception("Sentinel cycle failed: %s", exc)

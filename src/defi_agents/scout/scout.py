@@ -32,6 +32,21 @@ class YieldScout:
         "ETH", "WETH", "STETH", "WSTETH", "RETH", "CBETH", "EETH", "WEETH", "METH", "SETH",
     }
     _TARGET_GOLD = {"XAUT", "PAXG", "PAXGOLD"}
+    _NON_EVM_HINTS = {
+        "solana",
+        "sui",
+        "aptos",
+        "near",
+        "stellar",
+        "osmosis",
+        "cosmos",
+        "injective",
+        "tron",
+        "ton",
+        "algorand",
+        "cardano",
+        "polkadot",
+    }
 
     def __init__(
         self,
@@ -93,11 +108,17 @@ class YieldScout:
         missing_address = 0
         missing_chain_id = 0
         addressable_total = 0
+        missing_chain_name_counts: Counter[str] = Counter()
+        unsupported_non_evm = 0
         for pool in prioritized:
             if not pool.address:
                 missing_address += 1
             if pool.chain_id is None:
                 missing_chain_id += 1
+                chain_name = (pool.chain or "unknown").strip() or "unknown"
+                missing_chain_name_counts[chain_name] += 1
+                if self._is_non_evm_chain_name(chain_name):
+                    unsupported_non_evm += 1
             if pool.address and pool.chain_id is not None:
                 addressable_total += 1
         addressable_candidates = self._select_audit_candidates(prioritized)
@@ -224,7 +245,8 @@ class YieldScout:
         logger.info(
             "Funnel metrics: raw=%s heuristics=%s addressable_selected=%s missing_address=%s missing_chain_id=%s "
             "addressable_total=%s security_counts=%s top_reasons=%s lindy_softened=%s exploration_slots=%s tactical_filtered=%s "
-            "capacity_filtered=%s cost_filtered=%s blacklist_filtered=%s liquidity_filtered=%s universe_filtered=%s results=%s deduped=%s",
+            "capacity_filtered=%s cost_filtered=%s blacklist_filtered=%s liquidity_filtered=%s universe_filtered=%s "
+            "unsupported_non_evm=%s missing_chain_top=%s results=%s deduped=%s",
             raw_count,
             heuristics_count,
             len(addressable_candidates),
@@ -241,6 +263,8 @@ class YieldScout:
             blacklist_filtered,
             liquidity_filtered,
             universe_filtered,
+            unsupported_non_evm,
+            missing_chain_name_counts.most_common(5),
             len(results),
             len(deduped),
         )
@@ -283,6 +307,13 @@ class YieldScout:
             "SUSDS", "SDAI",
         }
         return set(stable) | set(self._TARGET_BTC) | set(self._TARGET_ETH) | set(self._TARGET_GOLD)
+
+    @classmethod
+    def _is_non_evm_chain_name(cls, chain: str | None) -> bool:
+        raw = (chain or "").strip().lower()
+        if not raw:
+            return False
+        return any(hint in raw for hint in cls._NON_EVM_HINTS)
 
     @staticmethod
     def _extract_symbol_tokens(symbol: str | None) -> list[str]:

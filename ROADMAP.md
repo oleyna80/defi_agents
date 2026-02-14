@@ -74,22 +74,21 @@
       - [x] Phase A: schema + policy wiring (`freshness` config, metadata fields, downgrade policy, counters, report tags).
       - [x] Phase B: first re-check adapter MVP (`Uniswap Subgraph` for Ethereum, timeout budget, metadata/delta wiring; feature-flagged by default).
       - [x] Phase C: расширение на non-Ethereum DEX (multi-chain source registry via Graph subgraph IDs + `Aerodrome` adapter scaffold, feature-flagged).
-      - [ ] Phase C+: Aave direct re-check (обновить endpoint strategy: `aave-api-v2` deprecated, нужен актуальный source contract).
+      - [x] Phase C+: Aave direct re-check (миграция на AaveKit GraphQL + outcome counters `ok/timeout/error/schema_mismatch/addr_mismatch`).
       - [ ] Phase D: add Morpho API and calibrate thresholds on VPS telemetry.
-- [ ] **Non‑EVM стратегия (явно):**
-    - Solana / Sui / Aptos: либо добавить отдельные адаптеры, либо пометить как `UNSUPPORTED` (но не “молча отбрасывать”).
-    - Цель: понимать реальный missed-opportunity, а не терять его в нулевой статистике.
+- [x] **Non‑EVM стратегия (явно):**
+    - Добавлена явная наблюдаемость unsupported/non‑EVM входов в funnel-метриках (`unsupported_non_evm`, `missing_chain_top`), чтобы такие кандидаты не исчезали “молча”.
+    - Отдельные non‑EVM адаптеры (Solana/Sui/Aptos) вынесены в следующий этап расширения coverage.
 - [x] **Смягчение Security Policy (v1 baseline):**
     - Внедрить правило "Lindy Effect" как *смягчение audit/reputation сигналов*, но НЕ как обход критических tech-флагов.
     - v1 пороги: `TVL >= $100M` и `age >= 180d` (при необходимости позже смягчить до `50M` по метрикам).
     - Эффект: отсутствие top-tier аудита переводить в `WARN`, но не в `PASS/TRUSTED`.
     - Разрешить `unknown` аудиты для “Blue Chip” протоколов (Aave, Uniswap, Curve) через реестр/whitelist, а не через хардкод.
-- [ ] **Fix "Silent Mode":**
-    - Настроить отправку уведомления "No opportunities found" раз в сутки (Heartbeat), чтобы подтверждать работоспособность.
-- [ ] **Scout: Staking Yield Discovery (новый источник):**
-    - Добавить discovery не только LP‑пулов, но и стейкинг‑доходности (LST / chain‑native / yield‑bearing stables).
-    - Классифицировать как отдельный тип кандидата (`staking` / `yield-bearing`) с метриками `apy`, `tvl`, `lockup`, `unbonding`, `slashing risk`.
-    - Цель: расширить “сырьё” для Strategy Simulator.
+- [x] **Fix "Silent Mode":**
+    - Добавлен Telegram heartbeat "No opportunities found" с отдельным daily rate-limit (`reporting.telegram_no_opportunities_heartbeat_*`), чтобы подтверждать liveness при пустой выдаче.
+- [x] **Scout: Staking Yield Discovery (v1):**
+    - Discovery расширен beyond LP: single-asset рынки классифицируются как `staking` и попадают в отдельный directional Top-10 блок.
+    - v1.1 backlog: добавить поля `lockup/unbonding/slashing` для chain-native/LST источников.
 
 ---
 

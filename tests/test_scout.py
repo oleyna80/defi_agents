@@ -625,3 +625,11 @@ def test_liquidity_gate_rejects_below_absolute_min_tvl_even_with_volume():
     status_map = {pools[0].address: SecurityResult.pass_as_tier1()}
     results = _run(_scout(cfg, pools, status_map).analyze())
     assert len(results) == 0
+
+
+def test_non_evm_chain_hint_detection():
+    cfg = ScoutConfig(min_tvl_usd=100_000)
+    scout = _scout(cfg, [], {})
+    assert scout._is_non_evm_chain_name("Solana") is True
+    assert scout._is_non_evm_chain_name("Sui") is True
+    assert scout._is_non_evm_chain_name("Ethereum") is False

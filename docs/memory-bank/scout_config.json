@@ -31,7 +31,9 @@
       "telegram_directional_staking_min_tvl_usd": 100000,
       "telegram_directional_staking_min_apy": 0.0,
       "telegram_show_source_confidence": true,
-      "telegram_show_market_signals": true
+      "telegram_show_market_signals": true,
+      "telegram_no_opportunities_heartbeat_enabled": true,
+      "telegram_no_opportunities_heartbeat_interval_seconds": 86400
     },
     "my_pools_monitor": {
       "enabled": true,

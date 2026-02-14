@@ -31,6 +31,7 @@
 - Plan 008 (L3 AI-Analyst): production hardening and real provider integration
 
 ## Completed
+- 2026-02-14: Reduced remaining Phase 2 tail: added daily “No opportunities found” Telegram heartbeat in `main.py`, surfaced explicit non-EVM unsupported counters in Scout funnel telemetry, updated reporting config defaults (`telegram_no_opportunities_heartbeat_*`), and refreshed `ROADMAP.md` checklist states (Freshness C+, Silent Mode, Staking discovery v1) — 2026-02-14
 - 2026-02-14: Closed pending code integration for provider/monitor features: landed `src/defi_agents/data/*` provider layer, Scout monitor wiring (`my_pools_monitor` + notifier/main hooks), and regression coverage (`test_defillama_provider`, `test_my_pools_monitor`, notifier/scout updates); validation green (`136 passed`) — 2026-02-14
 - 2026-02-14: Reframed `ROADMAP.md` product direction for Scout: priority moved from “find external pools” to “select networks/projects/tokens for creating own pools”, and added explicit stage-1 asset scope limit (top tokens + stablecoins only) — 2026-02-14
 - 2026-02-14: Synced docs contour for ongoing Scout initiatives: landed `015/016` spec+plan files, updated `docs/specs/INDEX.md` and `docs/plans/INDEX.md`, refreshed `ROADMAP.md` Phase 2.6 section, and recorded monitor/provider architecture decisions in `docs/memory-bank/systemPatterns.md` — 2026-02-14
@@ -156,6 +157,7 @@
 - 2026-02-04: Updated deployment/config templates for Graph gateway auth and revalidated full suite (`42 passed`) — 2026-02-04
 
 ## Changelog
+- 2026-02-14: Phase 2 operational liveness gap closed via no-op daily heartbeat and unsupported non-EVM funnel observability — 2026-02-14
 - 2026-02-14: RFC discussion file `ai-monitoring.md` moved to closed state (comments resolved) and LP spec polished to final implementation-ready wording (`v1.0.2`) — 2026-02-14
 - 2026-02-14: Final review confirms near-full consensus; remaining items are specification wording/alignment issues, not architecture disagreements — 2026-02-14
 - 2026-02-14: `ai-monitoring.md` consistency pass completed; remaining disagreements reduced to implementation sequencing choices, not architecture blockers — 2026-02-14
