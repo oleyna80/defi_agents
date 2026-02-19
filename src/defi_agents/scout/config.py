@@ -42,6 +42,17 @@ class ReportingConfig(BaseModel):
     telegram_directional_staking_min_apy: float = Field(default=0.0, ge=0.0)
     telegram_show_source_confidence: bool = True
     telegram_show_market_signals: bool = False
+    # Shadow-mode routing for pre-production validation.
+    telegram_shadow_mode_enabled: bool = False
+    telegram_shadow_prefix: str = "⚠️ SHADOW — DO NOT ACT"
+    telegram_shadow_chat_id_env: str = "TELEGRAM_SHADOW_CHAT_ID"
+    telegram_shadow_metrics_horizon_seconds: int = Field(default=86_400, ge=60)
+    telegram_shadow_capture_interval_seconds: int = Field(default=21_600, ge=60)
+    telegram_shadow_retention_seconds: int = Field(default=1_209_600, ge=3_600)
+    telegram_recheck_enabled: bool = False
+    telegram_recheck_poll_limit: int = Field(default=20, ge=1, le=100)
+    telegram_recheck_command: str = "/recheck"
+    telegram_recheck_change_threshold_pct: float = Field(default=20.0, ge=0.0)
     # Daily liveness signal when no candidates pass report gates.
     telegram_no_opportunities_heartbeat_enabled: bool = True
     telegram_no_opportunities_heartbeat_interval_seconds: int = Field(default=86_400, ge=0)
@@ -261,6 +272,26 @@ class FreshnessConfig(BaseModel):
             }
         }
     )
+    morpho_direct_enabled: bool = False
+    morpho_direct_timeout_seconds: int = 8
+    morpho_direct_api_key_env: str = "MORPHO_DIRECT_API_KEY"
+    # Per-chain endpoint(s): supports single URL string or ordered fallback list.
+    morpho_direct_endpoints: dict[str, str | list[str]] = Field(
+        default_factory=lambda: {"Ethereum": ["https://blue-api.morpho.org/graphql"]}
+    )
+    # Per-chain chainId map for marketByUniqueKey.
+    morpho_direct_chain_ids: dict[str, int] = Field(
+        default_factory=lambda: {
+            "Ethereum": 1,
+            "Base": 8453,
+            "Arbitrum": 42161,
+            "Optimism": 10,
+        }
+    )
+    # Allowlist map: SYMBOL -> Morpho market unique key (per chain).
+    morpho_direct_market_keys: dict[str, dict[str, str]] = Field(
+        default_factory=dict
+    )
 
 
 class StrategySimConfig(BaseModel):
@@ -354,6 +385,35 @@ class DeFiLlamaProviderConfig(BaseModel):
     stability_il_risk_factor: float = Field(default=0.95, ge=0.0, le=1.0)
 
 
+class TickDensityConfig(BaseModel):
+    enabled: bool = False
+    shadow_mode_enabled: bool = True
+    max_pages_per_pool: int = Field(default=100, ge=1)
+    max_ticks_per_pool: int = Field(default=50_000, ge=1)
+    scan_timeout_seconds: int = Field(default=5, ge=1)
+    retry_attempts: int = Field(default=3, ge=0)
+    min_expected_net_monthly_usd: float = Field(default=5.0, ge=0.0)
+    max_scan_candidates: int = Field(default=10, ge=1)
+    rpc_timeout_seconds: float = Field(default=3.0, ge=0.5)
+    graph_api_key_env: str = "GRAPH_API_KEY"
+    uniswap_subgraph_endpoints: Dict[str, str] = Field(default_factory=dict)
+    uniswap_subgraph_ids: Dict[str, str] = Field(
+        default_factory=lambda: {
+            "Ethereum": "5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV",
+            "Arbitrum": "C2KJVEU6fA9Bqf8QwK4MAnuS8xPYYn9N6HqFA7gKjsXo",
+            "Base": "3hCPRGfHk8NAxU1wR8UWQ2N8isf2Xn7u6xQ5q4VYqW3G",
+        }
+    )
+    # Chain name → env var for RPC URL (for slot0 cross-check)
+    rpc_url_env_map: Dict[str, str] = Field(
+        default_factory=lambda: {
+            "Ethereum": "RPC_URL_ETHEREUM",
+            "Arbitrum": "RPC_URL_ARBITRUM",
+            "Base": "RPC_URL_BASE",
+        }
+    )
+
+
 class ScoutConfig(BaseModel):
     min_tvl_usd: float = Field(default=1_000_000, ge=100_000)
     min_apy: float = 0.0
@@ -372,6 +432,7 @@ class ScoutConfig(BaseModel):
     dex_discovery: DexDiscoveryConfig = Field(default_factory=DexDiscoveryConfig)
     inspector: InspectorConfig = Field(default_factory=InspectorConfig)
     defillama_provider: DeFiLlamaProviderConfig = Field(default_factory=DeFiLlamaProviderConfig)
+    tick_density: TickDensityConfig = Field(default_factory=TickDensityConfig)
     strategy_sim: StrategySimConfig = Field(default_factory=StrategySimConfig)
     token_buckets: TokenBuckets = Field(default_factory=TokenBuckets)
     risk_policy: StableRiskPolicy = Field(default_factory=StableRiskPolicy)

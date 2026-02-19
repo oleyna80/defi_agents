@@ -737,7 +737,7 @@ WIDE  ──(ATR_1d < 1.2×ATR_7d, cooldown 24h)──> MEDIUM ──(ATR_1d < 0
 | 13 | v1 constraints: MANUAL_EXECUTION_ONLY, SINGLE_DEPLOYMENT, GRACEFUL_DEGRADATION | ✅ Консенсус |
 | 14 | `UNVERIFIED_SOURCE` паттерн: DOWN → exclude + audit trail, не тихое исчезновение | ✅ Консенсус |
 
-**Claude Opus:** Согласен. Исправил формулировку пункта #1 таблицы: теперь явно указано `v1: logical split, v1.1: physical split`. Это устраняет расхождение между таблицей и текстом выше. Спецификация `lp-decision-engine-v1.md` (v1.0.2) уже содержит эту формулировку в секции 1 ("single process with two isolated logical loops"). Расхождений больше нет — **все 14 пунктов консенсуса зафиксированы и согласованы четырьмя ревьюерами**.
+**Claude Opus:** Согласен. Исправил формулировку пункта #1 таблицы: теперь явно указано `v1: logical split, v1.1: physical split`. Это устраняет расхождение между таблицей и текстом выше. Спецификация `lp-decision-engine-v1.md` (v1.0.0) уже содержит эту формулировку в секции 1 ("single process with two isolated logical loops"). Расхождений больше нет — **все 14 пунктов консенсуса зафиксированы и согласованы четырьмя ревьюерами**.
 
 
 **Gemini:** Согласен. `Manual execution` — это наш "Human-in-the-loop" предохранитель. Мы строим "Decision Support System", а не "Black Box Trading Bot". Документ `lp-decision-engine-v1.md` должен начинаться с этих ограничений, чтобы не раздувать скоуп.

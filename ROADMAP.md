@@ -119,23 +119,56 @@
 *Цель: переключить Scout из "поиска чужих пулов" в "операционный мониторинг моих пулов" без потери risk-first и fail-safe поведения.*
 
 - **Spec/Plan:** `docs/specs/016-scout-my-pools-monitor-v1.md`, `docs/plans/016-scout-my-pools-monitor-v1-plan.md`
-- [ ] **Watchlist Mode (pool-centric):**
+- [x] **Watchlist Mode (pool-centric):**
     - Явный список пулов (`pool_id` и/или `chain+address`) в конфиге.
     - Отдельный pipeline мониторинга без смешивания с market Top-10.
-- [ ] **Pool Health Signals:**
+- [x] **Pool Health Signals:**
     - Метрики: `TVL`, `Vol24h`, `Vol/TVL`, `APY`, `APY vs 30d mean`, freshness/confidence.
     - Теги статуса: `HEALTHY / WATCH_VOLUME / WATCH_APY_DRIFT / WATCH_TVL_DRAIN / DATA_UNVERIFIED`.
-- [ ] **Telegram Decision Blocks (operator view):**
+- [x] **Telegram Decision Blocks (operator view):**
     - `My Pools — Health`
     - `My Pools — Alerts`
     - (опционально) `My Pools — Market Gap`
-- [ ] **Fail-safe + compatibility:**
+- [x] **Fail-safe + compatibility:**
     - При выключенном monitor-режиме текущий отчет не меняется.
     - Неразрешенные/неполные данные не валят цикл, а деградируют в `DATA_UNVERIFIED`.
-- [ ] **DoD для фазы 2.6:**
+- [x] **DoD для фазы 2.6:**
     - 24h стабильной работы с включенным monitor-режимом (без падений цикла).
     - Все пулы из watchlist отражаются в отчете (resolved или explicit-unverified).
     - Полный тест-пакет green.
+
+---
+
+## 🟧 Phase 2.7: Tick Density Scanner (Band Depth Module) (Новый приоритет: High, IN PROGRESS)
+*Цель: добавить tick-level анализ ликвидности для CLMM, чтобы LP Decision Engine выбирал диапазоны с низкой конкуренцией и контролируемым риском.*
+
+- **Spec/Plan:** `docs/specs/017-tick-density-scanner-v1.md`, `docs/plans/017-tick-density-scanner-v1-plan.md`
+- [x] **Governance gate (2026-02-19):**
+  - `docs/specs/017-tick-density-scanner-v1.md` переведена в `Status: APPROVED`.
+  - Коллизии `REQ-022/REQ-023` устранены, plan/spec синхронизированы.
+- [ ] **Phase 1 (P0, IN PROGRESS):**
+  - [x] `TickDataProvider` + `UniswapV3TickProvider` (core provider contract + fail-safe adapter).
+  - [x] Anchor-based tick walking (`pool.liquidity`), `band_depth_*` windows (+1%/+2.5%/+5%).
+  - [x] RPC drift semantics + typed degradation reasons (`DegradationReason`).
+  - [x] Pagination circuit breakers (`MAX_PAGES_PER_POOL`, `MAX_TICKS_PER_POOL`).
+  - [x] Feature-flag config surface `tick_density.*` in `ScoutConfig` + sample `scout_config.json`.
+  - [x] Regression suite for P0 foundations (`tests/test_tick_density_scanner.py`) + full suite green (`157 passed`).
+  - [ ] Integration hook into scorer/runtime shadow counters and live reference checks (`AC-01..AC-07`, `AC-17`).
+- [ ] **Phase 1.5 (P0.5):**
+  - pit detection + `CONFIDENT_PIT/NOISE_PIT`
+  - `SuggestedRange` (tickSpacing-aligned)
+  - Aerodrome adapter
+- [ ] **Phase 2 (P1):**
+  - history/stability gate (>=3 obs / 6h)
+  - multi-venue comparison
+  - PancakeSwap/HyperSwap adapters
+- [ ] **Ops gate (shadow):**
+  - 24h VPS shadow-run with `errors=0`
+  - mandatory counters in logs: `pits_found_count`, `degraded_count`, `scan_duration_p95_ms`
+  - degraded data -> watchlist only (no actionable)
+- [x] **Phase F (Krystal API Discovery, non-blocking):**
+  - `docs/research/krystal-api-discovery.md` зафиксировал текущий статус `NO-GO` (2026-02-19): server-side запросы блокируются Cloudflare challenge (`403 cf-mitigated`).
+  - P0 execution path не блокирован и остаётся на `UniswapV3TickProvider`; Krystal остаётся optional discovery-track до service-level auth.
 
 ---
 
@@ -257,3 +290,37 @@
 7) **Decision View**
    - Отчёт понятен конечному пользователю (что, где, почему, риск).
    - DoD: “хочу войти” → ясно куда и зачем.
+
+---
+
+## 🚀 Future Architectures & Moonshots (Gemini Architect Wishlist)
+*Концептуальные идеи для долгосрочного развития (Post-v1).*
+
+### 1. Delta-Neutral "Pure Yield" (Risk Hedging)
+*Shift from "High Yield" to "Risk-Free Yield".*
+- **Concept:** Одновременное открытие LP-позиции (Long) и шорта на ту же сумму (Perps/Aave).
+- **Goal:** Забирать 50%+ APY комиссий, полностью игнорируя движение цены токена (Delta Neutral).
+- **Tech:** Интеграция с Hyperliquid API или Aave V3.
+
+### 2. "Time Machine" Backtesting
+*Shift from "Forward Test" to "Historical Simulation".*
+- **Concept:** Валидация стратегий не на живых деньгах, а на исторических данных.
+- **Tech:** Fork-based simulation (Foundry/Anvil) с копией состояния блокчейна за прошлые периоды.
+- **Goal:** Тюнинг параметров (ширина ренджа, порог входа) с нулевым риском.
+
+### 3. Event-Driven Architecture
+*Shift from "Polling" to "Push".*
+- **Concept:** Замена cron/systemd polling (раз в 10 мин) на WebSocket подписку на события чейна.
+- **Tech:** Alchemy/Infura WebSockets -> Async Event Loop.
+- **Goal:** Реакция на появление "ямы ликвидности" за миллисекунды (опережение JIT-ботов).
+
+### 4. Smart Execution Agent
+*Shift from "Analysis" to "Action".*
+- **Concept:** Бот не просто шлет алерт, а генерирует готовую транзакцию (или исполняет её сам в доверенном контуре).
+- **Tech:** Safe Smart Account SDK или EOA signing service с жесткими лимитами.
+- **Goal:** Auto-Close rules (stop-loss, profit-take, liquidity drain exit) без участия человека.
+
+### 5. Cross-Chain Arbitrage Intelligence
+*Shift from "Isolated" to "Comparative".*
+- **Concept:** Сравнивать yield одного актива сразу во всех сетях (Base vs Arb vs Mainnet).
+- **Goal:** "Не лезь на Base, перекинь USDC на Arbitrum, там yield на 40% выше с учетом моста".

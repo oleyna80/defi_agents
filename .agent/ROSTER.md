@@ -19,3 +19,7 @@ Open the referenced file and follow it strictly.
 | Skill | Asset Classifier | `.agent/skills/asset-classifier/SKILL.md` | "Use skill asset-classifier" |
 | Skill | Risk Checks | `.agent/skills/risk-checks/SKILL.md` | "Use skill risk-checks" |
 | Skill | Telegram Alerting | `.agent/skills/telegram-alerting/SKILL.md` | "Use skill telegram-alerting" |
+| Skill | LP Opportunity Scoring | `.agent/skills/lp-opportunity-scoring/SKILL.md` | "Use skill lp-opportunity-scoring" / "Rank LP opportunities" |
+| Skill | Reward Economics | `.agent/skills/reward-economics/SKILL.md` | "Use skill reward-economics" / "Adjust rewards APR" |
+| Skill | CLMM Range Ops | `.agent/skills/clmm-range-ops/SKILL.md` | "Use skill clmm-range-ops" / "Plan LP range" |
+| Skill | DeFi Degradation Policy | `.agent/skills/defi-degradation-policy/SKILL.md` | "Use skill defi-degradation-policy" / "Apply safe downgrade" |

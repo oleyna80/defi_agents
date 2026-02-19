@@ -219,6 +219,18 @@ class DeFiLlamaClient:
             ],
         )
 
+    async def get_pool_by_id(self, pool_id: str) -> ScoutCandidate | None:
+        """Resolve a pool by DeFiLlama pool id using reporting candidate build."""
+        wanted = str(pool_id or "").strip()
+        if not wanted:
+            return None
+        pools = await self._fetch_raw_pools()
+        candidates = self._build_reporting_candidates(pools, min_tvl_floor=0.0)
+        for candidate in candidates:
+            if candidate.pool_id == wanted:
+                return candidate
+        return None
+
     async def get_my_pools_monitor_report(self) -> MyPoolsMonitorReport:
         monitor_cfg = getattr(self.config, "my_pools_monitor", None)
         if monitor_cfg is None or not bool(getattr(monitor_cfg, "enabled", False)):

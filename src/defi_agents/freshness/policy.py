@@ -42,6 +42,12 @@ def apply_freshness_policy(results: List[ScoutResult], config: FreshnessConfig) 
         "aave_error_count": 0,
         "aave_schema_mismatch_count": 0,
         "aave_addr_mismatch_count": 0,
+        "morpho_checked_count": 0,
+        "morpho_ok_count": 0,
+        "morpho_timeout_count": 0,
+        "morpho_error_count": 0,
+        "morpho_schema_mismatch_count": 0,
+        "morpho_addr_mismatch_count": 0,
     }
 
     if not results:
@@ -62,6 +68,19 @@ def apply_freshness_policy(results: List[ScoutResult], config: FreshnessConfig) 
                 counters["aave_addr_mismatch_count"] += 1
             else:
                 counters["aave_error_count"] += 1
+        if meta.get("morpho_recheck_checked") == "1":
+            counters["morpho_checked_count"] += 1
+            outcome = (meta.get("morpho_recheck_outcome") or "").strip().lower()
+            if outcome == "ok":
+                counters["morpho_ok_count"] += 1
+            elif outcome == "timeout":
+                counters["morpho_timeout_count"] += 1
+            elif outcome == "schema_mismatch":
+                counters["morpho_schema_mismatch_count"] += 1
+            elif outcome == "addr_mismatch":
+                counters["morpho_addr_mismatch_count"] += 1
+            else:
+                counters["morpho_error_count"] += 1
 
         status = (meta.get("freshness_status") or "UNVERIFIED").upper()
         meta["freshness_status"] = status

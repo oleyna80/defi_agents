@@ -116,6 +116,26 @@ def test_aave_outcome_counters_include_mismatch_and_schema():
     assert counters["aave_error_count"] == 1
 
 
+def test_morpho_outcome_counters_include_mismatch_and_schema():
+    cfg = FreshnessConfig(recheck_enabled=True, enforce_freshness_for_actionable=False)
+    res1 = _make_result(report_group="WATCHLIST", freshness_status="UNVERIFIED")
+    res2 = _make_result(report_group="WATCHLIST", freshness_status="UNVERIFIED")
+    res3 = _make_result(report_group="WATCHLIST", freshness_status="UNVERIFIED")
+    res1.metadata["morpho_recheck_checked"] = "1"
+    res2.metadata["morpho_recheck_checked"] = "1"
+    res3.metadata["morpho_recheck_checked"] = "1"
+    res1.metadata["morpho_recheck_outcome"] = "schema_mismatch"
+    res2.metadata["morpho_recheck_outcome"] = "addr_mismatch"
+    res3.metadata["morpho_recheck_outcome"] = "error"
+
+    counters = apply_freshness_policy([res1, res2, res3], cfg)
+
+    assert counters["morpho_checked_count"] == 3
+    assert counters["morpho_schema_mismatch_count"] == 1
+    assert counters["morpho_addr_mismatch_count"] == 1
+    assert counters["morpho_error_count"] == 1
+
+
 # --- map_source_confidence unit tests ---
 
 

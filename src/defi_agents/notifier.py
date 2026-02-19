@@ -4,7 +4,7 @@ import asyncio
 import logging
 import os
 import re
-from typing import List
+from typing import Any, List
 
 import httpx
 
@@ -40,13 +40,17 @@ class TelegramNotifier:
         top_n_per_section: int = 0,
         show_source_confidence: bool = True,
         show_market_signals: bool = False,
+        chat_id_env: str | None = None,
+        message_prefix: str = "",
     ) -> None:
         self.token = os.getenv("TELEGRAM_BOT_TOKEN")
-        self.chat_id = os.getenv("TELEGRAM_CHAT_ID") or os.getenv("CHAT_ID")
+        configured_chat = os.getenv(chat_id_env) if chat_id_env else None
+        self.chat_id = configured_chat or os.getenv("TELEGRAM_CHAT_ID") or os.getenv("CHAT_ID")
         self.include_tags = include_tags
         self.top_n_per_section = int(top_n_per_section) if isinstance(top_n_per_section, int) else 0
         self.show_source_confidence = show_source_confidence
         self.show_market_signals = show_market_signals
+        self.message_prefix = (message_prefix or "").strip()
 
     async def send_alpha_report(
         self,
@@ -74,13 +78,78 @@ class TelegramNotifier:
         for chunk in self._chunk_message(text):
             await self._send(chunk)
 
+    async def fetch_recheck_requests(
+        self,
+        *,
+        offset: int | None = None,
+        limit: int = 20,
+        command: str = "/recheck",
+    ) -> tuple[list[str], int | None]:
+        """Poll Telegram updates and extract `/recheck <pool_id>` commands.
+
+        Returns:
+            (pool_ids, next_offset)
+        """
+        if not self.token:
+            return [], offset
+        url = f"https://api.telegram.org/bot{self.token}/getUpdates"
+        params: dict[str, Any] = {
+            "timeout": 0,
+            "limit": max(1, min(int(limit), 100)),
+            "allowed_updates": '["message"]',
+        }
+        if isinstance(offset, int):
+            params["offset"] = offset
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(url, params=params)
+            if not response.is_success:
+                logging.warning("Telegram getUpdates failed: status=%s", response.status_code)
+                return [], offset
+            payload = response.json()
+        except Exception as exc:  # noqa: BLE001
+            logging.warning("Telegram getUpdates request error: %s", exc.__class__.__name__)
+            return [], offset
+
+        updates = payload.get("result", []) if isinstance(payload, dict) else []
+        if not isinstance(updates, list):
+            return [], offset
+
+        requests: list[str] = []
+        seen: set[str] = set()
+        max_update_id: int | None = None
+        expected_chat = str(self.chat_id) if self.chat_id is not None else None
+
+        for update in updates:
+            if not isinstance(update, dict):
+                continue
+            update_id = update.get("update_id")
+            if isinstance(update_id, int):
+                max_update_id = update_id if max_update_id is None else max(max_update_id, update_id)
+            message = update.get("message")
+            if not isinstance(message, dict):
+                continue
+            chat = message.get("chat")
+            chat_id = str(chat.get("id")) if isinstance(chat, dict) and chat.get("id") is not None else None
+            if expected_chat and chat_id and chat_id != expected_chat:
+                continue
+            text = message.get("text")
+            pool_id = self._extract_recheck_pool_id(text, command=command)
+            if pool_id and pool_id not in seen:
+                seen.add(pool_id)
+                requests.append(pool_id)
+
+        next_offset = (max_update_id + 1) if max_update_id is not None else offset
+        return requests, next_offset
+
     async def _send(self, text: str, retries: int = 3) -> bool:
+        text_to_send = self._with_prefix(text)
         if not self.token or not self.chat_id:
             # No credentials configured; fallback to console output.
-            print(text)
+            print(text_to_send)
             return False
         url = f"https://api.telegram.org/bot{self.token}/sendMessage"
-        payload = {"chat_id": self.chat_id, "text": text, "parse_mode": "Markdown"}
+        payload = {"chat_id": self.chat_id, "text": text_to_send, "parse_mode": "Markdown"}
         async with httpx.AsyncClient(timeout=10.0) as client:
             for attempt in range(1, retries + 1):
                 try:
@@ -110,6 +179,29 @@ class TelegramNotifier:
                         await asyncio.sleep(wait_seconds)
         logging.error("Telegram notification failed after retries.")
         return False
+
+    def _with_prefix(self, text: str) -> str:
+        if not self.message_prefix:
+            return text
+        if text.startswith(self.message_prefix):
+            return text
+        return f"{self.message_prefix}\n{text}"
+
+    @staticmethod
+    def _extract_recheck_pool_id(text: object, *, command: str = "/recheck") -> str | None:
+        if not isinstance(text, str):
+            return None
+        raw = text.strip()
+        if not raw:
+            return None
+        cmd = (command or "/recheck").strip()
+        # Supports /recheck <id> and /recheck@BotName <id>.
+        pattern = rf"^{re.escape(cmd)}(?:@\w+)?\s+([A-Za-z0-9\-:_]+)\s*$"
+        match = re.match(pattern, raw)
+        if not match:
+            return None
+        pool_id = match.group(1).strip()
+        return pool_id or None
 
     def _format_report(
         self,

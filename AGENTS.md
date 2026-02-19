@@ -43,6 +43,10 @@ Update after significant work:
 - Risk Checks: `.agent/skills/risk-checks/SKILL.md`
 - Portfolio Schema: `.agent/skills/portfolio-schema/SKILL.md`
 - Telegram Alerting: `.agent/skills/telegram-alerting/SKILL.md`
+- LP Opportunity Scoring: `.agent/skills/lp-opportunity-scoring/SKILL.md`
+- Reward Economics: `.agent/skills/reward-economics/SKILL.md`
+- CLMM Range Ops: `.agent/skills/clmm-range-ops/SKILL.md`
+- DeFi Degradation Policy: `.agent/skills/defi-degradation-policy/SKILL.md`
 
 ## Core Workflows
 - Project Bootstrap: `.agent/workflows/project-bootstrap.md`

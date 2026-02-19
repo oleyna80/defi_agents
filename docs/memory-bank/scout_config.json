@@ -8,12 +8,12 @@
       "telegram_digest_interval_seconds": 21600,
       "telegram_report_mode": "snapshot",
       "telegram_top_n_per_section": 10,
-      "telegram_turnover_section_enabled": true,
+      "telegram_turnover_section_enabled": false,
       "telegram_turnover_top_n": 10,
       "telegram_turnover_min_tvl_usd": 100000,
       "telegram_turnover_min_volume_24h_usd": 0,
       "telegram_turnover_min_vol_to_tvl": 1.0,
-      "telegram_directional_sections_enabled": true,
+      "telegram_directional_sections_enabled": false,
       "telegram_directional_top_n": 10,
       "telegram_directional_lp_min_tvl_usd": 100000,
       "telegram_directional_lp_min_vol_to_tvl": 1.0,
@@ -32,11 +32,21 @@
       "telegram_directional_staking_min_apy": 0.0,
       "telegram_show_source_confidence": true,
       "telegram_show_market_signals": true,
+      "telegram_shadow_mode_enabled": true,
+      "telegram_shadow_prefix": "⚠️ SHADOW — DO NOT ACT",
+      "telegram_shadow_chat_id_env": "TELEGRAM_SHADOW_CHAT_ID",
+      "telegram_shadow_metrics_horizon_seconds": 86400,
+      "telegram_shadow_capture_interval_seconds": 21600,
+      "telegram_shadow_retention_seconds": 1209600,
+      "telegram_recheck_enabled": true,
+      "telegram_recheck_poll_limit": 20,
+      "telegram_recheck_command": "/recheck",
+      "telegram_recheck_change_threshold_pct": 20.0,
       "telegram_no_opportunities_heartbeat_enabled": true,
       "telegram_no_opportunities_heartbeat_interval_seconds": 86400
     },
     "my_pools_monitor": {
-      "enabled": true,
+      "enabled": false,
       "pools": [
         {
           "pool_id": "ba557f7e-f287-45a9-bc37-8f3a24ca05c7",
@@ -149,6 +159,25 @@
           "DAI": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
           "GHO": "0x40D16FC0246aB6A3AE3E2fD7D8F9aE22fE2387bD"
         }
+      },
+      "morpho_direct_enabled": false,
+      "morpho_direct_timeout_seconds": 8,
+      "morpho_direct_api_key_env": "MORPHO_DIRECT_API_KEY",
+      "morpho_direct_endpoints": {
+        "Ethereum": [
+          "https://blue-api.morpho.org/graphql"
+        ]
+      },
+      "morpho_direct_chain_ids": {
+        "Ethereum": 1,
+        "Base": 8453,
+        "Arbitrum": 42161,
+        "Optimism": 10
+      },
+      "morpho_direct_market_keys": {
+        "Ethereum": {
+          "USDC": ""
+        }
       }
     },
     "dex_discovery": {
@@ -171,7 +200,7 @@
       }
     },
     "inspector": {
-      "enabled": true,
+      "enabled": false,
       "timeout_seconds": 10,
       "output_dir": "docs/memory-bank/cache/inspector",
       "rpc_urls": {
@@ -225,6 +254,29 @@
       "stability_sigma_to_mu_threshold": 0.6,
       "stability_sigma_factor": 0.92,
       "stability_il_risk_factor": 0.95
+    },
+    "tick_density": {
+      "enabled": true,
+      "shadow_mode_enabled": true,
+      "max_pages_per_pool": 100,
+      "max_ticks_per_pool": 50000,
+      "scan_timeout_seconds": 5,
+      "retry_attempts": 3,
+      "min_expected_net_monthly_usd": 5.0,
+      "max_scan_candidates": 10,
+      "rpc_timeout_seconds": 3.0,
+      "graph_api_key_env": "GRAPH_API_KEY",
+      "uniswap_subgraph_endpoints": {},
+      "uniswap_subgraph_ids": {
+        "Ethereum": "5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV",
+        "Arbitrum": "C2KJVEU6fA9Bqf8QwK4MAnuS8xPYYn9N6HqFA7gKjsXo",
+        "Base": "3hCPRGfHk8NAxU1wR8UWQ2N8isf2Xn7u6xQ5q4VYqW3G"
+      },
+      "rpc_url_env_map": {
+        "Ethereum": "RPC_URL_ETHEREUM",
+        "Arbitrum": "RPC_URL_ARBITRUM",
+        "Base": "RPC_URL_BASE"
+      }
     },
     "token_buckets": {
       "stablecoins_usd": [

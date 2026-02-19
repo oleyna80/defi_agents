@@ -112,6 +112,29 @@ def test_report_sorts_by_pair_categories():
     assert message.find("1) Stable/Stable") < message.find("2) Token/Stable") < message.find("3) Token/Token")
 
 
+def test_notifier_uses_custom_chat_id_env(monkeypatch):
+    monkeypatch.delenv("TELEGRAM_CHAT_ID", raising=False)
+    monkeypatch.delenv("CHAT_ID", raising=False)
+    monkeypatch.setenv("TELEGRAM_SHADOW_CHAT_ID", "shadow-chat")
+    notifier = TelegramNotifier(chat_id_env="TELEGRAM_SHADOW_CHAT_ID")
+    assert notifier.chat_id == "shadow-chat"
+
+
+def test_notifier_prefix_applied_once():
+    notifier = TelegramNotifier(message_prefix="⚠️ SHADOW — DO NOT ACT")
+    out = notifier._with_prefix("hello")
+    assert out.startswith("⚠️ SHADOW — DO NOT ACT")
+    assert "\nhello" in out
+    assert notifier._with_prefix(out) == out
+
+
+def test_extract_recheck_pool_id_parses_command():
+    assert TelegramNotifier._extract_recheck_pool_id("/recheck abc-123") == "abc-123"
+    assert TelegramNotifier._extract_recheck_pool_id("/recheck@MyBot abc-123") == "abc-123"
+    assert TelegramNotifier._extract_recheck_pool_id("/recheck") is None
+    assert TelegramNotifier._extract_recheck_pool_id("/start") is None
+
+
 def test_report_filters_non_target_tokens():
     notifier = TelegramNotifier()
     message = notifier._format_report(

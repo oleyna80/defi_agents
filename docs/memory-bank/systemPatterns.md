@@ -2,6 +2,25 @@
 
 ## Architecture Decisions
 - YYYY-MM-DD: <Decision> - <Rationale>
+- 2026-02-19: Tick Density Scanner runtime integration follows a post-L3, pre-scoring scan stage:
+  - scanner is invoked after `save_to_history()` and before `eligible` filtering,
+  - per-chain `UniswapV3TickProvider` is lazily initialized and reused across candidates on the same chain,
+  - optional RPC `slot0()` cross-check uses raw `eth_call` via `httpx` (no web3.py dependency),
+  - all scan results are attached to `metadata` dict (not model fields) to avoid breaking `ScoutResult` schema,
+  - WATCHLIST downgrade only fires when `tick_density.enabled=true` AND `shadow_mode_enabled=false` (safe rollout).
+  Rationale: metadata-driven approach avoids model migration, shadow mode allows 24h observation before scoring impact.
+
+- 2026-02-19: Tick Density Scanner P0 uses an explicit fail-safe contract in typed models:
+  - scanner output is `BandDepthResult` with mandatory `degradation_reason` whenever `data_quality != OK`,
+  - provider-layer failures are mapped to deterministic reason codes (`PAGINATION_LIMIT_REACHED`, `SUBGRAPH_TIMEOUT`, `SUBGRAPH_ERROR`, `RPC_*`, `TICK_COUNT_ZERO`),
+  - no silent empty-result fallbacks for degraded scanner outcomes.
+  Rationale: preserve decision traceability and allow downstream scorer/notifier to apply deterministic watchlist-only downgrades.
+
+- 2026-02-19: Optional discovery providers (Krystal Phase F) are explicitly decoupled from tick-level computation path.
+  - P0 tick-level source of truth remains `UniswapV3TickProvider` (subgraph + RPC validation),
+  - discovery-provider outages do not degrade `BandDepthResult` quality.
+  Rationale: avoid vendor lock-in and keep LP scoring correctness independent from optional market-discovery integrations.
+
 - 2026-02-13: Operator monitoring output is rendered as dedicated Telegram sections (`My Pools — Health` and `My Pools — Alerts`) and injected before directional market sections in section-block mode.
   Rationale: own-pool operational status must remain readable and independent from market discovery rankings; block-level rendering prevents mixed/partial sections under Telegram length limits.
 

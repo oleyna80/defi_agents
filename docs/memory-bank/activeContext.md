@@ -1,11 +1,39 @@
 # Active Context
 
 ## Current Session Focus
-Current Spec: docs/specs/016-scout-my-pools-monitor-v1.md
-Current Plan: docs/plans/016-scout-my-pools-monitor-v1-plan.md
-Active Task: `My Pools Monitor` Phase D implementation (Telegram Health/Alerts blocks)
+Current Spec: docs/specs/017-tick-density-scanner-v1.md
+Current Plan: docs/plans/017-tick-density-scanner-v1-plan.md
+Active Task: Tick Density Scanner Phase A complete, Phase B pit classifier implemented; pending: WHALE_DEPENDENT flag, shadow rollout on VPS
 
 ## Recent Changes
+- 2026-02-19: Completed Tick Density Scanner Phase A + B runtime integration: wired `scan_pool_band_depth()` into `main.py` (output-hook with per-chain UniswapV3TickProvider init, RPC `slot0` cross-check, band depth scan loop, metadata attachment, WATCHLIST downgrade for degraded data, cycle counters logging), added `rpc_helper.py` (raw `eth_call` slot0 fetch, fail-safe), `pit_classifier.py` (1% binning, pit detection, `CONFIDENT_PIT`/`NOISE_PIT`, tickSpacing-aligned range suggestion), extended `BandDepthResult` model (`pits_found`, `suggested_range_lower/upper_tick`), extended `TickDensityConfig` (`max_scan_candidates`, `rpc_timeout_seconds`, `rpc_url_env_map`), added 11 new tests in `tests/test_tick_density_phase_ab.py`; full suite green (`168 passed`) — 2026-02-19
+- 2026-02-19: Added researcher task brief `docs/research/2026-02-krystal-integration-research-brief.md` with decision-oriented scope (official Krystal access path vs alternative stack), hard constraints (no bypass, production-safe only), required deliverables, and acceptance criteria for GO/NO-GO recommendation — 2026-02-19
+- 2026-02-19: Disabled outdated Scout/Inspector notification surfaces in `docs/memory-bank/scout_config.json`: turned OFF `reporting.telegram_turnover_section_enabled`, `reporting.telegram_directional_sections_enabled`, `my_pools_monitor.enabled`, and `inspector.enabled` (Altura track), so routine Telegram output no longer includes deprecated LP/Altura blocks — 2026-02-19
+- 2026-02-19: Disabled scheduler `defi-inspector.timer` (`systemctl --user disable --now`) to stop separate Altura inspector runs entirely while keeping `defi-sentinel.timer` active — 2026-02-19
+- 2026-02-19: Promoted Spec 017 to `Status: APPROVED`, resolved Krystal discovery/degradation contract collisions (`REQ-022/REQ-023`), and marked approvals in `docs/specs/017-tick-density-scanner-v1.md`; aligned Phase F stop/go semantics in `docs/plans/017-tick-density-scanner-v1-plan.md` — 2026-02-19
+- 2026-02-19: Implemented Tick Density Scanner P0 foundation under `src/defi_agents/lp/` (`models.py`, `tick_provider.py`, `band_depth.py`, package exports), added `tick_density` config block in `src/defi_agents/scout/config.py` + `docs/memory-bank/scout_config.json`, and added regression suite `tests/test_tick_density_scanner.py`; validation green (`157 passed`) — 2026-02-19
+- 2026-02-18: Created implementation plan `docs/plans/017-tick-density-scanner-v1-plan.md` for Spec 017 (module architecture, phased delivery P0->P2, config/contracts, VPS shadow rollout gates, and test strategy) and registered it in `docs/plans/INDEX.md` — 2026-02-18
+- 2026-02-18: Added roadmap track `Phase 2.7: Tick Density Scanner` with linked spec/plan and staged milestones (Uniswap core, pit detection, multi-DEX adapters, shadow ops gate) in `ROADMAP.md` — 2026-02-18
+- 2026-02-18: Promoted Tick Density Scanner review items into executable spec requirements in `docs/specs/017-tick-density-scanner-v1.md`: pagination circuit breakers (`MAX_PAGES_PER_POOL`, `MAX_TICKS_PER_POOL`), LP scoring output-hook (`REQ-020`), small-cap net-profit guardrail (`REQ-021`), phased DEX scope (Uniswap → Aerodrome → Pancake/HyperSwap), and shadow-run acceptance gates (`AC-18..AC-20`) — 2026-02-18
+- 2026-02-18: Added `ChatGPT` review comments to tick-density docs (`docs/runbooks/Tick Density Scanner.md`, `docs/specs/017-tick-density-scanner-v1.md`) with implementation guardrails for small-cap net-profit floor, pagination circuit breakers, phased DEX adapter scope, and shadow rollout acceptance metrics — 2026-02-18
+- 2026-02-17: Added Senior DeFi skill pack under `.agent/skills/` for LP-focused decision workflows: `lp-opportunity-scoring`, `reward-economics`, `clmm-range-ops`, `defi-degradation-policy` — 2026-02-17
+- 2026-02-17: Updated agent manifests to expose new skills in invocation paths (`AGENTS.md`, `.agent/ROSTER.md`) so orchestrated agents can trigger them explicitly by name/intent — 2026-02-17
+- 2026-02-15: Implemented Telegram `/recheck` command path (proxy mode) in runtime: added `ReportingConfig` controls (`telegram_recheck_*`), Telegram update polling/parser in `TelegramNotifier`, pool resolver `get_pool_by_id()` in `DeFiLlamaClient`, and cycle handler in `main.py` that responds with CONFIRMED/ABORT/NEED_BASELINE based on `net@1k` proxy delta against latest shadow snapshot — 2026-02-15
+- 2026-02-15: Added regression coverage for command parsing and shadow baseline lookup (`tests/test_notifier.py`, `tests/test_shadow_metrics.py`), full suite green (`150 passed`) — 2026-02-15
+- 2026-02-15: Enabled LP SHADOW mode on VPS in `docs/memory-bank/scout_config.json` (`telegram_shadow_mode_enabled=true`), restarted `defi-sentinel.service`, and completed smoke validation via journal logs: `Shadow mode enabled`, `Shadow metrics`, and successful digest send (`Reported ... shadow=True`) without runtime errors — 2026-02-15
+- 2026-02-15: Added operator runbook `docs/runbooks/lp-shadow-rollout-v1.md` for VPS SHADOW enablement/validation/rollback (pre-flight, env wiring, smoke checks, 24h counters, rollback) — 2026-02-15
+- 2026-02-15: Implemented Phase 0.5 shadow telemetry tracker (`src/defi_agents/shadow_metrics.py`) with cache-backed prediction snapshots and proxy calibration metrics (`median_ape_proxy`, `p75_ape_proxy`, `directional_accuracy_proxy`, `rmse_normalized_proxy`); wired runtime logging in `main.py` when `reporting.telegram_shadow_mode_enabled=true` — 2026-02-15
+- 2026-02-15: Extended shadow config surface with metrics controls (`telegram_shadow_metrics_horizon_seconds`, `telegram_shadow_capture_interval_seconds`, `telegram_shadow_retention_seconds`) and synced sample values in `docs/memory-bank/scout_config.json` — 2026-02-15
+- 2026-02-15: Added regression tests for shadow telemetry and shadow notifier routing (`tests/test_shadow_metrics.py`, `tests/test_notifier.py`); validation green (`148 passed`) — 2026-02-15
+- 2026-02-15: Started LP Decision Engine Phase 0.5 runtime scaffold: added SHADOW reporting controls in `ReportingConfig` (`telegram_shadow_mode_enabled`, prefix, target chat env), wired shadow routing/prefix in `main.py` + `TelegramNotifier`, and updated sample config in `docs/memory-bank/scout_config.json` — 2026-02-15
+- 2026-02-15: Closed remaining LP review open points in both discussion artifacts (`docs/runbooks/low_competition_pool_finder_discussion.md`, `.gemini/.../implementation_plan.md.resolved`) with explicit Option-B locks for tactical sizing, Aerodrome P0.5 rollout, hybrid thresholds, vote-risk timing, and stablecoin-tier governance — 2026-02-15
+- 2026-02-15: Normalized LP decision spec/document links for consistency: `docs/specs/lp-decision-engine-v1.md` now uses v1 identifiers (`title/version/non-goals`), repo-relative source links (no `file:///`), IL heuristic calibration note, and synced review index blocks in both discussion artifacts (`docs/runbooks/low_competition_pool_finder_discussion.md`, `.gemini/.../implementation_plan.md.resolved`) — 2026-02-15
+- 2026-02-15: Added explicit ChatGPT cross-review block over Claude+Gemini comments in `docs/runbooks/low_competition_pool_finder_discussion.md` (AGREE/PARTIAL/DISAGREE per thesis, consensus replacements for liquidity math and reward-aware objective, and compromise proposals for disputed points) — 2026-02-15
+- 2026-02-15: Consolidated multi-agent LP finder reviews into executable runbook consensus in `docs/runbooks/low_competition_pool_finder_discussion.md`: added explicit `Consensus/Disagreements/Action Items`, resolved v1 stances (fixed thresholds for v1, SHADOW telegram visibility, multi-metric validation), and added reward-aware ranking requirement (`net_alpha = fee + realized rewards - drag`) — 2026-02-15
+- 2026-02-15: Consolidated multi-agent reasoning thread into single runbook: transferred Gemini critical review (liquidityNet fallacy, tick-walk requirement, JIT/fake-volume caution, and phase-1 rewrite requirement) into `docs/runbooks/low_competition_pool_finder_discussion.md` to keep one canonical discussion artifact — 2026-02-15
+- 2026-02-14: Started Freshness Phase D implementation: added `MorphoDirectAdapter` (`src/defi_agents/freshness/adapters/morpho_direct.py`), wired it in `FreshnessManager`, extended `FreshnessConfig` with `morpho_direct_*`, and added Morpho outcome counters to freshness policy + cycle summary log (`main.py`) — 2026-02-14
+- 2026-02-14: Added Morpho direct regression coverage (`tests/test_morpho_adapter.py`, `tests/test_freshness_policy.py`) and synced sample freshness config in `docs/memory-bank/scout_config.json` — 2026-02-14
+- 2026-02-14: Marked Phase 2.6 (`Scout My Pools Monitor`) as DoD-complete in `ROADMAP.md` after 24h VPS validation evidence (stable monitor counters, digest cadence, zero runtime errors) — 2026-02-14
 - 2026-02-14: Closed key open items of Phase 2 tail in runtime/docs: added daily Telegram no-op heartbeat (`reporting.telegram_no_opportunities_heartbeat_*`) in `main.py`, explicit non-EVM unsupported visibility counters in Scout funnel logs (`unsupported_non_evm`, `missing_chain_top`), and updated `ROADMAP.md` statuses (Freshness C+ done, Silent Mode done, Staking discovery v1 done) — 2026-02-14
 - 2026-02-14: Finalized pending Scout code pack for provider/monitor tracks in working tree (`DeFiLlamaDataProvider`, `my_pools_monitor`, Telegram monitor blocks, stability signal surface); validation complete: targeted tests `65 passed`, full suite `136 passed` — 2026-02-14
 - 2026-02-14: Updated `ROADMAP.md` strategic framing: Scout focus is now explicitly “create/manage own pools” (not third-party pool picking), with v1 asset-universe constraint to top tokens (`BTC/ETH` family) and top stablecoins only — 2026-02-14
@@ -208,12 +236,13 @@ Active Task: `My Pools Monitor` Phase D implementation (Telegram Health/Alerts b
 - Security adapters chosen: GoPlus (primary), De.Fi (secondary enrichment)
 - Data contracts: normalized position schema shared by all modules
 - LP imbalance metric definition (based on available data)
+- Krystal API auth path unresolved (`cf-mitigated: challenge`): service key/IP allowlist/partner channel required before optional discovery adapter work
 - Step 1 scouting exclusion decided: exclude leveraged/vault/bridged/synthetic categories at Step 1
 - AssetClassifier integration: whitelist SSOT decided:
   - `docs/memory-bank/security/whitelist.json` (tokens + protocols)
 
 ## Next Steps
-1. Continue 24h VPS shadow rollout for enabled `my_pools_monitor` and collect stability/noise metrics per cycle
-2. Calibrate `my_pools_monitor` thresholds (`min_vol_to_tvl_24h`, `max_apy_drop_pct_24h`, `max_tvl_drop_pct_24h`) from live alerts
-3. Replace seed pools in watchlist with your production pools (or add by `chain+address` where `pool_id` is unstable)
-4. Implement optional `My Pools — Market Gap` block (Phase E) against directional market baselines
+1. Wire Tick Density P0 output-hook (`BandDepthResult`) into LP scoring entrypoint and add watchlist-only downgrade for `data_quality != OK`
+2. Add RPC cross-check integration path (`slot0`) around scanner run and surface `RPC_DRIFT_EXCEEDED/RPC_UNAVAILABLE` counters in cycle logs
+3. Prepare P0 shadow switch in config/runtime (`tick_density.enabled=false`, `shadow_mode_enabled=true`) and run 24h VPS observation gate
+4. Keep Krystal workstream as non-blocking Phase F discovery; proceed only if service auth gate is unlocked
