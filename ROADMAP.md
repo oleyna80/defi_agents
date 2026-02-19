@@ -243,6 +243,85 @@
 
 ---
 
+## 🔷 Phase 3: LP Execution Pipeline — Foundation (Priority: Medium)
+*Переход от advisory ("вот хорошие пулы") к execution ("автоматически управляй позициями").*
+*Требует новых approved спецификаций — текущая логика зафиксирована как `MANUAL_EXECUTION_ONLY`.*
+
+### Phase 3.1 — Strategy Calibration + Forward Simulation (P1)
+*Калибровка параметров и stress-test на текущем state (не классический бэктест — ликвидность нестационарна).*
+
+- [ ] **Range Width Calibration:** Оптимальная ширина диапазона vs rebalance frequency (разовая задача, structural insight)
+- [ ] **Monte Carlo Forward Sim:** N случайных ценовых траекторий на текущем state → stress-test
+- [ ] **Rebalance Cost Model:** gas_cost × rebalance_count → минимальный TVL для прибыльности
+- [ ] **Regime Detector:** Бычий/медвежий/боковик → стратегия зависит от режима
+
+DoD: Range width + rebalance frequency калиброваны на текущем state. Monte Carlo stress-test проходит без критических потерь.
+
+### Phase 3.2 — Position Monitor v2 (P1)
+*Расширение My Pools Monitor до полноценного Position State Tracker.*
+
+- [ ] **Out-of-Range Detection:** Определение выхода позиции из диапазона + ETA (по волатильности)
+- [ ] **Fee Tracker:** Accumulated fees (claimed vs unclaimed), fee APR вычисление
+- [ ] **IL Tracker:** Impermanent loss в реальном времени vs entry price
+- [ ] **Rebalance Trigger Engine:** Конфигурируемые правила "rebalance needed when X"
+- [ ] **On-chain Position Reads:** Прямое чтение `positions()` из NonfungiblePositionManager
+
+DoD: Оператор видит полную картину каждой позиции (fees + IL + range status) в Telegram digest.
+
+### Phase 3.3 — Autocompound + Autorebalance Platform (P0.5 → **Spec Required**)
+*Execution-контур: автоматическое управление позициями.*
+
+> [!CAUTION]
+> Требует отдельной approved спецификации с: ключами, лимитами, kill-switch, safe-mode, gas budget.
+
+- [ ] **Autocompound:** Claim fees → swap → re-add liquidity (batch tx)
+- [ ] **Auto-Rebalance:** Close old range → open new range (trigger-based)
+- [ ] **Safe-Mode Guards:** Max gas per tx, max slippage, daily tx budget, kill-switch
+- [ ] **MEV Protection:** Flashbots Protect / MEV Blocker integration
+- [ ] **Multi-sig / Safe:** Smart Account SDK для execution с hardware signing
+
+**Open-source reference:**
+- `revert-finance/compoundor` (Solidity, audited) — autocompound smart contracts
+- `revert-finance/compoundor-js` (JS/MIT) — compounder bot implementation
+- `KrystalDeFi/v3utils` (fork of revert-finance/v3utils) — V3Utils + V3Automation: zap-in, compound, adjust, zap-out
+- `code-423n4/2024-06-krystal-defi` — Code4rena audit of Krystal contracts
+
+DoD: Paper mode → shadow mode → live mode escalation. Kill-switch в 1 click.
+
+---
+
+## 🔷 Phase 4: Risk Dashboard + Observability (Priority: Medium)
+*Единая картина портфеля перед запуском hedger.*
+
+- [ ] **Cross-chain Position Aggregation:** Все LP/lending/staking позиции в одном view
+- [ ] **Real-time PnL:** Unrealized + Realized, по позициям и суммарно
+- [ ] **Exposure Breakdown:** Asset / chain / protocol concentration matrix
+- [ ] **Risk Metrics:** Max drawdown, VaR, correlation matrix
+- [ ] **Alert Rules:** Configurable thresholds (IL > X%, TVL drop > Y%, fee APR < Z%)
+- [ ] **Web UI (optional):** Простой dashboard вместо чтения логов
+
+DoD: Оператор видит portfolio-level риск + может сказать hedger'у "что хеджировать".
+
+---
+
+## 🔷 Phase 5: Delta Hedger (Priority: Low, **Spec Required**)
+*Фьючерсный хедж для нейтрализации направленного риска LP позиций.*
+
+> [!CAUTION]
+> Самый рискованный слой (ликвидации, funding, basis risk). Запускать поэтапно:
+> advisory/paper mode → shadow → авто-исполнение.
+
+- [ ] **Funding Rate Monitor:** Отслеживание funding rates на CEX/perp DEX
+- [ ] **Hedge Calculator:** Optimal hedge ratio based on LP delta exposure
+- [ ] **Paper Trading Mode:** Симуляция hedging без реального исполнения
+- [ ] **CEX Integration:** API connection (Binance/Hyperliquid) для hedge execution
+- [ ] **Basis Tracker:** Мониторинг basis risk (spot vs futures)
+- [ ] **Liquidation Guard:** Pre-emptive de-leverage при приближении к ликвидации
+
+DoD: Delta-neutral mode доступен для top pairs (ETH/USDC, BTC/USDC).
+
+---
+
 ## ⚙️ Backlog & Tech Debt
 
 - [ ] **Dashboard:** Простая веб-страница или сообщение с текущим статусом портфеля (вместо чтения логов).

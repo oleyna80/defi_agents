@@ -226,10 +226,24 @@ def suggest_range(
     pit: PitInfo,
     pool_state: PoolState,
     bin_width_pct: float = 0.01,
+    *,
+    daily_vol: float | None = None,
+    holding_days: float = 7.0,
+    confidence_k: float = 2.0,
 ) -> SuggestedRange:
     """Generate tickSpacing-aligned LP range around a pit.
 
-    Expands the pit boundaries by 1 bin on each side, then aligns to tickSpacing.
+    When daily_vol is provided, range width = k × σ × √holding_days (vol-adjusted).
+    Otherwise falls back to pit boundaries + 1 bin margin.
+
+    Args:
+        pit: Detected liquidity pit to center the range around.
+        pool_state: Current pool state (tick, liquidity, decimals, tick_spacing).
+        bin_width_pct: Width of each price bin as decimal (default 1%).
+        daily_vol: Optional daily log-return volatility (σ). If provided, overrides
+            pit-based width with vol-adjusted width.
+        holding_days: Expected LP holding period in days (default 7).
+        confidence_k: Multiplier for range width (2.0 ≈ 95% containment).
     """
     current_price = float(
         tick_to_price(
@@ -239,12 +253,30 @@ def suggest_range(
         )
     )
 
-    # Pit center and width in % terms
-    lower_pct = (pit.center_tick - pit.width_ticks // 2 - 1) * bin_width_pct
-    upper_pct = (pit.center_tick + pit.width_ticks // 2 + 1) * bin_width_pct
+    if daily_vol is not None and daily_vol > 0:
+        # Vol-adjusted width: symmetric around pit center
+        from .volatility import vol_adjusted_range_width
 
-    lower_price = current_price * (1.0 + lower_pct)
-    upper_price = current_price * (1.0 + upper_pct)
+        half_width = vol_adjusted_range_width(
+            daily_vol,
+            holding_days=holding_days,
+            confidence_k=confidence_k,
+        )
+        center_pct = pit.center_tick * bin_width_pct
+        lower_price = current_price * (1.0 + center_pct - half_width)
+        upper_price = current_price * (1.0 + center_pct + half_width)
+        rationale = (
+            f"Vol-adjusted range: σ_daily={daily_vol:.4f}, "
+            f"half_width=±{half_width * 100:.1f}%, "
+            f"holding={holding_days:.0f}d, k={confidence_k}"
+        )
+    else:
+        # Fallback: pit boundaries + 1 bin margin
+        lower_pct = (pit.center_tick - pit.width_ticks // 2 - 1) * bin_width_pct
+        upper_pct = (pit.center_tick + pit.width_ticks // 2 + 1) * bin_width_pct
+        lower_price = current_price * (1.0 + lower_pct)
+        upper_price = current_price * (1.0 + upper_pct)
+        rationale = f"Pit at {pit.distance_to_spot_pct:.1f}% from spot, depth_ratio={pit.depth_ratio:.2f}"
 
     if lower_price <= 0:
         lower_price = current_price * 0.80
@@ -268,5 +300,5 @@ def suggest_range(
         lower_price=lower_price,
         upper_price=upper_price,
         width_pct=width_pct,
-        rationale=f"Pit at {pit.distance_to_spot_pct:.1f}% from spot, depth_ratio={pit.depth_ratio:.2f}",
+        rationale=rationale,
     )
