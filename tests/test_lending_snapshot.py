@@ -7,6 +7,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from defi_agents.scout.config import ScoutConfig
 from defi_agents.scout.defillama_client import DeFiLlamaClient
 from defi_agents.scout.models import YieldType
+from defi_agents.data.defillama_models import PriceFact
 
 
 def _run(coro):
@@ -333,3 +334,79 @@ def test_candidate_yield_type_classification_ssot():
     assert by_pool["lp-1"] == YieldType.LP_FEES
     assert by_pool["lend-1"] == YieldType.LENDING_SUPPLY
     assert by_pool["stake-1"] == YieldType.STAKING
+
+
+def test_pair_price_ratio_history_uses_defillama_prices(monkeypatch):
+    cfg = ScoutConfig(min_tvl_usd=100_000, min_apy=0.0)
+    client = DeFiLlamaClient(cfg)
+
+    pools = [
+        {
+            "pool": "lp-base",
+            "project": "uniswap-v3",
+            "chain": "Base",
+            "symbol": "WETH-USDC",
+            "address": "0x1111111111111111111111111111111111111111",
+            "underlyingTokens": [
+                "0x4200000000000000000000000000000000000006",
+                "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            ],
+            "tvlUsd": 2_000_000,
+            "apy": 7.0,
+            "apyBase": 7.0,
+            "apyReward": 0.0,
+        }
+    ]
+    candidate = client._build_reporting_candidates(pools, min_tvl_floor=0.0)[0]
+
+    calls = {"n": 0}
+    seen_keys: list[list[str]] = []
+
+    async def fake_prices_historical(_timestamp: int, keys: list[str]):
+        seen_keys.append(list(keys))
+        step = calls["n"]
+        calls["n"] = step + 1
+        return [
+            PriceFact(key=keys[0], symbol="WETH", price=2000.0 + step * 10.0, timestamp=1700000000 + step),
+            PriceFact(key=keys[1], symbol="USDC", price=1.0, timestamp=1700000000 + step),
+        ]
+
+    monkeypatch.setattr(client._provider, "get_prices_historical", fake_prices_historical)
+
+    ratios = _run(client.get_pair_price_ratio_history(candidate, lookback_days=5))
+    assert len(ratios) == 6
+    assert ratios[0] < ratios[-1]
+    assert seen_keys
+    assert all(key.startswith("base:") for key in seen_keys[0])
+
+
+def test_pair_price_ratio_history_returns_empty_for_unsupported_chain(monkeypatch):
+    cfg = ScoutConfig(min_tvl_usd=100_000, min_apy=0.0)
+    client = DeFiLlamaClient(cfg)
+
+    pools = [
+        {
+            "pool": "lp-unsupported",
+            "project": "some-dex",
+            "chain": "Sui",
+            "symbol": "WETH-USDC",
+            "address": "0x1111111111111111111111111111111111111111",
+            "underlyingTokens": [
+                "0x4200000000000000000000000000000000000006",
+                "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            ],
+            "tvlUsd": 2_000_000,
+            "apy": 7.0,
+            "apyBase": 7.0,
+            "apyReward": 0.0,
+        }
+    ]
+    candidate = client._build_reporting_candidates(pools, min_tvl_floor=0.0)[0]
+
+    async def fail_if_called(_timestamp: int, _keys: list[str]):
+        raise AssertionError("prices API should not be called for unsupported chain")
+
+    monkeypatch.setattr(client._provider, "get_prices_historical", fail_if_called)
+
+    ratios = _run(client.get_pair_price_ratio_history(candidate, lookback_days=5))
+    assert ratios == []

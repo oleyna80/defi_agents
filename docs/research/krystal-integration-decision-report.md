@@ -2,14 +2,14 @@
 
 **Date:** 2026-02-19 (updated with live API validation)
 **Author:** Gemini (Senior DeFi Research Lead)
-**Status:** ✅ **GO** — API validated, schema confirmed
+**Status:** ⚠️ **CONDITIONAL GO** — auth path and field mapping validated; 48h stability/rate-limit gates pending
 **Related:** Spec 017 (REQ-022, R-8, OQ-6), Plan 017 (Phase F), Research Brief
 
 ---
 
 ## 1. Executive Summary
 
-Our initial discovery report concluded Krystal was NO-GO due to Cloudflare challenge on `api.krystal.app`. **This was incorrect** — Krystal operates **two separate API surfaces**: the wallet/swap API (`api.krystal.app`, CF-gated) and **Krystal Cloud API** (`cloud-api.krystal.app`, key-based auth, no CF challenge). We obtained an API key, confirmed auth via `KC-APIKey` header, and **validated the live response schema**. The endpoint `GET /v1/pools?chainId={id}` returns rich pool objects with **all required fields** for our `PoolSummary` contract: `poolAddress`, `token0/token1` (address, symbol, decimals), `feeTier`, `tvl`, `stats30d.volume`, `protocol`, and `tickSpacing`. Krystal provides **pool-level aggregates only** (no tick data), confirming its role as **discovery provider** (REQ-022), not a tick-level source. We recommend **GO** for Krystal Cloud as optional discovery provider (Phase 2+), with P0 core (tick-level via The Graph subgraph) proceeding immediately.
+Our initial discovery report concluded Krystal was NO-GO due to Cloudflare challenge on `api.krystal.app`. **This was incorrect** — Krystal operates **two separate API surfaces**: the wallet/swap API (`api.krystal.app`, CF-gated) and **Krystal Cloud API** (`cloud-api.krystal.app`, key-based auth, no CF challenge). We obtained an API key, confirmed auth via `KC-APIKey` header, and **validated the live response schema**. The endpoint `GET /v1/pools?chainId={id}` returns rich pool objects with **all required fields** for our `PoolSummary` contract: `poolAddress`, `token0/token1` (address, symbol, decimals), `feeTier`, `tvl`, `stats30d.volume`, `protocol`, and `tickSpacing`. Krystal provides **pool-level aggregates only** (no tick data), confirming its role as **discovery provider** (REQ-022), not a tick-level source. We recommend **CONDITIONAL GO** for Krystal Cloud as optional discovery provider (Phase 2+): auth/data-contract gates are passed, while 48h schema stability and rate-limit capacity remain open.
 
 ---
 
@@ -125,13 +125,13 @@ Our initial discovery report concluded Krystal was NO-GO due to Cloudflare chall
 | **Architecture alignment** (15%) | ✅ Fits `PoolDiscoveryProvider` | ✅ Fits `TickDataProvider` (P0 spec) | ✅ Fits `PoolDiscoveryProvider` | ⚠️ GraphQL, different pattern |
 | **Reliability** (10%) | MEDIUM (rate limits unknown) | HIGH | MEDIUM (Beta) | HIGH |
 | **Cost** (10%) | FREE (current tier) | LOW (~$0.02/100K) | FREE | $350/mo |
-| **Overall** | **GO (Phase 2+ discovery)** | **GO (P0 primary)** | **BACKUP** | **NO-GO (cost)** |
+| **Overall** | **CONDITIONAL GO (Phase 2+ discovery)** | **GO (P0 primary)** | **BACKUP** | **NO-GO (cost)** |
 
 ---
 
 ## 4. Final Recommendation
 
-### Verdict: ✅ **GO** for Krystal Cloud as optional discovery provider (Phase 2+)
+### Verdict: ⚠️ **CONDITIONAL GO** for Krystal Cloud as optional discovery provider (Phase 2+)
 
 ### Primary Stack for P0 (Immediate):
 
@@ -141,13 +141,13 @@ This is spec-aligned (REQ-001/002), zero additional cost, and requires no unveri
 
 ### Krystal Cloud Integration (Phase 2+, post-P0):
 
-**All initial GO gates passed:**
+**Gate status:**
 - ✅ `KC-APIKey` header returns HTTP 200 from server-side `curl`
 - ✅ Response contains: `poolAddress`, `token0.token.address/symbol`, `token1.token.address/symbol`, `stats30d.volume`, `feeTier`
-- ⏳ Schema stability check: requires 2nd probe after 48h (remaining gate)
-- ❓ Rate limits: need production load testing
+- ⏳ 48h schema stability check: pending second probe window
+- ❓ Rate limits/quota: pending production-like load test
 
-**Implementation:** `KrystalDiscoveryProvider` adapter per REQ-022 contract (~100 LOC, direct field mapping).
+**Implementation decision:** proceed with `KrystalDiscoveryProvider` adapter per REQ-022 contract (~100 LOC) only after both remaining gates are closed.
 
 ### Fallback Stack:
 
@@ -172,7 +172,7 @@ GeckoTerminal (pool-level backup) + direct RPC (`eth_call` to pool contracts for
 | Day | Task | Owner | Stop/Go |
 |---|---|---|---|
 | D1 | Register at `cloud.krystal.app`, obtain API key | Dmitrii | **Checkpoint 1:** Key obtained? |
-| D2 | Probe `cloud-api.krystal.app/all/v1/pool/list` with key, capture response JSON | Engineer | **Checkpoint 2:** 200 + valid JSON? |
+| D2 | Probe `cloud-api.krystal.app/v1/pools?chainId=42161&limit=1` with key, capture response JSON | Engineer | **Checkpoint 2:** 200 + valid JSON? |
 | D3 | Map response fields to `PoolSummary` contract; document rate limits | Engineer | **Checkpoint 3:** Required fields present? |
 | D3-5 | Run 48h stability check (2+ calls, same schema) | Engineer | Checkpoint 4: Schema stable? |
 | D5 | **GO/NO-GO decision** documented | Tech Lead | — |
@@ -201,7 +201,7 @@ If **The Graph subgraph** becomes unreliable during Week 1:
 | # | Source | Evidence | Date |
 |---|---|---|---|
 | S1 | `curl -H 'KC-APIKey: <key>' cloud-api.krystal.app/v1/pools?chainId=42161&limit=1` | **HTTP 200**, full JSON pool object returned | 2026-02-19 |
-| S2 | `curl cloud-api.krystal.app/all/v1/pool/list` (no key) | HTTP 401 `{"error":"An API Key is required"}` | 2026-02-19 |
+| S2 | `curl cloud-api.krystal.app/v1/pools?chainId=42161&limit=1` (no key) | HTTP 401 `{"error":"An API Key is required"}` | 2026-02-19 |
 | S3 | `curl api.krystal.app/all/v1/pool/list` | HTTP 403 `cf-mitigated: challenge` (Cloudflare Turnstile) | 2026-02-19 |
 | S4 | Web search: Krystal Cloud API auth | `KC-APIKey` header discovered via GitHub reference | 2026-02-19 |
 | S5 | Live response schema | `poolAddress`, `token0/1.token.{address,symbol,decimals}`, `feeTier`, `tvl`, `stats30d.volume` — all present | 2026-02-19 |

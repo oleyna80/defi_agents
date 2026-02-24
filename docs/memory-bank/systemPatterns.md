@@ -2,6 +2,102 @@
 
 ## Architecture Decisions
 - YYYY-MM-DD: <Decision> - <Rationale>
+- 2026-02-23: Structured `v3utils` payloads are simulation-validated before live send:
+  - for structured compound/rebalance payloads, adapter `simulate()` checks expected selector and target contract consistency,
+  - mismatches are fail-safe rejected with explicit reason codes (`V3UTILS_SELECTOR_MISMATCH`, `V3UTILS_CONTRACT_MISMATCH`).
+  Rationale: prevent accidental live sends with malformed or mismatched encoded calldata.
+
+- 2026-02-23: v3utils compound calldata supports structured parameter encoding in adapter:
+  - adapter accepts `v3utils_compound_params` (nfpm/token_id/instructions),
+  - builds ABI calldata for `V3Utils.execute(...)` internally (selector `0xfd2d17d1`),
+  - keeps fallback to pre-encoded `*_data_hex` for compatibility during migration.
+  Rationale: move from manual hex payloads to typed intent metadata without breaking existing runs.
+
+- 2026-02-23: External execution-module reuse is commit-pinned with local ABI bundle snapshots:
+  - `v3utils` adapter references pinned upstream commit metadata (`33f487...`) in tx metadata,
+  - local ABI/address snapshot bundle is stored under `src/defi_agents/execution/abi/`,
+  - ABI asset presence/shape is covered by regression tests (`test_execution_v3utils_abi_assets.py`).
+  Rationale: prevent silent drift of upstream contract interfaces/addresses during staged live rollout.
+
+- 2026-02-23: `v3utils` integration is introduced as feature-flagged adapter scaffold, not a hard runtime dependency:
+  - adapter key `v3utils` is available in execution routing,
+  - activation requires explicit `execution.v3utils_enabled=true`,
+  - missing contract mappings fail fast (`V3UTILS_CONTRACTS_MISSING` / `V3UTILS_CONTRACT_MISSING`),
+  - execution transport reuses existing native live path (raw tx + receipt polling).
+  Rationale: incremental integration of upstream automation modules with fail-closed defaults.
+
+- 2026-02-23: Execution architecture explicitly separates data-plane and execution-plane dependencies:
+  - liquidity/tick state source of truth is direct DEX data (`subgraph + RPC`),
+  - external code reuse (`KrystalDeFi/v3utils`, `revert-finance`) is limited to execution mechanics behind `ExecutionAdapter`,
+  - runtime policy/orchestration remains internal (`TriggerEngine`, `PolicyGuard`, `ExecutionOrchestrator`).
+  Rationale: avoid vendor/API lock-in for analytics while accelerating execution delivery via audited/open-source modules.
+
+- 2026-02-23: Execution adapter resolution is fail-closed in `LIVE` mode:
+  - runtime selects only adapters declaring `supports_live_execution=True`,
+  - non-live-capable adapters (e.g., native stub) are explicitly rejected in LIVE,
+  - missing/invalid LIVE adapter path now raises `LIVE_EXECUTION_ADAPTER_UNAVAILABLE` instead of silently degrading to non-live fallback.
+  Rationale: canary/live execution must never "appear enabled" while routing into a known non-executing adapter path.
+
+- 2026-02-23: Native LIVE execution path uses external signing + raw tx submit semantics:
+  - `NativeLiveExecutionAdapter` is the current LIVE-capable native path (`supports_live_execution=True`),
+  - adapter sends pre-signed tx via `eth_sendRawTransaction` and polls `eth_getTransactionReceipt`,
+  - chain RPC routing is config/env-driven (`execution.native_live_rpc_env_by_chain` -> `<CHAIN>_RPC_URL`),
+  - missing signing payload or receipt timeout returns explicit fail-safe reason codes (`SIGNED_RAW_TX_MISSING`, `TX_RECEIPT_TIMEOUT`, `RPC_*`).
+  Rationale: enable deterministic canary/live transport without coupling runtime to private-key handling inside the scout process.
+
+- 2026-02-23: Krystal Cloud execution path is treated as discovery-only until server contract exists:
+  - `cloud-api.krystal.app` execution endpoints (`/v1/execution/*`) return `404` in live probes,
+  - adapter maps this condition to `KRYSTAL_EXECUTION_API_UNAVAILABLE`,
+  - SHADOW mode can fallback via `FailoverExecutionAdapter`, but LIVE mode rejects Krystal as non-live-capable.
+  Rationale: explicit endpoint-contract mismatch must degrade deterministically and never silently pass as execution-ready.
+
+- 2026-02-21: Phase G shadow bootstrap uses deterministic `execution.mock_positions` as execution-state source:
+  - profile includes representative scenarios (`COMPOUND`, `REBALANCE`, and policy-blocked intent),
+  - this provides stable baseline counters (`sim_ok`, policy reason taxonomy) before connecting live position-state provider.
+  Rationale: de-risks rollout by validating orchestrator/policy/adapter interactions with controlled input set.
+
+- 2026-02-21: Execution shadow observability uses reason-taxonomy counters instead of aggregate-only metrics:
+  - orchestrator report tracks per-reason maps for `policy blocks`, `simulation failures`, and `execution failures`,
+  - runtime logs publish these maps in `Execution summary` line each cycle,
+  - trigger metadata now passes tx-builder fields (`position_manager`, action-specific data hex, value) so SHADOW can validate both success and failure paths.
+  Rationale: 24h shadow gate requires actionable failure taxonomy, not only total counter deltas.
+
+- 2026-02-21: Execution adapter routing uses configurable primary/fallback with runtime failover:
+  - adapter selection is driven by `execution.primary_adapter` / `execution.fallback_adapter`,
+  - Krystal adapter requires `KC-APIKey` (from env var configured by `execution.krystal_api_key_env`) and timeout control (`execution.krystal_timeout_seconds`),
+  - runtime wrapper `FailoverExecutionAdapter` automatically retries the same operation on fallback adapter when primary adapter raises an exception.
+  Rationale: keeps vendor integration optional and prevents execution loop failure when external adapter path is unavailable.
+
+- 2026-02-21: Execution runtime integration is isolated behind explicit config gates:
+  - `main.py` runs execution loop only when `execution.enabled=true`,
+  - initial PAPER bootstrap uses `execution.mock_positions` (typed `PositionState` payloads) for deterministic dry-run,
+  - execution summary counters are logged per cycle and do not change Scout report delivery path.
+  Rationale: incremental rollout without coupling transaction orchestration to existing Scout/freshness/reporting behavior.
+
+- 2026-02-21: Native execution adapter baseline is intentionally "safe-non-live" for v1 rollout:
+  - `NativeUniswapV3Adapter` builds deterministic tx plans from intent metadata,
+  - `simulate()` validates tx-plan structure only (no chain side effects),
+  - `execute()` returns explicit fail-safe receipt (`LIVE_EXECUTION_NOT_IMPLEMENTED`) instead of attempting on-chain send.
+  Rationale: allows PAPER/SHADOW pipeline integration and contract testing before any private-key/on-chain execution path is enabled.
+
+- 2026-02-21: Execution `PolicyGuard` follows a fail-safe "block-on-missing" policy input contract:
+  - hard checks enforce `kill_switch`, expected net floor, gas/slippage per tx, and daily budgets,
+  - missing `estimated_gas_usd`/`slippage_bps` is treated as policy failure (`*_MISSING`) rather than silent allow,
+  - decisions are persisted to bounded in-memory journal entries (`PolicyJournalEntry`) with UTC-day usage snapshot for auditability.
+  Rationale: execution safety requires deterministic rejection on incomplete risk inputs and post-mortem traceability for operator review.
+
+- 2026-02-21: Execution trigger classification is deterministic and precedence-based:
+  - trigger order is fixed as `REBALANCE > COMPOUND > HOLD`,
+  - rebalance is fired on any of: `OUT_OF_RANGE`, low `range_utilization`, `edge_decay_bps` threshold breach,
+  - per-position cooldown converts actionable triggers into `SKIP` with explicit reason `COOLDOWN_ACTIVE`.
+  Rationale: avoid ambiguous dual-trigger behavior and keep execution intent generation auditable/testable before live orchestration.
+
+- 2026-02-21: Execution layer uses an explicit contract-first adapter boundary with config-gated safety:
+  - canonical typed contracts live in `src/defi_agents/execution/models.py` (`ActionIntent`, `TxPlan`, `SimulationResult`, `ExecutionReceipt`, `ExecutionCounters`, `PolicyDecision`, `ExecutionAdapter` protocol),
+  - runtime config is centralized in `ScoutConfig.execution` (`ExecutionConfig` + nested `ExecutionPolicyConfig`),
+  - `mode=LIVE` is invalid unless `allow_live_mode=true`, and `primary_adapter=krystal` is invalid unless `krystal_enabled=true`.
+  Rationale: enforce SDD governance and fail-safe defaults before any transaction orchestration logic is introduced.
+
 - 2026-02-19: Tick Density Scanner runtime integration follows a post-L3, pre-scoring scan stage:
   - scanner is invoked after `save_to_history()` and before `eligible` filtering,
   - per-chain `UniswapV3TickProvider` is lazily initialized and reused across candidates on the same chain,

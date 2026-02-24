@@ -2,7 +2,7 @@
 
 **Date:** 2026-02-19 (updated)
 **Author:** Gemini (Tech Lead)
-**Status:** ✅ **RESOLVED** — `cloud-api.krystal.app` validated with `KC-APIKey` header
+**Status:** ⚠️ **CONDITIONAL GO** — `cloud-api.krystal.app` auth path validated; production gates still open
 **Related:** Spec 017 (OQ-6, R-8), Plan 017 (Phase F)
 **Superseded by:** [krystal-integration-decision-report.md](krystal-integration-decision-report.md)
 
@@ -21,7 +21,7 @@
 | GitBook docs | `GET https://docs.krystal.app/krystal-api/api-reference` | HTTP fetch | **404** |
 | Browser UA spoof | `api.krystal.app` with Chrome-like `User-Agent` header | curl | **403** |
 
-## 2. What Blocks Server-Side Access
+## 2. What Blocks Server-Side Access (Wallet API Surface)
 
 The 403 response includes these Cloudflare headers:
 
@@ -31,39 +31,41 @@ critical-ch: Sec-CH-UA-Bitness, Sec-CH-UA-Arch, ...
 accept-ch: Sec-CH-UA-Bitness, Sec-CH-UA-Arch, ...
 ```
 
-This is a **Cloudflare Managed Challenge (Turnstile)** — it requires a JavaScript-capable browser to solve. `curl`/`httpx`/`aiohttp` cannot pass this challenge. This is **not** an API-key-based restriction; it's a WAF-level bot mitigation.
+This is a **Cloudflare Managed Challenge (Turnstile)** — it requires a JavaScript-capable browser to solve. `curl`/`httpx`/`aiohttp` cannot pass this challenge.  
+These findings apply to the wallet/front-end API surface (`api.krystal.app`/`defi.krystal.app`/`cloud.krystal.app`), not to `cloud-api.krystal.app`, which is key-authenticated via `KC-APIKey`.
 
 ## 3. Implications
 
 | Concern | Assessment |
 |---------|------------|
-| Server-side `httpx` integration | ❌ Impossible without Cloudflare bypass |
+| Server-side `httpx` integration for `api.krystal.app` | ❌ Impossible without Cloudflare bypass |
 | Headless browser (Playwright) | ⚠️ Possible but fragile, Cloudflare regularly patches headless detection |
-| Service API key / IP allowlist | ❓ Unknown — requires contact with Krystal team |
-| Tick-level data availability | ❓ Unknown — Swagger shows `/pool/list` endpoint but tick distribution endpoint unconfirmed |
+| Server-side integration via `cloud-api.krystal.app` | ✅ Supported with `KC-APIKey` header |
+| Tick-level data availability | ❓ Unknown at discovery stage (later confirmed pool-level only in decision report) |
 
-## 4. Minimum Required Inputs to Unblock
+## 4. Remaining Gates Before Production Enablement
 
-To integrate Krystal as a discovery provider (REQ-022), we need **one** of:
+Auth-path gate is now closed via `cloud-api.krystal.app` + `KC-APIKey`.  
+To integrate Krystal as a discovery provider (REQ-022) in production, we still need:
 
-1. **Service API key** — a dedicated key that bypasses Cloudflare challenge (e.g., `Authorization: Bearer <key>` or `x-api-key` header). Requires partnership / developer program enrollment.
-2. **Server IP allowlist** — Krystal adds our VPS IP to their Cloudflare WAF exception list.
-3. **Alternative API base URL** — some aggregators expose a separate `api-v2` or `internal` endpoint without WAF for approved integrators.
+1. **Schema stability check** — same response shape across at least 2 probes within 48h.
+2. **Rate-limit/load profile** — confirm quota and throughput for scheduled scans.
+3. **Operational fallback contract** — explicit fallback to DeFiLlama/GeckoTerminal when Krystal is unavailable.
 
 ## 5. Recommendation
 
 | Action | Priority | Deadline |
 |--------|----------|----------|
-| Contact Krystal team (support/partnerships) asking for service API access | P1 | +1 week |
-| Check if Krystal has a Discord/Telegram dev channel with API docs | P1 | +3 days |
+| Complete 48h schema-stability probe window (`/v1/pools`) | P0 | +2 days |
+| Run light load profile to estimate effective limits/quota | P0 | +3 days |
 | **Do not block P0** — proceed with `UniswapV3TickProvider` (Subgraph) as sole tick source | P0 | Immediate |
-| If no auth path within 2 weeks → close Krystal workstream, DeFiLlama remains sole discovery | — | +2 weeks |
+| If remaining gates fail → keep Krystal disabled and use DeFiLlama/GeckoTerminal discovery fallback | — | +1 week |
 
 ## 6. Go/No-Go Status
 
 **Previous status: NO-GO** (based on `api.krystal.app` probes only).
 
-**Updated status: ✅ GO** — `cloud-api.krystal.app` is a separate API surface with `KC-APIKey` header auth. See [decision report](krystal-integration-decision-report.md) for full validation results.
+**Updated status: ⚠️ CONDITIONAL GO** — `cloud-api.krystal.app` is a separate API surface with `KC-APIKey` header auth, but production enablement still depends on stability/limit validation. See [decision report](krystal-integration-decision-report.md) for full details.
 
 Conditions for GO (all required):
 - [x] Service API key returned 200 from server-side `curl` (**endpoint: `/v1/pools`, header: `KC-APIKey`**)

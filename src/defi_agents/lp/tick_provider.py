@@ -57,10 +57,43 @@ class UniswapV3TickProvider:
         self.graph_api_key_env = graph_api_key_env
         self.endpoint = self._resolve_endpoint(endpoint=endpoint, subgraph_id=subgraph_id)
         self._last_fee_tier: int | None = None
+        self._supports_tick_schema: bool | None = None
+
+    async def supports_tick_schema(self) -> bool:
+        if self._supports_tick_schema is not None:
+            return self._supports_tick_schema
+        payload = {
+            "query": """
+            query TickSchemaSupport {
+              queryType: __type(name: "Query") { fields { name } }
+              tickType: __type(name: "Tick") { fields { name } }
+            }
+            """
+        }
+        data = await self._query(payload)
+        query_fields = {
+            str(field.get("name", ""))
+            for field in (data.get("queryType", {}) or {}).get("fields", [])
+            if isinstance(field, dict)
+        }
+        tick_fields = {
+            str(field.get("name", ""))
+            for field in (data.get("tickType", {}) or {}).get("fields", [])
+            if isinstance(field, dict)
+        }
+        self._supports_tick_schema = (
+            "ticks" in query_fields and {"tickIdx", "liquidityNet", "liquidityGross"}.issubset(tick_fields)
+        )
+        return self._supports_tick_schema
 
     async def get_pool_ticks(self, pool_address: str, lower: int, upper: int) -> list[TickData]:
         if lower > upper:
             return []
+        if not await self.supports_tick_schema():
+            raise TickProviderError(
+                DegradationReason.SUBGRAPH_ERROR,
+                "Subgraph schema does not expose tick-level fields required by scanner.",
+            )
         pool = (pool_address or "").strip().lower()
         if not pool.startswith("0x"):
             return []
@@ -183,10 +216,119 @@ class UniswapV3TickProvider:
         self._last_fee_tier = state.fee_tier
         return state
 
+    async def find_pool_address_by_tokens(
+        self,
+        token_a: str,
+        token_b: str,
+        *,
+        fee_tier: int | None = None,
+        max_rows: int = 10,
+    ) -> str | None:
+        normalized_a = _normalize_address(token_a)
+        normalized_b = _normalize_address(token_b)
+        if not normalized_a or not normalized_b or normalized_a == normalized_b:
+            return None
+
+        strict_rows: list[dict[str, Any]] = []
+        if fee_tier is not None and int(fee_tier) > 0:
+            strict_rows.extend(
+                await self._fetch_pools_by_pair(
+                    token0=normalized_a,
+                    token1=normalized_b,
+                    fee_tier=int(fee_tier),
+                    max_rows=max_rows,
+                )
+            )
+            strict_rows.extend(
+                await self._fetch_pools_by_pair(
+                    token0=normalized_b,
+                    token1=normalized_a,
+                    fee_tier=int(fee_tier),
+                    max_rows=max_rows,
+                )
+            )
+            best_strict = _pick_best_pool_row(strict_rows)
+            if best_strict:
+                return best_strict
+
+        fallback_rows: list[dict[str, Any]] = []
+        fallback_rows.extend(
+            await self._fetch_pools_by_pair(
+                token0=normalized_a,
+                token1=normalized_b,
+                fee_tier=None,
+                max_rows=max_rows,
+            )
+        )
+        fallback_rows.extend(
+            await self._fetch_pools_by_pair(
+                token0=normalized_b,
+                token1=normalized_a,
+                fee_tier=None,
+                max_rows=max_rows,
+            )
+        )
+        return _pick_best_pool_row(fallback_rows)
+
     def protocol_fee_pct(self) -> float:
         if self._last_fee_tier is None:
             return 0.0
         return float(self._last_fee_tier) / 10_000.0
+
+    async def _fetch_pools_by_pair(
+        self,
+        *,
+        token0: str,
+        token1: str,
+        fee_tier: int | None,
+        max_rows: int,
+    ) -> list[dict[str, Any]]:
+        if fee_tier is not None and int(fee_tier) > 0:
+            payload = {
+                "query": """
+                query PoolsByPairAndFee($token0: String!, $token1: String!, $feeTier: BigInt!, $first: Int!) {
+                  pools(first: $first, where: {token0: $token0, token1: $token1, feeTier: $feeTier}) {
+                    id
+                    feeTier
+                    totalValueLockedUSD
+                    createdAtTimestamp
+                  }
+                }
+                """,
+                "variables": {
+                    "token0": token0,
+                    "token1": token1,
+                    "feeTier": int(fee_tier),
+                    "first": max(1, int(max_rows)),
+                },
+            }
+        else:
+            payload = {
+                "query": """
+                query PoolsByPair($token0: String!, $token1: String!, $first: Int!) {
+                  pools(first: $first, where: {token0: $token0, token1: $token1}) {
+                    id
+                    feeTier
+                    totalValueLockedUSD
+                    createdAtTimestamp
+                  }
+                }
+                """,
+                "variables": {
+                    "token0": token0,
+                    "token1": token1,
+                    "first": max(1, int(max_rows)),
+                },
+            }
+
+        try:
+            data = await self._query(payload)
+        except TickProviderError:
+            return []
+        rows = data.get("pools", []) if isinstance(data, dict) else []
+        if not isinstance(rows, list):
+            return []
+        return [row for row in rows if isinstance(row, dict)]
 
     def _resolve_endpoint(self, *, endpoint: str | None, subgraph_id: str | None) -> str:
         if endpoint and endpoint.strip():
@@ -225,7 +367,30 @@ class UniswapV3TickProvider:
                     continue
                 body = response.json()
                 if body.get("errors"):
-                    logger.warning("Uniswap tick provider GraphQL errors endpoint=%s", safe_endpoint)
+                    raw_errors = body.get("errors")
+                    first_error = ""
+                    if isinstance(raw_errors, list) and raw_errors:
+                        first = raw_errors[0]
+                        if isinstance(first, dict):
+                            first_error = str(first.get("message", ""))
+                        elif first is not None:
+                            first_error = str(first)
+                    logger.warning(
+                        "Uniswap tick provider GraphQL errors endpoint=%s err=%s",
+                        safe_endpoint,
+                        first_error[:220],
+                    )
+                    schema_error_signatures = (
+                        "has no field `ticks`",
+                        "has no field `tickIdx`",
+                        "has no field `liquidityNet`",
+                        "has no field `liquidityGross`",
+                    )
+                    if any(sig in first_error for sig in schema_error_signatures):
+                        raise TickProviderError(
+                            DegradationReason.SUBGRAPH_ERROR,
+                            "Subgraph schema is incompatible with tick-level scanner contract.",
+                        )
                     if attempt >= self.retry_attempts:
                         raise TickProviderError(DegradationReason.SUBGRAPH_ERROR, "GraphQL errors in subgraph response.")
                     await asyncio.sleep(2 ** attempt)
@@ -270,6 +435,42 @@ def _to_int(value: object, *, default: int | None = None) -> int | None:
         return int(str(value))
     except (TypeError, ValueError):
         return default
+
+
+def _to_float(value: object, *, default: float = 0.0) -> float:
+    if value in (None, ""):
+        return default
+    try:
+        return float(str(value))
+    except (TypeError, ValueError):
+        return default
+
+
+def _normalize_address(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    addr = value.strip()
+    if ":" in addr:
+        addr = addr.split(":")[-1].strip()
+    if re.fullmatch(r"0x[a-fA-F0-9]{40}", addr):
+        return addr.lower()
+    return None
+
+
+def _pick_best_pool_row(rows: list[dict[str, Any]]) -> str | None:
+    best_addr: str | None = None
+    best_score: tuple[float, int] = (-1.0, -1)
+    for row in rows:
+        pool_id = _normalize_address(row.get("id"))
+        if not pool_id:
+            continue
+        tvl = _to_float(row.get("totalValueLockedUSD"), default=0.0)
+        created_ts = _to_int(row.get("createdAtTimestamp"), default=0) or 0
+        score = (tvl, created_ts)
+        if score > best_score:
+            best_score = score
+            best_addr = pool_id
+    return best_addr
 
 
 def _extract_decimals(token_data: object) -> int:

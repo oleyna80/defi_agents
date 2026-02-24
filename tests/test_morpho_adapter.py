@@ -103,6 +103,8 @@ def test_morpho_adapter_supports_flag_and_shape_filters():
         market_keys=market_keys,
     )
     assert adapter.supports(_result(project="morpho-blue")) is True
+    assert adapter.supports(_result(project="morpho-blue", symbol="ALPHAUSDCENHANCEDV2")) is True
+    assert adapter.supports(_result(project="morpho-blue", symbol="SKYMONEYUSDTRISKCAPITAL")) is False
     assert adapter.supports(_result(project="morpho-vault")) is True
     assert adapter.supports(_result(project="aave-v3")) is False
     assert adapter.supports(_result(chain="Arbitrum")) is False

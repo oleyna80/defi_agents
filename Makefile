@@ -1,4 +1,4 @@
-.PHONY: setup install test run live-l3 lint clean dry-run
+.PHONY: setup install test run live-l3 lint clean dry-run krystal-probe
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -20,6 +20,9 @@ run:
 
 dry-run:
 	PYTHONPATH=src $(PYTHON) main.py
+
+krystal-probe:
+	PYTHONPATH=src $(PYTHON) scripts/krystal_execution_probe.py
 
 test:
 	PYTHONPATH=src $(PYTEST) -v tests/

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import re
 import sys
 from pathlib import Path
 from time import time
@@ -28,9 +29,21 @@ from defi_agents.shadow_metrics import ShadowMetricsTracker
 from defi_agents.strategy_sim.engine import StrategySimEngine
 from defi_agents.strategy_sim.models import SimulationCounters
 from defi_agents.lp.band_depth import scan_pool_band_depth
-from defi_agents.lp.tick_provider import UniswapV3TickProvider
+from defi_agents.lp.tick_provider import TickProviderError, UniswapV3TickProvider
 from defi_agents.lp.rpc_helper import fetch_slot0_tick
 from defi_agents.lp.models import DataQuality
+from defi_agents.lp.volatility import estimate_vol
+from defi_agents.execution import (
+    ExecutionOrchestrator,
+    FailoverExecutionAdapter,
+    KrystalExecutionAdapter,
+    NativeLiveExecutionAdapter,
+    NativeUniswapV3Adapter,
+    PolicyGuard,
+    PositionState,
+    TriggerEngine,
+    V3UtilsExecutionAdapter,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -73,6 +86,51 @@ def _is_excluded_by_l3(tag) -> bool:  # noqa: ANN001
         return False
     value = getattr(tag, "value", str(tag))
     return value in {"AI_REJECT", "PENDING"}
+
+
+def _to_float_or_none(value: object) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _percentile(values: list[float], q: float) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    pos = int(round((len(ordered) - 1) * max(0.0, min(1.0, q))))
+    return ordered[pos]
+
+
+def _freshness_divergence_stats(results) -> dict[str, tuple[int, float | None, float | None, float | None, float | None]]:  # noqa: ANN001
+    stats: dict[str, dict[str, list[float]]] = {}
+    for r in results:
+        provider = str((r.metadata or {}).get("freshness_provider", "") or "").strip() or "none"
+        apy_div = _to_float_or_none((r.metadata or {}).get("apy_divergence_pct"))
+        tvl_div = _to_float_or_none((r.metadata or {}).get("tvl_divergence_pct"))
+        if provider not in stats:
+            stats[provider] = {"apy": [], "tvl": []}
+        if apy_div is not None:
+            stats[provider]["apy"].append(apy_div)
+        if tvl_div is not None:
+            stats[provider]["tvl"].append(tvl_div)
+
+    out: dict[str, tuple[int, float | None, float | None, float | None, float | None]] = {}
+    for provider, values in stats.items():
+        apy_vals = values["apy"]
+        tvl_vals = values["tvl"]
+        sample_size = max(len(apy_vals), len(tvl_vals))
+        out[provider] = (
+            sample_size,
+            _percentile(apy_vals, 0.5),
+            _percentile(apy_vals, 0.9),
+            _percentile(tvl_vals, 0.5),
+            _percentile(tvl_vals, 0.9),
+        )
+    return out
 
 
 def _telegram_digest_due(config: ScoutConfig) -> tuple[bool, int, int]:
@@ -122,6 +180,144 @@ def _telegram_no_opps_heartbeat_due(config: ScoutConfig) -> tuple[bool, int, int
 def _mark_telegram_no_opps_heartbeat_sent() -> None:
     cache = CacheController(namespace="telegram_no_opps_heartbeat")
     cache.set("last_sent_at", int(time()), ttl_seconds=365 * 24 * 3600)
+
+
+def _load_execution_mock_states(config: ScoutConfig) -> list[PositionState]:
+    states: list[PositionState] = []
+    for idx, raw in enumerate(list(getattr(config.execution, "mock_positions", []) or [])):
+        if not isinstance(raw, dict):
+            logger.warning("Execution mock position skipped: idx=%s reason=INVALID_SHAPE", idx)
+            continue
+        try:
+            states.append(PositionState(**raw))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Execution mock position skipped: idx=%s reason=VALIDATION_ERROR err=%s",
+                idx,
+                exc.__class__.__name__,
+            )
+    return states
+
+
+def _build_execution_adapter(config: ScoutConfig):
+    exec_cfg = config.execution
+    strict_live = exec_cfg.mode == "LIVE"
+
+    def _supports_live_execution(adapter: object) -> bool:
+        return bool(getattr(adapter, "supports_live_execution", False))
+
+    def _build_one(name: str):
+        if name == "krystal":
+            api_key = os.getenv(exec_cfg.krystal_api_key_env, "").strip()
+            if not api_key:
+                raise RuntimeError("KRYSTAL_API_KEY_MISSING")
+            return KrystalExecutionAdapter(
+                base_url=exec_cfg.krystal_base_url,
+                api_key=api_key,
+                timeout_seconds=exec_cfg.krystal_timeout_seconds,
+            )
+        if name == "native_uniswap_v3_live":
+            rpc_urls: dict[str, str] = {}
+            for chain, env_name in dict(exec_cfg.native_live_rpc_env_by_chain).items():
+                rpc_url = os.getenv(str(env_name), "").strip()
+                if rpc_url:
+                    rpc_urls[str(chain)] = rpc_url
+            return NativeLiveExecutionAdapter(
+                rpc_urls=rpc_urls,
+                timeout_seconds=exec_cfg.native_live_timeout_seconds,
+                receipt_timeout_seconds=exec_cfg.native_live_receipt_timeout_seconds,
+                receipt_poll_seconds=exec_cfg.native_live_receipt_poll_seconds,
+            )
+        if name == "v3utils":
+            if not exec_cfg.v3utils_enabled:
+                raise RuntimeError("V3UTILS_DISABLED")
+            rpc_urls: dict[str, str] = {}
+            for chain, env_name in dict(exec_cfg.native_live_rpc_env_by_chain).items():
+                rpc_url = os.getenv(str(env_name), "").strip()
+                if rpc_url:
+                    rpc_urls[str(chain)] = rpc_url
+            return V3UtilsExecutionAdapter(
+                rpc_urls=rpc_urls,
+                contracts_by_chain=exec_cfg.v3utils_contracts_by_chain,
+                routers_by_chain=exec_cfg.v3utils_router_by_chain,
+                default_slippage_bps=exec_cfg.v3utils_slippage_bps_default,
+                timeout_seconds=exec_cfg.native_live_timeout_seconds,
+                receipt_timeout_seconds=exec_cfg.native_live_receipt_timeout_seconds,
+                receipt_poll_seconds=exec_cfg.native_live_receipt_poll_seconds,
+            )
+        return NativeUniswapV3Adapter()
+
+    if strict_live:
+        candidate_names: list[str] = [exec_cfg.primary_adapter]
+        if exec_cfg.fallback_adapter != exec_cfg.primary_adapter:
+            candidate_names.append(exec_cfg.fallback_adapter)
+
+        errors: list[str] = []
+        for name in candidate_names:
+            try:
+                adapter = _build_one(name)
+            except Exception as exc:  # noqa: BLE001
+                logger.error(
+                    "Execution LIVE adapter init failed: adapter=%s err=%s",
+                    name,
+                    exc.__class__.__name__,
+                )
+                errors.append(f"{name}:{exc.__class__.__name__}")
+                continue
+
+            if not _supports_live_execution(adapter):
+                logger.error(
+                    "Execution LIVE adapter rejected: adapter=%s reason=NOT_LIVE_CAPABLE",
+                    name,
+                )
+                errors.append(f"{name}:NOT_LIVE_CAPABLE")
+                continue
+
+            logger.info("Execution LIVE adapter selected: adapter=%s", name)
+            return adapter
+
+        raise RuntimeError(f"LIVE_EXECUTION_ADAPTER_UNAVAILABLE ({','.join(errors)})")
+
+    primary = None
+    try:
+        primary = _build_one(exec_cfg.primary_adapter)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Execution primary adapter init failed: adapter=%s err=%s",
+            exec_cfg.primary_adapter,
+            exc.__class__.__name__,
+        )
+
+    if primary is None:
+        try:
+            primary = _build_one(exec_cfg.fallback_adapter)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Execution fallback adapter init failed: adapter=%s err=%s",
+                exec_cfg.fallback_adapter,
+                exc.__class__.__name__,
+            )
+
+    if primary is None:
+        logger.warning("Execution adapter init failed for configured adapters; using native fallback.")
+        return NativeUniswapV3Adapter()
+
+    if exec_cfg.fallback_adapter == exec_cfg.primary_adapter:
+        return primary
+
+    try:
+        fallback = _build_one(exec_cfg.fallback_adapter)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Execution secondary fallback init failed: adapter=%s err=%s; using native fallback",
+            exec_cfg.fallback_adapter,
+            exc.__class__.__name__,
+        )
+        fallback = NativeUniswapV3Adapter()
+
+    if primary.__class__ is fallback.__class__:
+        return primary
+    return FailoverExecutionAdapter(primary, fallback, logger_name="Sentinel")
 
 
 async def run_sentinel_cycle() -> None:
@@ -282,30 +478,86 @@ async def run_sentinel_cycle() -> None:
         td_ok = 0
         td_degraded = 0
         td_skipped = 0
+        td_discovery_scanned = 0
+        td_discovery_ok = 0
+        td_discovery_degraded = 0
+        td_discovery_skipped = 0
         td_scan_ms_total = 0.0
         if td_cfg.enabled:
-            # Supported chains for tick scanning (must have subgraph ID configured)
-            supported_chains = set(td_cfg.uniswap_subgraph_ids.keys()) | set(td_cfg.uniswap_subgraph_endpoints.keys())
+            async def _build_chain_providers(
+                *,
+                venue: str,
+                subgraph_endpoints: dict[str, str],
+                subgraph_ids: dict[str, str],
+            ) -> dict[str, UniswapV3TickProvider]:
+                providers: dict[str, UniswapV3TickProvider] = {}
+                chains = set(subgraph_ids.keys()) | set(subgraph_endpoints.keys())
+                for chain_name in chains:
+                    endpoint = subgraph_endpoints.get(chain_name)
+                    subgraph_id = subgraph_ids.get(chain_name)
+                    if not endpoint and not subgraph_id:
+                        continue
+                    try:
+                        provider = UniswapV3TickProvider(
+                            endpoint=endpoint,
+                            subgraph_id=subgraph_id,
+                            graph_api_key_env=td_cfg.graph_api_key_env,
+                            timeout_seconds=td_cfg.scan_timeout_seconds,
+                            retry_attempts=td_cfg.retry_attempts,
+                            max_pages_per_pool=td_cfg.max_pages_per_pool,
+                            max_ticks_per_pool=td_cfg.max_ticks_per_pool,
+                        )
+                        try:
+                            supports = await provider.supports_tick_schema()
+                        except TickProviderError as exc:
+                            # Fail-safe: treat as "disabled this cycle" (likely downtime/rate-limit),
+                            # not as a hard init failure.
+                            logger.warning(
+                                "Tick density provider unavailable: venue=%s chain=%s reason=%s msg=%s",
+                                venue,
+                                chain_name,
+                                getattr(exc.reason, "value", str(exc.reason)),
+                                str(exc)[:220],
+                            )
+                            continue
+                        if not supports:
+                            # Unsupported schema is expected on some subgraphs and is handled fail-safe.
+                            # Keep this as INFO to avoid alert fatigue in routine shadow runs.
+                            logger.info(
+                                "Tick density provider disabled (schema unsupported): venue=%s chain=%s",
+                                venue,
+                                chain_name,
+                            )
+                            continue
+                        providers[chain_name] = provider
+                    except TickProviderError as exc:
+                        logger.warning(
+                            "Tick density provider init failed: venue=%s chain=%s reason=%s msg=%s",
+                            venue,
+                            chain_name,
+                            getattr(exc.reason, "value", str(exc.reason)),
+                            str(exc)[:220],
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning(
+                            "Tick density provider init failed: venue=%s chain=%s err=%s msg=%s",
+                            venue,
+                            chain_name,
+                            exc.__class__.__name__,
+                            str(exc)[:220],
+                        )
+                return providers
 
-            # Build per-chain providers (reuse across candidates on same chain)
-            chain_providers: dict[str, UniswapV3TickProvider] = {}
-            for chain_name in supported_chains:
-                endpoint = td_cfg.uniswap_subgraph_endpoints.get(chain_name)
-                subgraph_id = td_cfg.uniswap_subgraph_ids.get(chain_name)
-                if not endpoint and not subgraph_id:
-                    continue
-                try:
-                    chain_providers[chain_name] = UniswapV3TickProvider(
-                        endpoint=endpoint,
-                        subgraph_id=subgraph_id,
-                        graph_api_key_env=td_cfg.graph_api_key_env,
-                        timeout_seconds=td_cfg.scan_timeout_seconds,
-                        retry_attempts=td_cfg.retry_attempts,
-                        max_pages_per_pool=td_cfg.max_pages_per_pool,
-                        max_ticks_per_pool=td_cfg.max_ticks_per_pool,
-                    )
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning("Tick density provider init failed for %s: %s", chain_name, exc)
+            uniswap_chain_providers = await _build_chain_providers(
+                venue="uniswap",
+                subgraph_endpoints=td_cfg.uniswap_subgraph_endpoints,
+                subgraph_ids=td_cfg.uniswap_subgraph_ids,
+            )
+            aerodrome_chain_providers = await _build_chain_providers(
+                venue="aerodrome",
+                subgraph_endpoints=td_cfg.aerodrome_subgraph_endpoints,
+                subgraph_ids=td_cfg.aerodrome_subgraph_ids,
+            )
 
             # Resolve per-chain RPC URLs for slot0 cross-check
             chain_rpc_urls: dict[str, str] = {}
@@ -314,46 +566,156 @@ async def run_sentinel_cycle() -> None:
                 if rpc_url:
                     chain_rpc_urls[chain_name] = rpc_url
 
-            # CLMM project keywords for candidate selection
-            clmm_projects = {"uniswap", "uniswap-v3", "sushiswap", "pancakeswap", "aerodrome", "camelot"}
+            def _provider_for_candidate(candidate) -> UniswapV3TickProvider | None:  # noqa: ANN001
+                project_lower = (candidate.project or "").lower().replace(" ", "")
+                chain = candidate.chain or ""
+                if "aerodrome-slipstream" in project_lower:
+                    return aerodrome_chain_providers.get(chain)
+                if "uniswap-v3" in project_lower or "uniswapv3" in project_lower:
+                    return uniswap_chain_providers.get(chain)
+                return None
 
-            # Select candidates for scanning
-            scan_candidates = []
+            def _normalize_evm_address(value: object) -> str | None:
+                if not isinstance(value, str):
+                    return None
+                raw = value.strip()
+                if ":" in raw:
+                    raw = raw.split(":")[-1].strip()
+                if re.fullmatch(r"0x[a-fA-F0-9]{40}", raw):
+                    return raw.lower()
+                return None
+
+            def _token_pair(candidate) -> tuple[str, str] | None:  # noqa: ANN001
+                normalized_tokens: list[str] = []
+                for raw_token in list(getattr(candidate, "underlying_tokens", []) or []):
+                    normalized = _normalize_evm_address(raw_token)
+                    if normalized and normalized not in normalized_tokens:
+                        normalized_tokens.append(normalized)
+                if len(normalized_tokens) < 2:
+                    return None
+                return normalized_tokens[0], normalized_tokens[1]
+
+            def _parse_fee_tier(pool_meta: str | None) -> int | None:
+                raw = str(pool_meta or "").strip()
+                if not raw:
+                    return None
+                match = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*%", raw)
+                if not match:
+                    return None
+                try:
+                    pct_value = float(match.group(1))
+                except ValueError:
+                    return None
+                if pct_value <= 0:
+                    return None
+                return max(1, int(round(pct_value * 10_000.0)))
+
+            def _candidate_scan_eligible(candidate) -> bool:  # noqa: ANN001
+                direct = _normalize_evm_address(candidate.address)
+                if direct and (candidate.address_source or "").upper() == "POOL":
+                    return True
+                return _token_pair(candidate) is not None
+
+            pool_resolve_cache: dict[tuple[str, str, str, int | None], str | None] = {}
+            scanned_pool_addrs: set[str] = set()
+
+            async def _resolve_scan_pool_address(
+                provider: UniswapV3TickProvider,
+                candidate,
+                metadata: dict[str, str] | None,
+            ) -> str | None:  # noqa: ANN001
+                direct = _normalize_evm_address(candidate.address)
+                if direct and (candidate.address_source or "").upper() == "POOL":
+                    return direct
+
+                pair = _token_pair(candidate)
+                if pair is None:
+                    return None
+
+                fee_tier = _parse_fee_tier(getattr(candidate, "pool_meta", None))
+                token0, token1 = pair
+                cache_key = (
+                    provider.endpoint,
+                    min(token0, token1),
+                    max(token0, token1),
+                    fee_tier,
+                )
+                if cache_key not in pool_resolve_cache:
+                    resolved = await provider.find_pool_address_by_tokens(
+                        token0,
+                        token1,
+                        fee_tier=fee_tier,
+                    )
+                    pool_resolve_cache[cache_key] = resolved
+                resolved = pool_resolve_cache.get(cache_key)
+                if resolved and metadata is not None:
+                    metadata["tick_pool_address"] = resolved
+                    metadata["tick_pool_source"] = "TOKEN_RESOLVER"
+                    if fee_tier is not None:
+                        metadata["tick_pool_fee_tier"] = str(fee_tier)
+                return resolved
+
+            # Select shortlist candidates for scanning
+            scan_candidates: list[tuple[object, UniswapV3TickProvider]] = []
             for opt in opportunities:
                 c = opt.candidate
-                project_lower = (c.project or "").lower().replace(" ", "")
-                chain = c.chain or ""
-                if chain not in supported_chains:
-                    td_skipped += 1
-                    continue
-                if not any(kw in project_lower for kw in clmm_projects):
-                    td_skipped += 1
-                    continue
-                if not c.address:
-                    td_skipped += 1
-                    continue
-                scan_candidates.append(opt)
-
-            # Limit to max_scan_candidates (sorted by TVL desc for priority)
-            scan_candidates.sort(key=lambda o: float(o.candidate.tvl_usd or 0), reverse=True)
-            scan_candidates = scan_candidates[:td_cfg.max_scan_candidates]
-
-            for opt in scan_candidates:
-                c = opt.candidate
-                chain = c.chain or ""
-                provider = chain_providers.get(chain)
+                provider = _provider_for_candidate(c)
                 if provider is None:
                     td_skipped += 1
                     continue
-
-                pool_addr = (c.address or "").strip().lower()
-                if not pool_addr.startswith("0x"):
+                if not _candidate_scan_eligible(c):
                     td_skipped += 1
                     continue
+                scan_candidates.append((opt, provider))
+
+            # Limit shortlist scan scope by TVL priority.
+            scan_candidates.sort(key=lambda entry: float(entry[0].candidate.tvl_usd or 0), reverse=True)
+            scan_candidates = scan_candidates[:td_cfg.max_scan_candidates]
+            # Cache vol estimates per pool for this cycle to avoid duplicate historical lookups.
+            vol_cache: dict[str, tuple[float, float, int, float] | None] = {}
+            # Returns: ok | degraded | error | skip, plus resolved pool address if any.
+            async def _scan_tick_candidate(
+                provider: UniswapV3TickProvider,
+                candidate,
+                metadata: dict[str, str] | None,
+            ) -> tuple[str, str | None]:  # noqa: ANN001
+                nonlocal td_scanned, td_ok, td_degraded, td_scan_ms_total
+
+                pool_addr = await _resolve_scan_pool_address(provider, candidate, metadata)
+                if not pool_addr:
+                    return "skip", None
+                if pool_addr in scanned_pool_addrs:
+                    return "skip", pool_addr
+                scanned_pool_addrs.add(pool_addr)
+
+                # DeFiLlama price-based daily volatility (token0/token1 ratio) for scan-stage metadata.
+                # This is fail-safe and optional: scan continues even when vol data is unavailable.
+                vol_key = str(candidate.pool_id or pool_addr)
+                if vol_key not in vol_cache:
+                    vol_cache[vol_key] = None
+                    try:
+                        ratio_prices = await client.get_pair_price_ratio_history(candidate, lookback_days=10)
+                        vol_est = estimate_vol(ratio_prices, holding_days=7.0)
+                        if vol_est is not None:
+                            vol_cache[vol_key] = (
+                                float(vol_est.daily_vol),
+                                float(vol_est.annual_vol),
+                                int(vol_est.sample_days),
+                                float(vol_est.range_half_width_pct),
+                            )
+                    except Exception:  # noqa: BLE001
+                        pass
+                vol_info = vol_cache.get(vol_key)
+                if metadata is not None and vol_info is not None:
+                    daily_vol, annual_vol, sample_days, range_half_width = vol_info
+                    metadata["tick_daily_vol"] = f"{daily_vol:.6f}"
+                    metadata["tick_annual_vol"] = f"{annual_vol:.6f}"
+                    metadata["tick_vol_samples"] = str(sample_days)
+                    metadata["tick_range_half_width_pct"] = f"{range_half_width * 100.0:.2f}"
 
                 # RPC slot0 cross-check (optional, fail-safe)
                 rpc_tick = None
-                rpc_url = chain_rpc_urls.get(chain)
+                rpc_url = chain_rpc_urls.get(candidate.chain or "")
                 if rpc_url:
                     try:
                         rpc_tick = await fetch_slot0_tick(
@@ -372,30 +734,78 @@ async def run_sentinel_cycle() -> None:
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("Tick scan error pool=%s: %s", pool_addr[:10], exc.__class__.__name__)
                     td_degraded += 1
-                    opt.metadata["tick_data_quality"] = "ERROR"
-                    continue
-                scan_elapsed_ms = (time() - scan_start) * 1000.0
-                td_scan_ms_total += scan_elapsed_ms
+                    if metadata is not None:
+                        metadata["tick_data_quality"] = "ERROR"
+                    return "error", pool_addr
+
+                td_scan_ms_total += (time() - scan_start) * 1000.0
                 td_scanned += 1
 
-                # Attach band depth fields to metadata
-                opt.metadata["tick_data_quality"] = band_result.data_quality.value
-                opt.metadata["band_depth_1pct_usd"] = f"{band_result.band_depth_1pct_usd:.2f}"
-                opt.metadata["band_depth_2_5pct_usd"] = f"{band_result.band_depth_2_5pct_usd:.2f}"
-                opt.metadata["band_depth_5pct_usd"] = f"{band_result.band_depth_5pct_usd:.2f}"
-                opt.metadata["tick_pit_type"] = band_result.pit_type.value
-                opt.metadata["tick_pits_found"] = str(band_result.pits_found)
-                if band_result.degradation_reason:
-                    opt.metadata["tick_degradation_reason"] = band_result.degradation_reason.value
+                if metadata is not None:
+                    metadata["tick_data_quality"] = band_result.data_quality.value
+                    metadata["band_depth_1pct_usd"] = f"{band_result.band_depth_1pct_usd:.2f}"
+                    metadata["band_depth_2_5pct_usd"] = f"{band_result.band_depth_2_5pct_usd:.2f}"
+                    metadata["band_depth_5pct_usd"] = f"{band_result.band_depth_5pct_usd:.2f}"
+                    metadata["tick_pit_type"] = band_result.pit_type.value
+                    metadata["tick_pits_found"] = str(band_result.pits_found)
+                    if band_result.degradation_reason:
+                        metadata["tick_degradation_reason"] = band_result.degradation_reason.value
 
                 if band_result.data_quality == DataQuality.OK:
                     td_ok += 1
+                    return "ok", pool_addr
+
+                td_degraded += 1
+                return "degraded", pool_addr
+
+            for opt, provider in scan_candidates:
+                status, _pool_addr = await _scan_tick_candidate(provider, opt.candidate, opt.metadata)
+                if status == "skip":
+                    td_skipped += 1
+
+            # Secondary stream: scan discovered Uniswap pools even if they are not in shortlist.
+            discovery_candidates_raw = list(getattr(scout, "last_discovery_candidates", []) or [])
+            discovery_candidates: list[tuple[object, UniswapV3TickProvider]] = []
+            discovery_seen_addrs: set[str] = set()
+            for c in discovery_candidates_raw:
+                provider = _provider_for_candidate(c)
+                if provider is None:
+                    td_discovery_skipped += 1
+                    continue
+                if not _candidate_scan_eligible(c):
+                    td_discovery_skipped += 1
+                    continue
+                pool_addr_direct = _normalize_evm_address(c.address)
+                if pool_addr_direct and (c.address_source or "").upper() == "POOL":
+                    if pool_addr_direct in scanned_pool_addrs or pool_addr_direct in discovery_seen_addrs:
+                        continue
+                    discovery_seen_addrs.add(pool_addr_direct)
+                discovery_candidates.append((c, provider))
+
+            discovery_candidates.sort(key=lambda entry: float(entry[0].tvl_usd or 0), reverse=True)
+            discovery_candidates = discovery_candidates[:td_cfg.max_scan_candidates]
+            for c, provider in discovery_candidates:
+                status, _pool_addr = await _scan_tick_candidate(provider, c, None)
+                if status == "ok":
+                    td_discovery_scanned += 1
+                    td_discovery_ok += 1
+                elif status == "degraded":
+                    td_discovery_scanned += 1
+                    td_discovery_degraded += 1
+                elif status == "error":
+                    td_discovery_degraded += 1
                 else:
-                    td_degraded += 1
+                    td_discovery_skipped += 1
+
+            td_skipped += td_discovery_skipped
 
             logger.info(
-                "Tick density scan: scanned=%s ok=%s degraded=%s skipped=%s scan_ms_total=%.0f enabled=%s shadow=%s",
-                td_scanned, td_ok, td_degraded, td_skipped, td_scan_ms_total,
+                "Tick density scan: scanned=%s ok=%s degraded=%s skipped=%s "
+                "discovery_scanned=%s discovery_ok=%s discovery_degraded=%s discovery_skipped=%s "
+                "scan_ms_total=%.0f enabled=%s shadow=%s",
+                td_scanned, td_ok, td_degraded, td_skipped,
+                td_discovery_scanned, td_discovery_ok, td_discovery_degraded, td_discovery_skipped,
+                td_scan_ms_total,
                 td_cfg.enabled, td_cfg.shadow_mode_enabled,
             )
         else:
@@ -491,6 +901,40 @@ async def run_sentinel_cycle() -> None:
             logger.info(sim_counters.to_log_line())
         else:
             logger.info("StrategySim disabled or no candidates.")
+
+        # --- Execution loop (Spec 018, isolated and optional) ---
+        if config.execution.enabled:
+            mock_states = _load_execution_mock_states(config)
+            if not mock_states:
+                logger.info("Execution enabled but no valid mock positions configured; loop skipped.")
+            else:
+                execution_orchestrator = ExecutionOrchestrator(
+                    mode=config.execution.mode,
+                    trigger_engine=TriggerEngine(config.execution),
+                    policy_guard=PolicyGuard(config.execution.policy),
+                    adapter=_build_execution_adapter(config),
+                )
+                execution_report = await execution_orchestrator.run_states(mock_states)
+                ec = execution_report.counters
+                logger.info(
+                    "Execution summary: mode=%s states=%s tx_plans=%s intents=%s blocked_by_policy=%s "
+                    "sim_ok=%s sim_fail=%s exec_ok=%s exec_fail=%s "
+                    "policy_blocks=%s sim_fail_reasons=%s exec_fail_reasons=%s",
+                    execution_report.mode,
+                    len(mock_states),
+                    len(execution_report.tx_plans),
+                    ec.intent_count,
+                    ec.blocked_by_policy,
+                    ec.sim_ok,
+                    ec.sim_fail,
+                    ec.exec_ok,
+                    ec.exec_fail,
+                    execution_report.policy_block_reason_counts or {},
+                    execution_report.sim_fail_reason_counts or {},
+                    execution_report.exec_fail_reason_counts or {},
+                )
+        else:
+            logger.info("Execution loop disabled.")
 
         logger.info(
             "Final filters: eligible=%s profit_ok=%s safe=%s warn=%s safe_min_score=%.2f warn_min_score=%.2f min_monthly_profit_usd=%.2f",
@@ -615,6 +1059,20 @@ async def run_sentinel_cycle() -> None:
             config.freshness.recheck_enabled,
             config.freshness.enforce_freshness_for_actionable,
         )
+        if report_picks:
+            div_stats = _freshness_divergence_stats(report_picks)
+            for provider, (samples, apy_p50, apy_p90, tvl_p50, tvl_p90) in sorted(div_stats.items()):
+                if samples <= 0:
+                    continue
+                logger.info(
+                    "Freshness divergence: provider=%s samples=%s apy_p50=%s apy_p90=%s tvl_p50=%s tvl_p90=%s",
+                    provider,
+                    samples,
+                    f"{apy_p50:.2f}" if apy_p50 is not None else "n/a",
+                    f"{apy_p90:.2f}" if apy_p90 is not None else "n/a",
+                    f"{tvl_p50:.2f}" if tvl_p50 is not None else "n/a",
+                    f"{tvl_p90:.2f}" if tvl_p90 is not None else "n/a",
+                )
         # Report both actionable and watchlist sections with clear labels.
         if report_picks:
             due, interval, remaining = _telegram_digest_due(config)

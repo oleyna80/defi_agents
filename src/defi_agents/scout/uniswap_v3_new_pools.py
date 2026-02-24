@@ -151,6 +151,7 @@ class UniswapV3NewPoolsAdapter:
                 "chain": chain,
                 "symbol": f"{token0}-{token1}",
                 "address": pool_id,
+                "address_source": "POOL",
                 "chain_id": chain_id,
                 "tvlUsd": tvl,
                 # Keep discovery candidates compatible with existing Scout heuristics

@@ -61,6 +61,7 @@ class YieldScout:
         self.deduper = deduper or ScoutDeduper(ttl_seconds=self.config.dedupe_ttl_seconds)
         self._new_pools_adapter = UniswapV3NewPoolsAdapter(config)
         self.last_discovery_stats = DexDiscoveryStats()
+        self.last_discovery_candidates: List[ScoutCandidate] = []
         self.last_lending_snapshot = LendingSnapshot()
         self.last_my_pools_report = MyPoolsMonitorReport()
 
@@ -87,6 +88,7 @@ class YieldScout:
             logger.warning("DeFiLlama pools fetch failed: %s", exc.__class__.__name__)
             pools = []
         discovery = await self._new_pools_adapter.fetch_new_pools(self.config.target_chains)
+        self.last_discovery_candidates = list(discovery.candidates)
         if discovery.candidates:
             pools.extend(discovery.candidates)
 

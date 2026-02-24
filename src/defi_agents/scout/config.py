@@ -226,8 +226,11 @@ class FreshnessConfig(BaseModel):
     uniswap_subgraph_ids: dict[str, str] = Field(
         default_factory=lambda: {
             "Ethereum": "5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV",
-            "Arbitrum": "C2KJVEU6fA9Bqf8QwK4MAnuS8xPYYn9N6HqFA7gKjsXo",
-            "Base": "3hCPRGfHk8NAxU1wR8UWQ2N8isf2Xn7u6xQ5q4VYqW3G",
+            # Keep in sync with docs/memory-bank/scout_config.json (SSOT).
+            "Arbitrum": "HyW7A86UEdYVt5b9Lrw8W2F98yKecerHKutZTRbSCX27",
+            "Base": "43Hwfi3dJSoGpyas9VwNoDAv55yjgGrPpNSmbQZArzMG",
+            "Optimism": "Cghf4LfVqPiFw6fp6Y5X5Ubc8UpmUhSfJL82zwiBFLaj",
+            "Polygon": "3hCPRGf4z88VC5rsBKU5AA9FBBq5nF3jbKJG7VZCbhjm",
             "BSC": "6zfiRjwudV3wRMMWfDh29k14bP4fXp6q6qJZNk9b8f6R",
             "Binance": "6zfiRjwudV3wRMMWfDh29k14bP4fXp6q6qJZNk9b8f6R",
             "Avalanche": "4iA7jQX3U7zFfD6J2Wf6ByfQX7Qd8L1nY3mA6P7Y5b5M",
@@ -292,6 +295,58 @@ class FreshnessConfig(BaseModel):
     morpho_direct_market_keys: dict[str, dict[str, str]] = Field(
         default_factory=dict
     )
+
+
+class ExecutionPolicyConfig(BaseModel):
+    max_gas_usd_per_tx: float = Field(default=15.0, ge=0.0)
+    max_slippage_bps: int = Field(default=100, ge=0, le=10_000)
+    max_daily_txs: int = Field(default=10, ge=0)
+    max_daily_gas_usd: float = Field(default=100.0, ge=0.0)
+    min_expected_net_usd: float = Field(default=2.0, ge=0.0)
+    kill_switch: bool = False
+
+
+class ExecutionConfig(BaseModel):
+    enabled: bool = False
+    mode: Literal["PAPER", "SHADOW", "LIVE"] = "PAPER"
+    primary_adapter: Literal["native_uniswap_v3", "native_uniswap_v3_live", "v3utils", "krystal"] = "native_uniswap_v3"
+    fallback_adapter: Literal["native_uniswap_v3", "native_uniswap_v3_live", "v3utils", "krystal"] = "native_uniswap_v3"
+    allow_live_mode: bool = False
+    idempotency_ttl_seconds: int = Field(default=86_400, ge=60)
+    per_position_cooldown_seconds: int = Field(default=1_800, ge=0)
+    compound_min_fees_usd: float = Field(default=5.0, ge=0.0)
+    rebalance_min_range_utilization: float = Field(default=0.15, ge=0.0, le=1.0)
+    rebalance_edge_decay_bps: int = Field(default=250, ge=0, le=10_000)
+    mock_positions: List[dict] = Field(default_factory=list)
+    krystal_enabled: bool = False
+    krystal_base_url: str = "https://cloud-api.krystal.app"
+    krystal_api_key_env: str = "KRYSTAL_CLOUD_API_KEY"
+    krystal_timeout_seconds: float = Field(default=8.0, ge=1.0)
+    v3utils_enabled: bool = False
+    v3utils_contracts_by_chain: dict[str, str] = Field(default_factory=dict)
+    v3utils_router_by_chain: dict[str, str] = Field(default_factory=dict)
+    v3utils_slippage_bps_default: int = Field(default=50, ge=0, le=10_000)
+    native_live_rpc_env_by_chain: dict[str, str] = Field(
+        default_factory=lambda: {
+            "Base": "BASE_RPC_URL",
+            "Arbitrum": "ARBITRUM_RPC_URL",
+            "Ethereum": "ETH_RPC_URL",
+        }
+    )
+    native_live_timeout_seconds: float = Field(default=12.0, ge=1.0)
+    native_live_receipt_timeout_seconds: float = Field(default=45.0, ge=0.0)
+    native_live_receipt_poll_seconds: float = Field(default=1.5, ge=0.1)
+    policy: ExecutionPolicyConfig = Field(default_factory=ExecutionPolicyConfig)
+
+    @model_validator(mode="after")
+    def _validate_execution_mode(self) -> "ExecutionConfig":
+        if self.mode == "LIVE" and not self.allow_live_mode:
+            raise ValueError("execution.mode=LIVE requires execution.allow_live_mode=true")
+        if self.primary_adapter == "krystal" and not self.krystal_enabled:
+            raise ValueError("execution.primary_adapter=krystal requires execution.krystal_enabled=true")
+        if self.primary_adapter == "v3utils" and not self.v3utils_enabled:
+            raise ValueError("execution.primary_adapter=v3utils requires execution.v3utils_enabled=true")
+        return self
 
 
 class StrategySimConfig(BaseModel):
@@ -400,8 +455,17 @@ class TickDensityConfig(BaseModel):
     uniswap_subgraph_ids: Dict[str, str] = Field(
         default_factory=lambda: {
             "Ethereum": "5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV",
-            "Arbitrum": "C2KJVEU6fA9Bqf8QwK4MAnuS8xPYYn9N6HqFA7gKjsXo",
-            "Base": "3hCPRGfHk8NAxU1wR8UWQ2N8isf2Xn7u6xQ5q4VYqW3G",
+            # Keep in sync with docs/memory-bank/scout_config.json (SSOT).
+            "Arbitrum": "HyW7A86UEdYVt5b9Lrw8W2F98yKecerHKutZTRbSCX27",
+            "Base": "43Hwfi3dJSoGpyas9VwNoDAv55yjgGrPpNSmbQZArzMG",
+            "Optimism": "Cghf4LfVqPiFw6fp6Y5X5Ubc8UpmUhSfJL82zwiBFLaj",
+            "Polygon": "3hCPRGf4z88VC5rsBKU5AA9FBBq5nF3jbKJG7VZCbhjm",
+        }
+    )
+    aerodrome_subgraph_endpoints: Dict[str, str] = Field(default_factory=dict)
+    aerodrome_subgraph_ids: Dict[str, str] = Field(
+        default_factory=lambda: {
+            "Base": "https://gateway.thegraph.com/api/{GRAPH_API_KEY}/deployments/id/QmasYjypV6nTLp4iNH4Vjf7fksRNxAkAskqDdKf2DCsQkV",
         }
     )
     # Chain name → env var for RPC URL (for slot0 cross-check)
@@ -410,6 +474,8 @@ class TickDensityConfig(BaseModel):
             "Ethereum": "RPC_URL_ETHEREUM",
             "Arbitrum": "RPC_URL_ARBITRUM",
             "Base": "RPC_URL_BASE",
+            "Optimism": "RPC_URL_OPTIMISM",
+            "Polygon": "RPC_URL_POLYGON",
         }
     )
 
@@ -433,6 +499,7 @@ class ScoutConfig(BaseModel):
     inspector: InspectorConfig = Field(default_factory=InspectorConfig)
     defillama_provider: DeFiLlamaProviderConfig = Field(default_factory=DeFiLlamaProviderConfig)
     tick_density: TickDensityConfig = Field(default_factory=TickDensityConfig)
+    execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
     strategy_sim: StrategySimConfig = Field(default_factory=StrategySimConfig)
     token_buckets: TokenBuckets = Field(default_factory=TokenBuckets)
     risk_policy: StableRiskPolicy = Field(default_factory=StableRiskPolicy)

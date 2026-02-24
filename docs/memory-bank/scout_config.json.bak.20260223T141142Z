@@ -160,7 +160,7 @@
           "GHO": "0x40D16FC0246aB6A3AE3E2fD7D8F9aE22fE2387bD"
         }
       },
-      "morpho_direct_enabled": true,
+      "morpho_direct_enabled": false,
       "morpho_direct_timeout_seconds": 8,
       "morpho_direct_api_key_env": "MORPHO_DIRECT_API_KEY",
       "morpho_direct_endpoints": {
@@ -176,10 +176,7 @@
       },
       "morpho_direct_market_keys": {
         "Ethereum": {
-          "USDC": "0x64d65c9a2d91c36d56fbc42d69e979335320169b3df63bf92789e2c8883fcc64"
-        },
-        "Base": {
-          "USDC": "0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836"
+          "USDC": ""
         }
       }
     },
@@ -344,18 +341,6 @@
       "krystal_base_url": "https://cloud-api.krystal.app",
       "krystal_api_key_env": "KRYSTAL_CLOUD_API_KEY",
       "krystal_timeout_seconds": 8.0,
-      "v3utils_enabled": false,
-      "v3utils_contracts_by_chain": {},
-      "v3utils_router_by_chain": {},
-      "v3utils_slippage_bps_default": 50,
-      "native_live_rpc_env_by_chain": {
-        "Base": "BASE_RPC_URL",
-        "Arbitrum": "ARBITRUM_RPC_URL",
-        "Ethereum": "ETH_RPC_URL"
-      },
-      "native_live_timeout_seconds": 12.0,
-      "native_live_receipt_timeout_seconds": 45.0,
-      "native_live_receipt_poll_seconds": 1.5,
       "policy": {
         "max_gas_usd_per_tx": 15.0,
         "max_slippage_bps": 100,

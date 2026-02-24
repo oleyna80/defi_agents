@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import logging
 import os
+import re
 
 import httpx
 
@@ -185,6 +186,19 @@ class MorphoDirectAdapter:
             return None
         mapped = self._lookup_case_insensitive(mapping, base_symbol)
         if not isinstance(mapped, str):
+            # Fallback for composite strategy symbols from aggregators (e.g. ALPHAUSDCENHANCEDV2).
+            compact_symbol = re.sub(r"[^A-Z0-9]", "", base_symbol.upper())
+            normalized_items: list[tuple[str, str]] = []
+            for raw_key, raw_val in mapping.items():
+                if not isinstance(raw_key, str) or not isinstance(raw_val, str):
+                    continue
+                norm_key = re.sub(r"[^A-Z0-9]", "", raw_key.upper())
+                if norm_key and raw_val.strip():
+                    normalized_items.append((norm_key, raw_val.strip()))
+            normalized_items.sort(key=lambda item: len(item[0]), reverse=True)
+            for norm_key, norm_val in normalized_items:
+                if norm_key in compact_symbol:
+                    return norm_val
             return None
         value = mapped.strip()
         return value or None
