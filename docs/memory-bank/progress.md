@@ -31,6 +31,7 @@
 - Plan 008 (L3 AI-Analyst): production hardening and real provider integration
 
 ## Completed
+- 2026-03-01: Re-prioritized execution roadmap to align with `docs/runbooks/LP_OS_Prompt_NewChat.md`: added `Phase 3.0 — Real Position Reader (LP_OS Critical Path, P0)` in `ROADMAP.md` and marked Gate-3/LIVE as blocked until `mock_positions` is replaced by real on-chain position reads with stale-data guard and DoD checks — 2026-03-01
 - 2026-03-01: Created `docs/runbooks/INDEX.md` as runbook catalog (operational runbooks, design/reference docs, LP_OS program docs, binary/export artifacts) and updated `ROADMAP.md` with direct index linkage for execution/hedger tracks and ops invariants docs-hygiene note — 2026-03-01
 - 2026-03-01: Added Tick Density runtime metrics module `src/defi_agents/lp/runtime_metrics.py` (`compute_scan_duration_p95_ms`, `summarize_tick_scan_runtime_metrics`) and integrated counters into `main.py` scan log (`degraded_count`, `pits_found_count`, `confident_pit_count`, `scan_duration_p95_ms`); added `tests/test_tick_density_runtime_metrics.py`; updated `ROADMAP.md` ops-gate metrics checkbox; targeted tick-density test pack green (`36 passed`) — 2026-03-01
 - 2026-02-27: Finalized Plan 020 post-gate documentation package: added spec draft `docs/specs/020-delta-hedger-poc-v1.md`, added gate decision note `docs/research/2026-02-27-hedger-shadow-gate-note.md` (`CONDITIONAL GO`), updated plan snapshot in `docs/plans/020-delta-hedger-hummingbot-poc-plan.md`, and synced Phase 5 status line in `ROADMAP.md` to reflect 24h SHADOW pass and next real-connector sandbox track — 2026-02-27
@@ -215,6 +216,7 @@
 - 2026-02-04: Updated deployment/config templates for Graph gateway auth and revalidated full suite (`42 passed`) — 2026-02-04
 
 ## Changelog
+- 2026-03-01: Priority alignment update: execution track sequencing now explicitly follows LP_OS critical path (`Real Position Reader -> Gate-3 canary -> LIVE`), preventing premature LIVE/canary work while runtime still depends on mock position state — 2026-03-01
 - 2026-03-01: Runbook docs were normalized around a single navigation entrypoint (`docs/runbooks/INDEX.md`), and roadmap references for execution/hedger ops were updated to make operational documentation discoverable from planning artifacts — 2026-03-01
 - 2026-03-01: Tick Density shadow observability strengthened: runtime now emits required ops counters (`pits_found_count`, `degraded_count`, `scan_duration_p95_ms`) plus `confident_pit_count`; added deterministic metric helper module and unit tests to keep logging contract stable before 24h VPS gate — 2026-03-01
 - 2026-02-21: Phase G moved from pure code-readiness to rollout preset state (`execution.mode=SHADOW` with deterministic seed positions), pending 24h runtime gate evidence — 2026-02-21

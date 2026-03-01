@@ -2,10 +2,11 @@
 
 ## Current Session Focus
 Current Spec: docs/specs/018-lp-autocompound-autorebalance-v1.md
-Current Plan: docs/plans/020-delta-hedger-hummingbot-poc-plan.md
-Active Task: Execute Plan 020 runtime gate: enable hedger SHADOW worker and collect 24h stability/reason telemetry
+Current Plan: docs/plans/018-lp-autocompound-autorebalance-v1-plan.md
+Active Task: LP_OS Phase 0 priority sync — implement Real Position Reader (Arbitrum + Uniswap v3) to replace `mock_positions` as Gate-3/LIVE blocker before further execution expansion
 
 ## Recent Changes
+- 2026-03-01: Synchronized roadmap priorities with `docs/runbooks/LP_OS_Prompt_NewChat.md`: added explicit `Phase 3.0 — Real Position Reader (P0)` in `ROADMAP.md` as Gate-3/LIVE blocker (remove `mock_positions` dependency, add stale-data guard + DoD), and added execution-status note that LIVE remains blocked until this phase is closed — 2026-03-01
 - 2026-03-01: Added runbook navigation SSOT `docs/runbooks/INDEX.md` after reviewing all runbook documents (`.md`, `.html`, `.docx` artifacts), classified files into operational vs design/reference vs export artifacts, and linked index in `ROADMAP.md` (Phase 3.3 draft docs, Phase 5 PoC docs, Ops Invariants note) to reduce doc-discovery friction — 2026-03-01
 - 2026-03-01: Added Tick Density runtime metrics helper (`src/defi_agents/lp/runtime_metrics.py`) with deterministic `scan_duration_p95_ms` calculation and pit counters aggregation (`pits_found_count`, `confident_pit_count`); integrated metrics into `main.py` tick scan log line (now logs `degraded_count`, `pits_found_count`, `confident_pit_count`, `scan_duration_p95_ms`), added tests `tests/test_tick_density_runtime_metrics.py`, and updated Roadmap ops-gate counter checkbox; targeted validation green (`36 passed`) — 2026-03-01
 - 2026-02-27: Closed Plan 020 SHADOW observation gate with 24h evidence and decision docs: added gate memo `docs/research/2026-02-27-hedger-shadow-gate-note.md` (`CONDITIONAL GO`), drafted spec `docs/specs/020-delta-hedger-poc-v1.md` (`Status: DRAFT`), updated plan snapshot in `docs/plans/020-delta-hedger-hummingbot-poc-plan.md` (Phase D evidence + GO/NO-GO memo marked complete), and synced status line in `ROADMAP.md` for Phase 5 — 2026-02-27

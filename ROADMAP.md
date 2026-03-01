@@ -250,6 +250,24 @@
 *Переход от advisory ("вот хорошие пулы") к execution ("автоматически управляй позициями").*
 *Требует новых approved спецификаций — текущая логика зафиксирована как `MANUAL_EXECUTION_ONLY`.*
 
+### Phase 3.0 — Real Position Reader (LP_OS Critical Path, P0)
+*Gate-3/LIVE блокер: execution не должен зависеть от `mock_positions`.*
+
+- [ ] **Replace mock state with real on-chain position reads (Arbitrum + Uniswap v3):**
+    - убрать зависимость execution-контура от `execution.mock_positions`,
+    - читать позиции через `NonfungiblePositionManager` + `slot0()` + fee fields.
+- [ ] **Position state integrity:**
+    - корректный `in_range/out_of_range` статус в реальном времени,
+    - `P&L` и `HODL benchmark` для реальных позиций.
+- [ ] **Stale data safety gate:**
+    - блокировать LIVE execution при `STALE_POSITION_DATA`,
+    - добавить явные reason-codes в policy/report path.
+- [ ] **DoD для Gate-3 readiness:**
+    - минимум 3 реальные позиции с отклонением расчёта `P&L < 1%` от ручной проверки,
+    - стабильная работа reader path в SHADOW без runtime failures.
+
+DoD: Gate-3 canary и любой `LIVE` execution остаются заблокированными до закрытия Phase 3.0.
+
 ### Phase 3.1 — Strategy Calibration + Forward Simulation (P1)
 *Калибровка параметров и stress-test на текущем state (не классический бэктест — ликвидность нестационарна).*
 
@@ -289,6 +307,7 @@ DoD: Оператор видит полную картину каждой поз
   - Spec 018 approved; implementation phases A-F completed (contracts, triggers, policy, adapters, orchestrator).
   - Phase G SHADOW gate passed (24h): `runs=85`, `execution_summaries=85`, `errors=0`, `sim_fail=0`, `exec_fail=0`.
   - Phase H prep: kill-switch drill passed in controlled LIVE profile (`KILL_SWITCH_ENABLED` hard-block confirmed), rollback to SHADOW verified.
+  - LP_OS alignment: Gate-3/LIVE remains blocked by unresolved Phase 3.0 (`Real Position Reader`, no mock dependency).
   - Added LIVE-capable native path `native_uniswap_v3_live` (RPC `eth_sendRawTransaction` + receipt polling for pre-signed tx payloads).
   - Started module-reuse execution scaffold: feature-flagged `v3utils` adapter route added (Plan 019).
   - Pinned `v3utils` ABI/address bundle committed (`src/defi_agents/execution/abi/`, commit lock `33f487...`).
