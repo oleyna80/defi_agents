@@ -305,6 +305,61 @@ class DeFiLlamaClient:
         self.last_provider_counters = self._provider.get_counters()
         return history_rows
 
+    async def get_pair_price_ratio_history(
+        self,
+        candidate: ScoutCandidate,
+        *,
+        lookback_days: int = 10,
+    ) -> list[float]:
+        """Build daily token0/token1 price ratio series from DeFiLlama coins API.
+
+        Returns oldest->newest ratio points. Fail-safe by design: any missing mapping,
+        malformed token address, or provider error yields a partial/empty series.
+        """
+        chain_key = self._price_chain_key(candidate.chain)
+        if not chain_key:
+            return []
+
+        normalized_tokens: list[str] = []
+        for raw in list(candidate.underlying_tokens or []):
+            addr = self._normalize_address(raw)
+            if addr and addr not in normalized_tokens:
+                normalized_tokens.append(addr)
+
+        if len(normalized_tokens) < 2:
+            return []
+
+        token0_key = f"{chain_key}:{normalized_tokens[0]}"
+        token1_key = f"{chain_key}:{normalized_tokens[1]}"
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        days = max(2, int(lookback_days))
+
+        ratios: list[float] = []
+        for day_offset in range(days, -1, -1):
+            ts = now_ts - day_offset * 86_400
+            try:
+                facts = await self._provider.get_prices_historical(ts, [token0_key, token1_key])
+            except Exception:
+                continue
+            if not facts:
+                continue
+
+            price_map: dict[str, float] = {}
+            for fact in facts:
+                key = str(getattr(fact, "key", "") or "").lower()
+                price = self._to_float(getattr(fact, "price", None))
+                if key and isinstance(price, float) and price > 0:
+                    price_map[key] = price
+
+            p0 = price_map.get(token0_key.lower())
+            p1 = price_map.get(token1_key.lower())
+            if p0 is None or p1 is None or p0 <= 0 or p1 <= 0:
+                continue
+            ratios.append(float(p0) / float(p1))
+
+        self.last_provider_counters = self._provider.get_counters()
+        return ratios
+
     def _build_candidates(self, pools: list[dict], apply_min_apy: bool) -> List[ScoutCandidate]:
         results: List[ScoutCandidate] = []
         for item in pools:
@@ -518,6 +573,25 @@ class DeFiLlamaClient:
     def _extract_symbol_tokens(symbol: str) -> set[str]:
         parts = re.split(r"[^A-Za-z0-9.]+", symbol.upper())
         return {part for part in parts if part}
+
+    @staticmethod
+    def _price_chain_key(chain: str) -> str | None:
+        normalized = re.sub(r"[^a-z0-9]+", "", (chain or "").lower())
+        chain_map = {
+            "ethereum": "ethereum",
+            "mainnet": "ethereum",
+            "arbitrum": "arbitrum",
+            "arbitrumone": "arbitrum",
+            "base": "base",
+            "optimism": "optimism",
+            "polygon": "polygon",
+            "matic": "polygon",
+            "bsc": "bsc",
+            "binance": "bsc",
+            "binancesmartchain": "bsc",
+            "avalanche": "avax",
+        }
+        return chain_map.get(normalized)
 
     def _resolve_chain_id(self, item: dict, chain: str) -> int | None:
         raw_chain_id = item.get("chainId")

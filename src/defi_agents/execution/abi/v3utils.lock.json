@@ -1,0 +1,12 @@
+{
+  "upstream_repo": "https://github.com/KrystalDeFi/v3utils",
+  "upstream_commit": "33f487253051c3d6f439dc911b0e415b28b4cc9c",
+  "upstream_contracts_file": "contracts.json",
+  "chain_ids_in_snapshot": ["1", "10", "56", "137", "8453", "42161"],
+  "generated_from_interface_signatures": true,
+  "generated_at_utc": "2026-02-23T16:06:00Z",
+  "notes": [
+    "ABI bundle includes public entrypoints used by execution adapters.",
+    "Runtime policy/orchestration controls remain internal to defi_agents."
+  ]
+}

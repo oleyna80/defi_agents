@@ -374,7 +374,7 @@ src/defi_agents/lp/
 | R-5 | Air Pocket — яма это отсутствие support | MEDIUM | CEX VPVR cross-check (manual, Phase 2+) |
 | R-6 | Subgraph lag (5-30 blocks on Base) | MEDIUM | RPC `slot0()` cross-check (REQ-007) |
 | R-7 | Low-liquidity pool data noise | MEDIUM | `NOISE_PIT` classification + stability gate |
-| R-8 | Krystal API vendor risk: Cloudflare WAF challenge blocks all server-side calls (confirmed 2026-02-19) | HIGH | P0 не зависит от Krystal; discovery gated behind OQ-6 resolution. Timeboxed API discovery (2 weeks). |
+| R-8 | Krystal Cloud vendor risk: auth path works (`cloud-api` + `KC-APIKey`), but schema stability/rate limits are not yet production-verified | MEDIUM | P0 не зависит от Krystal; Krystal остаётся optional discovery (REQ-022) с fallback на DeFiLlama/GeckoTerminal до закрытия stability/limit gates. |
 
 ### Open Questions
 
@@ -388,7 +388,7 @@ src/defi_agents/lp/
 
 5. **Multi-chain priority:** Base first (Q: сколько пулов сканировать?). Arbitrum — Phase 1.5?
 
-6. **Krystal API auth:** Все эндпоинты (`api.krystal.app`, `defi.krystal.app`, `cloud.krystal.app`) возвращают 403 + `cf-mitigated: challenge`. Для server-side интеграции нужен один из: (a) service API key от Krystal team, (b) IP allowlist, (c) партнёрский доступ. До решения — Krystal gated, P0 не блокирован. См. `docs/research/krystal-api-discovery.md`.
+6. **Krystal API auth/status:** `api.krystal.app` остаётся Cloudflare-gated (`403 cf-mitigated`), но `cloud-api.krystal.app` доступен server-side через `KC-APIKey`; endpoint `/v1/pools` подтверждён для pool-level discovery. Открытые вопросы: 48h schema stability и достаточные rate limits для production. До закрытия этих gate Krystal остаётся optional discovery-provider, P0 не блокирован. См. `docs/research/krystal-integration-decision-report.md`.
 
 ---
 

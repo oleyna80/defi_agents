@@ -102,6 +102,18 @@ async def test_uniswap_provider_pagination_limit_raises() -> None:
     )
 
     async def _fake_query(payload: dict) -> dict:
+        query = str(payload.get("query", ""))
+        if "TickSchemaSupport" in query:
+            return {
+                "queryType": {"fields": [{"name": "ticks"}]},
+                "tickType": {
+                    "fields": [
+                        {"name": "tickIdx"},
+                        {"name": "liquidityNet"},
+                        {"name": "liquidityGross"},
+                    ]
+                },
+            }
         last_tick = int(payload["variables"]["lastTick"])
         rows = []
         for idx in range(1000):
@@ -146,6 +158,115 @@ async def test_uniswap_provider_pool_state_parses_and_maps_tick_spacing() -> Non
     assert state.token0_decimals == 18
     assert state.token1_decimals == 6
     assert provider.protocol_fee_pct() == pytest.approx(0.3)
+
+
+@pytest.mark.asyncio
+async def test_uniswap_provider_supports_tick_schema_cached() -> None:
+    provider = UniswapV3TickProvider(endpoint="https://example.com/graphql", retry_attempts=0)
+    call_count = 0
+
+    async def _fake_query(payload: dict) -> dict:
+        nonlocal call_count
+        call_count += 1
+        return {
+            "queryType": {"fields": [{"name": "pool"}, {"name": "ticks"}]},
+            "tickType": {
+                "fields": [
+                    {"name": "tickIdx"},
+                    {"name": "liquidityNet"},
+                    {"name": "liquidityGross"},
+                ]
+            },
+        }
+
+    provider._query = _fake_query  # type: ignore[method-assign]
+    assert await provider.supports_tick_schema() is True
+    assert await provider.supports_tick_schema() is True
+    assert call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_uniswap_provider_rejects_schema_without_ticks_field() -> None:
+    provider = UniswapV3TickProvider(endpoint="https://example.com/graphql", retry_attempts=0)
+
+    async def _fake_query(payload: dict) -> dict:
+        return {
+            "queryType": {"fields": [{"name": "pool"}]},
+            "tickType": None,
+        }
+
+    provider._query = _fake_query  # type: ignore[method-assign]
+
+    with pytest.raises(TickProviderError) as exc_info:
+        await provider.get_pool_ticks("0x1111111111111111111111111111111111111111", -10, 10)
+    assert exc_info.value.reason == DegradationReason.SUBGRAPH_ERROR
+
+
+@pytest.mark.asyncio
+async def test_uniswap_provider_find_pool_address_prefers_fee_tier() -> None:
+    provider = UniswapV3TickProvider(endpoint="https://example.com/graphql", retry_attempts=0)
+
+    async def _fake_query(payload: dict) -> dict:
+        query = str(payload.get("query", ""))
+        variables = dict(payload.get("variables", {}) or {})
+        if "PoolsByPairAndFee" in query:
+            # Only one orientation matches + fee filter applied.
+            if variables.get("token0") == "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" and variables.get("token1") == "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb":
+                return {
+                    "pools": [
+                        {
+                            "id": "0x1111111111111111111111111111111111111111",
+                            "feeTier": "500",
+                            "totalValueLockedUSD": "1000",
+                            "createdAtTimestamp": "100",
+                        }
+                    ]
+                }
+            return {"pools": []}
+        return {"pools": []}
+
+    provider._query = _fake_query  # type: ignore[method-assign]
+    resolved = await provider.find_pool_address_by_tokens(
+        "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "0xBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+        fee_tier=500,
+    )
+    assert resolved == "0x1111111111111111111111111111111111111111"
+
+
+@pytest.mark.asyncio
+async def test_uniswap_provider_find_pool_address_falls_back_without_fee() -> None:
+    provider = UniswapV3TickProvider(endpoint="https://example.com/graphql", retry_attempts=0)
+
+    async def _fake_query(payload: dict) -> dict:
+        query = str(payload.get("query", ""))
+        if "PoolsByPairAndFee" in query:
+            return {"pools": []}
+        return {
+            "pools": [
+                {
+                    "id": "0x2222222222222222222222222222222222222222",
+                    "feeTier": "3000",
+                    "totalValueLockedUSD": "1500",
+                    "createdAtTimestamp": "200",
+                },
+                {
+                    "id": "0x3333333333333333333333333333333333333333",
+                    "feeTier": "500",
+                    "totalValueLockedUSD": "4000",
+                    "createdAtTimestamp": "150",
+                },
+            ]
+        }
+
+    provider._query = _fake_query  # type: ignore[method-assign]
+    resolved = await provider.find_pool_address_by_tokens(
+        "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        fee_tier=500,
+    )
+    # Highest TVL pool wins in fallback mode.
+    assert resolved == "0x3333333333333333333333333333333333333333"
 
 
 def test_scout_config_includes_tick_density_block() -> None:

@@ -103,20 +103,20 @@ Scope:
 - Read-only investigation: no production code until stop/go gate passes.
 
 Workstream tasks:
-1. Obtain Krystal service-level API auth (contact team, partnership request).
-2. If auth obtained: document endpoint list, JSON shapes, rate limits.
-3. Validate tick-level data availability (does Krystal expose per-tick data or only pool-level?).
-4. If pool-level only: Krystal = discovery provider, tick data stays Subgraph-sourced.
+1. Validate authenticated endpoint contract (`cloud-api.krystal.app/v1/pools`, header `KC-APIKey`) and map fields to `PoolSummary`.
+2. Run 48h schema-stability checks (2+ probes) for backward-compatible parsing guarantees.
+3. Characterize rate limits/quota for planned scan cadence.
+4. Confirm that Krystal remains pool-level discovery only; tick data stays Subgraph-sourced.
 
 Stop/Go criteria:
 - **GO** if ALL conditions met:
-  - Service API key exists and returns 200 from server-side `curl`
+  - Authenticated endpoint returns 200 from server-side `curl`
   - JSON response schema is stable across 2+ calls over 48h
   - Response includes at minimum: `pool_address`, `token0`, `token1`, `volume_30d`, `fee_tier`
 - **STOP** if ANY:
-  - No auth path available within 2-week timebox
-  - Krystal requires browser-only session (no server-side integration possible)
   - Response schema remains unstable/missing required pool-level fields for discovery contract
+  - Effective rate limits/quota are insufficient for planned scan cadence
+  - Auth path regresses to browser-only/session-bound behavior
 
 Timebox: 2 weeks from plan approval date.
 

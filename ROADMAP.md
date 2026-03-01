@@ -152,7 +152,9 @@
   - [x] RPC drift semantics + typed degradation reasons (`DegradationReason`).
   - [x] Pagination circuit breakers (`MAX_PAGES_PER_POOL`, `MAX_TICKS_PER_POOL`).
   - [x] Feature-flag config surface `tick_density.*` in `ScoutConfig` + sample `scout_config.json`.
+  - [x] DeFiLlama prices → `tick_daily_vol` metadata in scan stage (token0/token1 ratio σ; fail-safe).
   - [x] Regression suite for P0 foundations (`tests/test_tick_density_scanner.py`) + full suite green (`157 passed`).
+  - [x] Improved tick provider init diagnostics (reason+message) + fail-safe handling for temporary subgraph downtime.
   - [ ] Integration hook into scorer/runtime shadow counters and live reference checks (`AC-01..AC-07`, `AC-17`).
 - [ ] **Phase 1.5 (P0.5):**
   - pit detection + `CONFIDENT_PIT/NOISE_PIT`
@@ -167,8 +169,9 @@
   - mandatory counters in logs: `pits_found_count`, `degraded_count`, `scan_duration_p95_ms`
   - degraded data -> watchlist only (no actionable)
 - [x] **Phase F (Krystal API Discovery, non-blocking):**
-  - `docs/research/krystal-api-discovery.md` зафиксировал текущий статус `NO-GO` (2026-02-19): server-side запросы блокируются Cloudflare challenge (`403 cf-mitigated`).
-  - P0 execution path не блокирован и остаётся на `UniswapV3TickProvider`; Krystal остаётся optional discovery-track до service-level auth.
+  - `docs/research/krystal-integration-decision-report.md` зафиксировал текущий статус `CONDITIONAL GO` (2026-02-19): `cloud-api.krystal.app` доступен server-side через `KC-APIKey`, подтверждён pool-level schema fit для REQ-022.
+  - Remaining gate перед production enablement: 48h schema stability check + rate-limit/load validation.
+  - P0 execution path не блокирован и остаётся на `UniswapV3TickProvider`; Krystal остаётся optional discovery-track и включается только после закрытия remaining gate.
 
 ---
 
@@ -274,6 +277,25 @@ DoD: Оператор видит полную картину каждой поз
 > [!CAUTION]
 > Требует отдельной approved спецификации с: ключами, лимитами, kill-switch, safe-mode, gas budget.
 
+- **Spec/Plan (draft):**
+  - `docs/specs/018-lp-autocompound-autorebalance-v1.md`
+  - `docs/plans/018-lp-autocompound-autorebalance-v1-plan.md`
+  - `docs/plans/019-v3utils-reuse-execution-plan.md` (execution module reuse track)
+  - `docs/research/2026-02-open-source-reuse-matrix.md` (license-aware reuse matrix)
+  - `docs/runbooks/execution-loop-rollout-v1.md`
+
+- **Execution track status (2026-02-23):**
+  - Spec 018 approved; implementation phases A-F completed (contracts, triggers, policy, adapters, orchestrator).
+  - Phase G SHADOW gate passed (24h): `runs=85`, `execution_summaries=85`, `errors=0`, `sim_fail=0`, `exec_fail=0`.
+  - Phase H prep: kill-switch drill passed in controlled LIVE profile (`KILL_SWITCH_ENABLED` hard-block confirmed), rollback to SHADOW verified.
+  - Added LIVE-capable native path `native_uniswap_v3_live` (RPC `eth_sendRawTransaction` + receipt polling for pre-signed tx payloads).
+  - Started module-reuse execution scaffold: feature-flagged `v3utils` adapter route added (Plan 019).
+  - Pinned `v3utils` ABI/address bundle committed (`src/defi_agents/execution/abi/`, commit lock `33f487...`).
+  - Started ABI-driven `compound` calldata builder (`v3utils_compound_params` -> `V3Utils.execute`).
+  - Added ABI-driven `rebalance` structured path + selector/contract simulation checks.
+  - Track moved to Phase H canary prep (LIVE remains guarded).
+  - LIVE remains blocked (`allow_live_mode=false`) until canary + kill-switch drill.
+
 - [ ] **Autocompound:** Claim fees → swap → re-add liquidity (batch tx)
 - [ ] **Auto-Rebalance:** Close old range → open new range (trigger-based)
 - [ ] **Safe-Mode Guards:** Max gas per tx, max slippage, daily tx budget, kill-switch
@@ -282,9 +304,10 @@ DoD: Оператор видит полную картину каждой поз
 
 **Open-source reference:**
 - `revert-finance/compoundor` (Solidity, audited) — autocompound smart contracts
-- `revert-finance/compoundor-js` (JS/MIT) — compounder bot implementation
+- `revert-finance/compoundor-js` (license to be confirmed) — compounder bot implementation
 - `KrystalDeFi/v3utils` (fork of revert-finance/v3utils) — V3Utils + V3Automation: zap-in, compound, adjust, zap-out
 - `code-423n4/2024-06-krystal-defi` — Code4rena audit of Krystal contracts
+- Reuse policy: direct code import only for permissive licenses (`MIT`/`Apache-2.0`); AGPL/GPL/BUSL repos are reference-only in core runtime.
 
 DoD: Paper mode → shadow mode → live mode escalation. Kill-switch в 1 click.
 
@@ -310,6 +333,11 @@ DoD: Оператор видит portfolio-level риск + может сказ�
 > [!CAUTION]
 > Самый рискованный слой (ликвидации, funding, basis risk). Запускать поэтапно:
 > advisory/paper mode → shadow → авто-исполнение.
+
+- **PoC Plan (started):**
+  - `docs/plans/020-delta-hedger-hummingbot-poc-plan.md`
+  - Текущий формат: isolated worker в `PAPER/SHADOW`, без LIVE-исполнения и без coupling к `main.py`.
+  - Status (2026-02-27): 24h SHADOW gate passed (`cycles=88`, `sim_ok=176`, `sim_fail=0`, `connector_errors=0`, no `FATAL/Traceback/CRITICAL`). Next: formalize Spec 020 scope and move from mock connector to real venue sandbox readiness checks.
 
 - [ ] **Funding Rate Monitor:** Отслеживание funding rates на CEX/perp DEX
 - [ ] **Hedge Calculator:** Optimal hedge ratio based on LP delta exposure

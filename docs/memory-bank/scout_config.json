@@ -160,7 +160,7 @@
           "GHO": "0x40D16FC0246aB6A3AE3E2fD7D8F9aE22fE2387bD"
         }
       },
-      "morpho_direct_enabled": false,
+      "morpho_direct_enabled": true,
       "morpho_direct_timeout_seconds": 8,
       "morpho_direct_api_key_env": "MORPHO_DIRECT_API_KEY",
       "morpho_direct_endpoints": {
@@ -176,13 +176,16 @@
       },
       "morpho_direct_market_keys": {
         "Ethereum": {
-          "USDC": ""
+          "USDC": "0x64d65c9a2d91c36d56fbc42d69e979335320169b3df63bf92789e2c8883fcc64"
+        },
+        "Base": {
+          "USDC": "0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836"
         }
       }
     },
     "dex_discovery": {
       "uniswap_v3_new_pools": {
-        "enabled": false,
+        "enabled": true,
         "timeout_seconds": 8,
         "max_pools": 200,
         "min_tvl_usd": 250000,
@@ -194,8 +197,10 @@
         "subgraph_endpoints": {},
         "subgraph_ids": {
           "Ethereum": "5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV",
-          "Arbitrum": "C2KJVEU6fA9Bqf8QwK4MAnuS8xPYYn9N6HqFA7gKjsXo",
-          "Base": "3hCPRGfHk8NAxU1wR8UWQ2N8isf2Xn7u6xQ5q4VYqW3G"
+          "Arbitrum": "HyW7A86UEdYVt5b9Lrw8W2F98yKecerHKutZTRbSCX27",
+          "Base": "43Hwfi3dJSoGpyas9VwNoDAv55yjgGrPpNSmbQZArzMG",
+          "Optimism": "Cghf4LfVqPiFw6fp6Y5X5Ubc8UpmUhSfJL82zwiBFLaj",
+          "Polygon": "3hCPRGf4z88VC5rsBKU5AA9FBBq5nF3jbKJG7VZCbhjm"
         }
       }
     },
@@ -269,13 +274,150 @@
       "uniswap_subgraph_endpoints": {},
       "uniswap_subgraph_ids": {
         "Ethereum": "5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV",
-        "Arbitrum": "C2KJVEU6fA9Bqf8QwK4MAnuS8xPYYn9N6HqFA7gKjsXo",
-        "Base": "3hCPRGfHk8NAxU1wR8UWQ2N8isf2Xn7u6xQ5q4VYqW3G"
+        "Arbitrum": "HyW7A86UEdYVt5b9Lrw8W2F98yKecerHKutZTRbSCX27",
+        "Base": "43Hwfi3dJSoGpyas9VwNoDAv55yjgGrPpNSmbQZArzMG",
+        "Optimism": "Cghf4LfVqPiFw6fp6Y5X5Ubc8UpmUhSfJL82zwiBFLaj",
+        "Polygon": "3hCPRGf4z88VC5rsBKU5AA9FBBq5nF3jbKJG7VZCbhjm"
+      },
+      "aerodrome_subgraph_endpoints": {},
+      "aerodrome_subgraph_ids": {
+        "Base": "https://gateway.thegraph.com/api/{GRAPH_API_KEY}/deployments/id/QmasYjypV6nTLp4iNH4Vjf7fksRNxAkAskqDdKf2DCsQkV"
       },
       "rpc_url_env_map": {
         "Ethereum": "RPC_URL_ETHEREUM",
         "Arbitrum": "RPC_URL_ARBITRUM",
-        "Base": "RPC_URL_BASE"
+        "Base": "RPC_URL_BASE",
+        "Optimism": "RPC_URL_OPTIMISM",
+        "Polygon": "RPC_URL_POLYGON"
+      }
+    },
+    "execution": {
+      "enabled": true,
+      "mode": "SHADOW",
+      "primary_adapter": "uniswap_v3_simulate",
+      "fallback_adapter": "uniswap_v3_simulate",
+      "allow_live_mode": false,
+      "idempotency_ttl_seconds": 86400,
+      "per_position_cooldown_seconds": 1800,
+      "compound_min_fees_usd": 5.0,
+      "rebalance_min_range_utilization": 0.15,
+      "rebalance_edge_decay_bps": 250,
+      "mock_positions": [
+        {
+          "chain": "Base",
+          "position_ref": "shadow-compound-1",
+          "current_tick": 100,
+          "lower_tick": 80,
+          "upper_tick": 120,
+          "unclaimed_fees_usd": 9.5,
+          "estimated_compound_gas_usd": 1.2,
+          "expected_slippage_bps": 35,
+          "position_manager": "0x1111111111111111111111111111111111111111",
+          "compound_data_hex": "0xabc123"
+        },
+        {
+          "chain": "Base",
+          "position_ref": "shadow-rebalance-1",
+          "current_tick": 130,
+          "lower_tick": 80,
+          "upper_tick": 120,
+          "expected_rebalance_net_usd": 12.0,
+          "estimated_rebalance_gas_usd": 1.8,
+          "expected_slippage_bps": 45,
+          "position_manager": "0x2222222222222222222222222222222222222222",
+          "rebalance_data_hex": "0xdef456"
+        },
+        {
+          "chain": "Base",
+          "position_ref": "shadow-blocked-net-1",
+          "current_tick": 100,
+          "lower_tick": 80,
+          "upper_tick": 120,
+          "unclaimed_fees_usd": 5.2,
+          "estimated_compound_gas_usd": 4.0,
+          "expected_slippage_bps": 40,
+          "position_manager": "0x3333333333333333333333333333333333333333",
+          "compound_data_hex": "0xaaa111"
+        }
+      ],
+      "krystal_enabled": false,
+      "krystal_base_url": "https://cloud-api.krystal.app",
+      "krystal_api_key_env": "KRYSTAL_CLOUD_API_KEY",
+      "krystal_timeout_seconds": 8.0,
+      "v3utils_enabled": false,
+      "v3utils_contracts_by_chain": {},
+      "v3utils_router_by_chain": {},
+      "v3utils_slippage_bps_default": 50,
+      "native_live_rpc_env_by_chain": {
+        "Base": "BASE_RPC_URL",
+        "Arbitrum": "ARBITRUM_RPC_URL",
+        "Ethereum": "ETH_RPC_URL"
+      },
+      "native_live_timeout_seconds": 12.0,
+      "native_live_receipt_timeout_seconds": 45.0,
+      "native_live_receipt_poll_seconds": 1.5,
+      "policy": {
+        "max_gas_usd_per_tx": 15.0,
+        "max_slippage_bps": 100,
+        "max_daily_txs": 10,
+        "max_daily_gas_usd": 100.0,
+        "min_expected_net_usd": 2.0,
+        "kill_switch": false
+      }
+    },
+    "hedger": {
+      "enabled": true,
+      "mode": "SHADOW",
+      "allow_live_mode": false,
+      "connector": "hummingbot",
+      "connector_timeout_seconds": 8.0,
+      "hummingbot_base_url": "http://127.0.0.1:15888",
+      "hummingbot_api_key_env": "HUMMINGBOT_API_KEY",
+      "hummingbot_exchange": "binance_perpetual",
+      "hummingbot_market_map": {},
+      "hummingbot_health_path": "/health",
+      "hummingbot_markets_path": "/api/v1/markets",
+      "hummingbot_ticker_path": "/api/v1/ticker",
+      "mock_exposures": [
+        {
+          "chain": "Base",
+          "position_ref": "hedge-shadow-eth",
+          "symbol": "ETH",
+          "delta_usd": 1500.0,
+          "mark_price_usd": 2800.0,
+          "snapshot_ts": 0,
+          "freshness_age_seconds": 30
+        },
+        {
+          "chain": "Base",
+          "position_ref": "hedge-shadow-btc",
+          "symbol": "BTC",
+          "delta_usd": -900.0,
+          "mark_price_usd": 52000.0,
+          "snapshot_ts": 0,
+          "freshness_age_seconds": 30
+        },
+        {
+          "chain": "Base",
+          "position_ref": "hedge-shadow-stale",
+          "symbol": "ETH",
+          "delta_usd": 1200.0,
+          "mark_price_usd": 2800.0,
+          "snapshot_ts": 0,
+          "freshness_age_seconds": 99999
+        }
+      ],
+      "exposure_max_age_seconds": 900,
+      "min_cycle_interval_seconds": 300,
+      "per_symbol_cooldown_seconds": 1800,
+      "default_hedge_ratio": 1.0,
+      "idempotency_ttl_seconds": 86400,
+      "policy": {
+        "kill_switch": false,
+        "min_rebalance_notional_usd": 100.0,
+        "max_notional_usd_per_order": 2000.0,
+        "max_daily_notional_usd": 10000.0,
+        "max_slippage_bps": 100
       }
     },
     "token_buckets": {

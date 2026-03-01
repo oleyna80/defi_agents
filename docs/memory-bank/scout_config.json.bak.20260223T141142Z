@@ -1,0 +1,414 @@
+{
+  "scout_settings": {
+    "target_chains": [],
+    "min_tvl_usd": 500000,
+    "min_apy": 8.0,
+    "global_search": true,
+    "reporting": {
+      "telegram_digest_interval_seconds": 21600,
+      "telegram_report_mode": "snapshot",
+      "telegram_top_n_per_section": 10,
+      "telegram_turnover_section_enabled": false,
+      "telegram_turnover_top_n": 10,
+      "telegram_turnover_min_tvl_usd": 100000,
+      "telegram_turnover_min_volume_24h_usd": 0,
+      "telegram_turnover_min_vol_to_tvl": 1.0,
+      "telegram_directional_sections_enabled": false,
+      "telegram_directional_top_n": 10,
+      "telegram_directional_lp_min_tvl_usd": 100000,
+      "telegram_directional_lp_min_vol_to_tvl": 1.0,
+      "telegram_directional_lending_min_tvl_usd": 100000,
+      "telegram_directional_borrow_symbols": [
+        "USDC",
+        "USDT",
+        "DAI",
+        "USDS",
+        "EURC",
+        "GHO",
+        "FRAX",
+        "LUSD"
+      ],
+      "telegram_directional_staking_min_tvl_usd": 100000,
+      "telegram_directional_staking_min_apy": 0.0,
+      "telegram_show_source_confidence": true,
+      "telegram_show_market_signals": true,
+      "telegram_shadow_mode_enabled": true,
+      "telegram_shadow_prefix": "⚠️ SHADOW — DO NOT ACT",
+      "telegram_shadow_chat_id_env": "TELEGRAM_SHADOW_CHAT_ID",
+      "telegram_shadow_metrics_horizon_seconds": 86400,
+      "telegram_shadow_capture_interval_seconds": 21600,
+      "telegram_shadow_retention_seconds": 1209600,
+      "telegram_recheck_enabled": true,
+      "telegram_recheck_poll_limit": 20,
+      "telegram_recheck_command": "/recheck",
+      "telegram_recheck_change_threshold_pct": 20.0,
+      "telegram_no_opportunities_heartbeat_enabled": true,
+      "telegram_no_opportunities_heartbeat_interval_seconds": 86400
+    },
+    "my_pools_monitor": {
+      "enabled": false,
+      "pools": [
+        {
+          "pool_id": "ba557f7e-f287-45a9-bc37-8f3a24ca05c7",
+          "label": "Base USDC-USDT"
+        },
+        {
+          "pool_id": "10137e20-efbc-4e15-a733-17ecb52c48e8",
+          "label": "Base WETH-USDC"
+        },
+        {
+          "pool_id": "ff82c362-dea1-4946-b3b1-92ebd5100b1e",
+          "label": "Base USDC-CBBTC"
+        }
+      ],
+      "min_tvl_usd": 100000,
+      "min_vol_to_tvl_24h": 1.0,
+      "max_apy_drop_pct_24h": 25.0,
+      "max_tvl_drop_pct_24h": 20.0,
+      "show_health": true,
+      "show_alerts": true,
+      "show_market_gap": false,
+      "top_n": 10
+    },
+    "asset_universe": {
+      "intake_target_assets_only": false
+    },
+    "liquidity_gates": {
+      "absolute_min_tvl_usd": 100000,
+      "min_volume_24h_usd": 0,
+      "max_tvl_to_volume_24h_ratio": 0
+    },
+    "risk_filters": {
+      "min_bridge_liquidity": 5000000,
+      "max_chain_risk_score": 7
+    },
+    "gas_efficiency": {
+      "portfolio_total_usd": 10000,
+      "position_size_usd": 1000,
+      "min_monthly_net_profit_usd": 0.0,
+      "estimated_roundtrip_gas_usd": 8.0,
+      "holding_period_days": 45
+    },
+    "investor_profile": {
+      "initial_capital_usd": 10000,
+      "monthly_contribution_usd": 0,
+      "risk_profile": "standard",
+      "horizon_days": 45,
+      "benchmark_apy": 5.0,
+      "benchmark_buffer_apy": 1.0
+    },
+    "sleeves": {
+      "core_safe_pct": 0.7,
+      "yield_plus_pct": 0.25,
+      "tactical_high_apy_pct": 0.05,
+      "tactical_enabled": false,
+      "tactical_min_apy": 100.0
+    },
+    "capacity_guards": {
+      "max_position_pct_of_tvl": 0.005,
+      "max_protocol_allocation_pct": 0.4,
+      "max_chain_allocation_pct": 0.5
+    },
+    "max_audit_candidates": 40,
+    "dedupe_ttl_seconds": 14400,
+    "exploration_slots": 15,
+    "exploration_min_apy": 20.0,
+    "exploration_stable_only": false,
+    "freshness": {
+      "recheck_enabled": true,
+      "enforce_freshness_for_actionable": false,
+      "recheck_max_candidates": 40,
+      "recheck_timeout_seconds": 8,
+      "max_age_minutes": 90,
+      "max_apy_divergence_pct": 25.0,
+      "max_tvl_divergence_pct": 20.0,
+      "graph_api_key_env": "GRAPH_API_KEY",
+      "uniswap_subgraph_endpoints": {},
+      "uniswap_subgraph_ids": {
+        "Ethereum": "5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV",
+        "Arbitrum": "https://gateway.thegraph.com/api/{GRAPH_API_KEY}/deployments/id/QmcdjWnhGN86U4EkYdnnZoWvKDt8bk3T8knrBmyLXXGVds",
+        "Avalanche": "https://gateway.thegraph.com/api/{GRAPH_API_KEY}/deployments/id/QmNbdixvustXQm4pSWbj6CmVmX2Qw6JbAdBTFbKZvSsSZh"
+      },
+      "aerodrome_subgraph_ids": {
+        "Base": "https://gateway.thegraph.com/api/{GRAPH_API_KEY}/deployments/id/QmasYjypV6nTLp4iNH4Vjf7fksRNxAkAskqDdKf2DCsQkV"
+      },
+      "aave_direct_enabled": true,
+      "aave_direct_timeout_seconds": 8,
+      "aave_direct_api_key_env": "AAVE_DIRECT_API_KEY",
+      "aave_direct_endpoints": {
+        "Ethereum": [
+          "https://api.v3.aave.com/graphql"
+        ]
+      },
+      "aave_direct_chain_ids": {
+        "Ethereum": 1,
+        "Arbitrum": 42161,
+        "Avalanche": 43114,
+        "Base": 8453,
+        "BSC": 56,
+        "Binance": 56,
+        "Optimism": 10,
+        "Polygon": 137
+      },
+      "aave_direct_reserve_symbols": {
+        "Ethereum": {
+          "WETH": "0xC02aaA39b223FE8D0A0E5C4F27eAD9083C756Cc2",
+          "WBTC": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599",
+          "USDC": "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+          "USDT": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+          "DAI": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+          "GHO": "0x40D16FC0246aB6A3AE3E2fD7D8F9aE22fE2387bD"
+        }
+      },
+      "morpho_direct_enabled": false,
+      "morpho_direct_timeout_seconds": 8,
+      "morpho_direct_api_key_env": "MORPHO_DIRECT_API_KEY",
+      "morpho_direct_endpoints": {
+        "Ethereum": [
+          "https://blue-api.morpho.org/graphql"
+        ]
+      },
+      "morpho_direct_chain_ids": {
+        "Ethereum": 1,
+        "Base": 8453,
+        "Arbitrum": 42161,
+        "Optimism": 10
+      },
+      "morpho_direct_market_keys": {
+        "Ethereum": {
+          "USDC": ""
+        }
+      }
+    },
+    "dex_discovery": {
+      "uniswap_v3_new_pools": {
+        "enabled": true,
+        "timeout_seconds": 8,
+        "max_pools": 200,
+        "min_tvl_usd": 250000,
+        "page_size": 50,
+        "max_pages": 4,
+        "order_by": "createdAtTimestamp",
+        "order_direction": "desc",
+        "graph_api_key_env": "GRAPH_API_KEY",
+        "subgraph_endpoints": {},
+        "subgraph_ids": {
+          "Ethereum": "5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV",
+          "Arbitrum": "HyW7A86UEdYVt5b9Lrw8W2F98yKecerHKutZTRbSCX27",
+          "Base": "43Hwfi3dJSoGpyas9VwNoDAv55yjgGrPpNSmbQZArzMG",
+          "Optimism": "Cghf4LfVqPiFw6fp6Y5X5Ubc8UpmUhSfJL82zwiBFLaj",
+          "Polygon": "3hCPRGf4z88VC5rsBKU5AA9FBBq5nF3jbKJG7VZCbhjm"
+        }
+      }
+    },
+    "inspector": {
+      "enabled": false,
+      "timeout_seconds": 10,
+      "output_dir": "docs/memory-bank/cache/inspector",
+      "rpc_urls": {
+        "HyperEVM": "https://rpc.hyperliquid.xyz/evm",
+        "Ethereum": "https://eth.llamarpc.com"
+      },
+      "budgets": {
+        "max_http_requests": 20,
+        "max_rpc_calls": 100,
+        "max_targets_per_run": 5,
+        "enable_rpc_log_inference": false,
+        "rpc_log_inference_block_window": 5000
+      },
+      "targets": [
+        {
+          "target_id": "altura-hyperevm",
+          "name": "Altura",
+          "chain": "HyperEVM",
+          "chain_id": 999,
+          "defillama_protocol_slug": "altura",
+          "defillama_yield_pool_id": "e3384973-c269-4849-9747-3a8b48897114",
+          "seed_addresses": [
+            "0xd0Ee0CF300DFB598270cd7F4D0c6E0D8F6e13f29"
+          ],
+          "docs_urls": [
+            "https://docs.altura.trade/"
+          ]
+        }
+      ]
+    },
+    "defillama_provider": {
+      "enabled": true,
+      "timeout_seconds": 8,
+      "retry_attempts": 2,
+      "cache_ttl_seconds": {
+        "yields_pools": 300,
+        "yields_pools_old": 900,
+        "yields_chart": 900,
+        "overview": 1800,
+        "summary": 1800,
+        "stablecoins_snapshot": 3600,
+        "bridges_snapshot": 1800,
+        "prices_current": 120,
+        "prices_historical": 86400
+      },
+      "enable_optional_market_surfaces": false,
+      "enable_stability_scoring": false,
+      "stability_outlier_factor": 0.9,
+      "stability_apy_mean_deviation_pct": 50.0,
+      "stability_apy_deviation_factor": 0.92,
+      "stability_sigma_to_mu_threshold": 0.6,
+      "stability_sigma_factor": 0.92,
+      "stability_il_risk_factor": 0.95
+    },
+    "tick_density": {
+      "enabled": true,
+      "shadow_mode_enabled": true,
+      "max_pages_per_pool": 100,
+      "max_ticks_per_pool": 50000,
+      "scan_timeout_seconds": 5,
+      "retry_attempts": 3,
+      "min_expected_net_monthly_usd": 5.0,
+      "max_scan_candidates": 10,
+      "rpc_timeout_seconds": 3.0,
+      "graph_api_key_env": "GRAPH_API_KEY",
+      "uniswap_subgraph_endpoints": {},
+      "uniswap_subgraph_ids": {
+        "Ethereum": "5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV",
+        "Arbitrum": "HyW7A86UEdYVt5b9Lrw8W2F98yKecerHKutZTRbSCX27",
+        "Base": "43Hwfi3dJSoGpyas9VwNoDAv55yjgGrPpNSmbQZArzMG",
+        "Optimism": "Cghf4LfVqPiFw6fp6Y5X5Ubc8UpmUhSfJL82zwiBFLaj",
+        "Polygon": "3hCPRGf4z88VC5rsBKU5AA9FBBq5nF3jbKJG7VZCbhjm"
+      },
+      "aerodrome_subgraph_endpoints": {},
+      "aerodrome_subgraph_ids": {
+        "Base": "https://gateway.thegraph.com/api/{GRAPH_API_KEY}/deployments/id/QmasYjypV6nTLp4iNH4Vjf7fksRNxAkAskqDdKf2DCsQkV"
+      },
+      "rpc_url_env_map": {
+        "Ethereum": "RPC_URL_ETHEREUM",
+        "Arbitrum": "RPC_URL_ARBITRUM",
+        "Base": "RPC_URL_BASE",
+        "Optimism": "RPC_URL_OPTIMISM",
+        "Polygon": "RPC_URL_POLYGON"
+      }
+    },
+    "execution": {
+      "enabled": true,
+      "mode": "SHADOW",
+      "primary_adapter": "native_uniswap_v3",
+      "fallback_adapter": "native_uniswap_v3",
+      "allow_live_mode": false,
+      "idempotency_ttl_seconds": 86400,
+      "per_position_cooldown_seconds": 1800,
+      "compound_min_fees_usd": 5.0,
+      "rebalance_min_range_utilization": 0.15,
+      "rebalance_edge_decay_bps": 250,
+      "mock_positions": [
+        {
+          "chain": "Base",
+          "position_ref": "shadow-compound-1",
+          "current_tick": 100,
+          "lower_tick": 80,
+          "upper_tick": 120,
+          "unclaimed_fees_usd": 9.5,
+          "estimated_compound_gas_usd": 1.2,
+          "expected_slippage_bps": 35,
+          "position_manager": "0x1111111111111111111111111111111111111111",
+          "compound_data_hex": "0xabc123"
+        },
+        {
+          "chain": "Base",
+          "position_ref": "shadow-rebalance-1",
+          "current_tick": 130,
+          "lower_tick": 80,
+          "upper_tick": 120,
+          "expected_rebalance_net_usd": 12.0,
+          "estimated_rebalance_gas_usd": 1.8,
+          "expected_slippage_bps": 45,
+          "position_manager": "0x2222222222222222222222222222222222222222",
+          "rebalance_data_hex": "0xdef456"
+        },
+        {
+          "chain": "Base",
+          "position_ref": "shadow-blocked-net-1",
+          "current_tick": 100,
+          "lower_tick": 80,
+          "upper_tick": 120,
+          "unclaimed_fees_usd": 5.2,
+          "estimated_compound_gas_usd": 4.0,
+          "expected_slippage_bps": 40,
+          "position_manager": "0x3333333333333333333333333333333333333333",
+          "compound_data_hex": "0xaaa111"
+        }
+      ],
+      "krystal_enabled": false,
+      "krystal_base_url": "https://cloud-api.krystal.app",
+      "krystal_api_key_env": "KRYSTAL_CLOUD_API_KEY",
+      "krystal_timeout_seconds": 8.0,
+      "policy": {
+        "max_gas_usd_per_tx": 15.0,
+        "max_slippage_bps": 100,
+        "max_daily_txs": 10,
+        "max_daily_gas_usd": 100.0,
+        "min_expected_net_usd": 2.0,
+        "kill_switch": false
+      }
+    },
+    "token_buckets": {
+      "stablecoins_usd": [
+        "USDC",
+        "USDT",
+        "DAI",
+        "USDS",
+        "crvUSD",
+        "GHO",
+        "PYUSD"
+      ],
+      "stablecoins_eur": [
+        "EURS",
+        "EURC",
+        "agEUR",
+        "EURe"
+      ],
+      "stablecoins_speculative": [
+        "USDe",
+        "TUSD",
+        "FDUSD",
+        "FRAX",
+        "LUSD"
+      ],
+      "exclude_symbols": [],
+      "exclude_addresses": []
+    },
+    "risk_policy": {
+      "enabled": true,
+      "apply_scoring_penalties": false,
+      "stable_tier_weights": {
+        "T1": 1.0,
+        "T2": 0.9,
+        "T3": 0.7
+      },
+      "fx_pair_penalty": 0.15,
+      "fx_pairs_core_safe_allowed": false,
+      "t3_min_apy_premium": 3.0
+    },
+    "strategy_sim": {
+      "enabled": true,
+      "max_candidates": 20,
+      "supported_tiers": [
+        "T1",
+        "T2"
+      ],
+      "allow_unsupported_as_watchlist": true,
+      "risk_thresholds_by_profile": {
+        "micro": 30,
+        "standard": 50,
+        "whale": 70
+      },
+      "min_data_completeness_pct": 80.0
+    },
+    "min_warn_score": 0.0,
+    "confidence_factors": {
+      "VERIFIED": 1.0,
+      "AGGREGATOR_ONLY": 0.75,
+      "DIVERGED": 0.4,
+      "STALE": 0.2
+    }
+  }
+}

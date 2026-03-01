@@ -1,4 +1,4 @@
-.PHONY: setup install test run live-l3 lint clean dry-run
+.PHONY: setup install test run hedger-run live-l3 lint clean dry-run krystal-probe hedger-gate-report
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -18,8 +18,17 @@ install:
 run:
 	PYTHONPATH=src $(PYTHON) main.py
 
+hedger-run:
+	PYTHONPATH=src $(PYTHON) hedger_main.py
+
 dry-run:
 	PYTHONPATH=src $(PYTHON) main.py
+
+krystal-probe:
+	PYTHONPATH=src $(PYTHON) scripts/krystal_execution_probe.py
+
+hedger-gate-report:
+	./scripts/hedger_shadow_gate_report.sh "24 hours ago"
 
 test:
 	PYTHONPATH=src $(PYTEST) -v tests/

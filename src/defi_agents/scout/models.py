@@ -117,6 +117,7 @@ class ScoutCandidate(BaseModel):
     address: Optional[str] = None
     address_source: Optional[str] = None
     project_url: Optional[str] = Field(alias="url", default=None)
+    pool_meta: Optional[str] = Field(alias="poolMeta", default=None)
     underlying_tokens: List[str] = Field(alias="underlyingTokens", default_factory=list)
     chain_id: Optional[int] = None
     tvl_usd: float = Field(alias="tvlUsd")

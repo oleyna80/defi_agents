@@ -1,0 +1,15 @@
+[Unit]
+Description=DeFi Hedger PoC Worker (User Mode)
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/projects/defi_agents
+EnvironmentFile=%h/projects/defi_agents/.env
+Environment=PYTHONPATH=%h/projects/defi_agents/src
+ExecStart=%h/projects/defi_agents/.venv/bin/python %h/projects/defi_agents/hedger_main.py
+TimeoutStartSec=180
+
+[Install]
+WantedBy=default.target
+
