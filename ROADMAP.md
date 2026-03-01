@@ -283,6 +283,7 @@ DoD: Оператор видит полную картину каждой поз
   - `docs/plans/019-v3utils-reuse-execution-plan.md` (execution module reuse track)
   - `docs/research/2026-02-open-source-reuse-matrix.md` (license-aware reuse matrix)
   - `docs/runbooks/execution-loop-rollout-v1.md`
+  - `docs/runbooks/INDEX.md` (runbook entrypoint / navigation)
 
 - **Execution track status (2026-02-23):**
   - Spec 018 approved; implementation phases A-F completed (contracts, triggers, policy, adapters, orchestrator).
@@ -336,6 +337,7 @@ DoD: Оператор видит portfolio-level риск + может сказ�
 
 - **PoC Plan (started):**
   - `docs/plans/020-delta-hedger-hummingbot-poc-plan.md`
+  - `docs/runbooks/hedger-shadow-rollout-v1.md`
   - Текущий формат: isolated worker в `PAPER/SHADOW`, без LIVE-исполнения и без coupling к `main.py`.
   - Status (2026-02-27): 24h SHADOW gate passed (`cycles=88`, `sim_ok=176`, `sim_fail=0`, `connector_errors=0`, no `FATAL/Traceback/CRITICAL`). Next: formalize Spec 020 scope and move from mock connector to real venue sandbox readiness checks.
 
@@ -361,6 +363,7 @@ DoD: Delta-neutral mode доступен для top pairs (ETH/USDC, BTC/USDC).
 - [ ] **Ops Invariants (SSOT):**
     - Явно зафиксировать правило “single scheduler”: VPS systemd *или* GitHub Actions, но не оба одновременно.
     - Короткий runbook/rollback для смены scheduler.
+    - [x] Единая точка входа по runbooks: `docs/runbooks/INDEX.md`.
 - [ ] **History/Artifacts Hygiene:**
     - Ротация/архивация `docs/memory-bank/history.csv` (или периодическая выгрузка), чтобы файл не рос бесконечно.
 

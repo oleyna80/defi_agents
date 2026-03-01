@@ -31,6 +31,7 @@
 - Plan 008 (L3 AI-Analyst): production hardening and real provider integration
 
 ## Completed
+- 2026-03-01: Created `docs/runbooks/INDEX.md` as runbook catalog (operational runbooks, design/reference docs, LP_OS program docs, binary/export artifacts) and updated `ROADMAP.md` with direct index linkage for execution/hedger tracks and ops invariants docs-hygiene note — 2026-03-01
 - 2026-03-01: Added Tick Density runtime metrics module `src/defi_agents/lp/runtime_metrics.py` (`compute_scan_duration_p95_ms`, `summarize_tick_scan_runtime_metrics`) and integrated counters into `main.py` scan log (`degraded_count`, `pits_found_count`, `confident_pit_count`, `scan_duration_p95_ms`); added `tests/test_tick_density_runtime_metrics.py`; updated `ROADMAP.md` ops-gate metrics checkbox; targeted tick-density test pack green (`36 passed`) — 2026-03-01
 - 2026-02-27: Finalized Plan 020 post-gate documentation package: added spec draft `docs/specs/020-delta-hedger-poc-v1.md`, added gate decision note `docs/research/2026-02-27-hedger-shadow-gate-note.md` (`CONDITIONAL GO`), updated plan snapshot in `docs/plans/020-delta-hedger-hummingbot-poc-plan.md`, and synced Phase 5 status line in `ROADMAP.md` to reflect 24h SHADOW pass and next real-connector sandbox track — 2026-02-27
 - 2026-02-27: Rechecked Plan 020 SHADOW gate after full 24h window: `UNIT=defi-hedger.service ./scripts/hedger_shadow_gate_report.sh "24 hours ago"` => `cycles=88`, `sim_ok=176`, `sim_fail=0`, `connector_errors=0`; latest journal cycles consistently show `Hedger summary: ... sim_ok=2 sim_fail=0` with no uncaught runtime failures. Gate status: PASS for SHADOW stability/simulation criteria — 2026-02-27
@@ -214,6 +215,7 @@
 - 2026-02-04: Updated deployment/config templates for Graph gateway auth and revalidated full suite (`42 passed`) — 2026-02-04
 
 ## Changelog
+- 2026-03-01: Runbook docs were normalized around a single navigation entrypoint (`docs/runbooks/INDEX.md`), and roadmap references for execution/hedger ops were updated to make operational documentation discoverable from planning artifacts — 2026-03-01
 - 2026-03-01: Tick Density shadow observability strengthened: runtime now emits required ops counters (`pits_found_count`, `degraded_count`, `scan_duration_p95_ms`) plus `confident_pit_count`; added deterministic metric helper module and unit tests to keep logging contract stable before 24h VPS gate — 2026-03-01
 - 2026-02-21: Phase G moved from pure code-readiness to rollout preset state (`execution.mode=SHADOW` with deterministic seed positions), pending 24h runtime gate evidence — 2026-02-21
 - 2026-02-21: Execution stack now emits per-reason failure taxonomy (`policy/sim/exec`) required for Spec 018 Phase G 24h shadow gate observability — 2026-02-21
