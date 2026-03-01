@@ -18,6 +18,11 @@ from .models import (
 )
 from .pit_classifier import PitInfo, PriceBin, SuggestedRange, build_price_bins, find_liquidity_pits, suggest_range
 from .rpc_helper import CHAIN_RPC_ENV_MAP, fetch_slot0_tick
+from .runtime_metrics import (
+    TickScanRuntimeMetrics,
+    compute_scan_duration_p95_ms,
+    summarize_tick_scan_runtime_metrics,
+)
 from .tick_provider import TickDataProvider, TickProviderError, UniswapV3TickProvider
 from .volatility import VolEstimate, compute_historical_vol, estimate_vol, vol_adjusted_range_width
 
@@ -34,6 +39,7 @@ __all__ = [
     "TickData",
     "TickDataProvider",
     "TickFreshnessCheck",
+    "TickScanRuntimeMetrics",
     "TickProviderError",
     "UniswapV3TickProvider",
     "VolEstimate",
@@ -41,6 +47,7 @@ __all__ = [
     "align_tick_up",
     "build_price_bins",
     "calculate_band_depth_windows",
+    "compute_scan_duration_p95_ms",
     "compute_historical_vol",
     "estimate_vol",
     "fetch_slot0_tick",
@@ -48,6 +55,7 @@ __all__ = [
     "price_to_tick",
     "scan_pool_band_depth",
     "suggest_range",
+    "summarize_tick_scan_runtime_metrics",
     "tick_to_price",
     "validate_tick_freshness",
     "vol_adjusted_range_width",

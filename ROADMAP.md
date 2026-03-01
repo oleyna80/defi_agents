@@ -166,7 +166,7 @@
   - PancakeSwap/HyperSwap adapters
 - [ ] **Ops gate (shadow):**
   - 24h VPS shadow-run with `errors=0`
-  - mandatory counters in logs: `pits_found_count`, `degraded_count`, `scan_duration_p95_ms`
+  - [x] mandatory counters in logs: `pits_found_count`, `degraded_count`, `scan_duration_p95_ms`
   - degraded data -> watchlist only (no actionable)
 - [x] **Phase F (Krystal API Discovery, non-blocking):**
   - `docs/research/krystal-integration-decision-report.md` зафиксировал текущий статус `CONDITIONAL GO` (2026-02-19): `cloud-api.krystal.app` доступен server-side через `KC-APIKey`, подтверждён pool-level schema fit для REQ-022.

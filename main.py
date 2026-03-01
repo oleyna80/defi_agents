@@ -33,6 +33,7 @@ from defi_agents.lp.tick_provider import TickProviderError, UniswapV3TickProvide
 from defi_agents.lp.rpc_helper import fetch_slot0_tick
 from defi_agents.lp.models import DataQuality
 from defi_agents.lp.volatility import estimate_vol
+from defi_agents.lp.runtime_metrics import summarize_tick_scan_runtime_metrics
 from defi_agents.tracker import ArbitrumUniswapV3PositionReader
 from defi_agents.execution import (
     ExecutionOrchestrator,
@@ -534,6 +535,8 @@ async def run_sentinel_cycle() -> None:
         td_discovery_degraded = 0
         td_discovery_skipped = 0
         td_scan_ms_total = 0.0
+        td_scan_durations_ms: list[float] = []
+        td_scan_results = []
         if td_cfg.enabled:
             async def _build_chain_providers(
                 *,
@@ -789,8 +792,11 @@ async def run_sentinel_cycle() -> None:
                         metadata["tick_data_quality"] = "ERROR"
                     return "error", pool_addr
 
-                td_scan_ms_total += (time() - scan_start) * 1000.0
+                scan_elapsed_ms = (time() - scan_start) * 1000.0
+                td_scan_ms_total += scan_elapsed_ms
+                td_scan_durations_ms.append(scan_elapsed_ms)
                 td_scanned += 1
+                td_scan_results.append(band_result)
 
                 if metadata is not None:
                     metadata["tick_data_quality"] = band_result.data_quality.value
@@ -850,13 +856,19 @@ async def run_sentinel_cycle() -> None:
 
             td_skipped += td_discovery_skipped
 
+            td_runtime_metrics = summarize_tick_scan_runtime_metrics(
+                scan_results=td_scan_results,
+                scan_durations_ms=td_scan_durations_ms,
+            )
             logger.info(
-                "Tick density scan: scanned=%s ok=%s degraded=%s skipped=%s "
+                "Tick density scan: scanned=%s ok=%s degraded_count=%s skipped=%s "
                 "discovery_scanned=%s discovery_ok=%s discovery_degraded=%s discovery_skipped=%s "
-                "scan_ms_total=%.0f enabled=%s shadow=%s",
+                "pits_found_count=%s confident_pit_count=%s scan_ms_total=%.0f scan_duration_p95_ms=%.0f "
+                "enabled=%s shadow=%s",
                 td_scanned, td_ok, td_degraded, td_skipped,
                 td_discovery_scanned, td_discovery_ok, td_discovery_degraded, td_discovery_skipped,
-                td_scan_ms_total,
+                td_runtime_metrics.pits_found_count, td_runtime_metrics.confident_pit_count,
+                td_scan_ms_total, td_runtime_metrics.scan_duration_p95_ms,
                 td_cfg.enabled, td_cfg.shadow_mode_enabled,
             )
         else:
