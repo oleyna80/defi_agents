@@ -18,4 +18,5 @@
 - 017-tick-density-scanner-v1-plan.md
 - 018-lp-autocompound-autorebalance-v1-plan.md
 - 019-v3utils-reuse-execution-plan.md
+- 020-delta-hedger-hummingbot-poc-plan.md
 - (add plans here)

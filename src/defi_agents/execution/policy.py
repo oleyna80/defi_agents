@@ -47,6 +47,7 @@ class PolicyGuard:
         *,
         estimated_gas_usd: float | None = None,
         slippage_bps: int | None = None,
+        enforce_stale_guard: bool = False,
         counters: ExecutionCounters | None = None,
         now_ts: int | None = None,
     ) -> PolicyDecision:
@@ -61,6 +62,8 @@ class PolicyGuard:
         else:
             if self.config.kill_switch:
                 reasons.append("KILL_SWITCH_ENABLED")
+            if enforce_stale_guard and bool(intent.metadata.get("stale_position_data")):
+                reasons.append("STALE_POSITION_DATA")
             if intent.expected_net_usd < self.config.min_expected_net_usd:
                 reasons.append("MIN_EXPECTED_NET_NOT_MET")
             if gas is None:

@@ -7,7 +7,7 @@ from typing import Any, Awaitable, Callable
 import httpx
 
 from ..models import ExecutionReceipt, TxPlan
-from .native_uniswap import NativeUniswapV3Adapter
+from .uniswap_v3_simulate import NativeUniswapV3Adapter
 
 RpcRequestFn = Callable[[str, dict[str, Any], float], Awaitable[dict[str, Any]]]
 SleepFn = Callable[[float], Awaitable[None]]
@@ -86,7 +86,7 @@ class NativeLiveExecutionAdapter(NativeUniswapV3Adapter):
                 gas_used_usd=gas_used_usd,
                 reason_codes=[] if ok else ["TX_REVERTED"],
                 metadata={
-                    "adapter": "native_uniswap_v3_live",
+                    "adapter": "uniswap_v3_live",
                     "rpc_chain": tx.chain,
                     "tx_kind": str(tx.metadata.get("tx_kind") or ""),
                 },
@@ -129,7 +129,7 @@ class NativeLiveExecutionAdapter(NativeUniswapV3Adapter):
             return response
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+            async with httpx.AsyncClient(timeout=self.timeout_seconds, http2=False) as client:
                 resp = await client.post(rpc_url, json=payload)
                 resp.raise_for_status()
                 data = resp.json()
@@ -205,7 +205,7 @@ class NativeLiveExecutionAdapter(NativeUniswapV3Adapter):
         detail: str | None = None,
         tx_hash: str | None = None,
     ) -> ExecutionReceipt:
-        metadata: dict[str, Any] = {"adapter": "native_uniswap_v3_live"}
+        metadata: dict[str, Any] = {"adapter": "uniswap_v3_live"}
         if detail:
             metadata["detail"] = detail
         if tx_hash:

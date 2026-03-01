@@ -99,6 +99,14 @@ class TriggerEngine:
             "range_utilization": f"{state.range_utilization:.4f}",
             "edge_decay_bps": state.edge_decay_bps,
         }
+        if state.data_freshness_at is not None:
+            metadata["data_freshness_at"] = state.data_freshness_at
+        if state.stale:
+            metadata["stale_position_data"] = True
+        if state.stale_reason_codes:
+            metadata["stale_reason_codes"] = list(state.stale_reason_codes)
+        if state.metadata:
+            metadata["state_metadata"] = dict(state.metadata)
         if state.position_manager:
             metadata["position_manager"] = state.position_manager
         if state.compound_data_hex:

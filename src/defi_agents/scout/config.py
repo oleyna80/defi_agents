@@ -309,8 +309,16 @@ class ExecutionPolicyConfig(BaseModel):
 class ExecutionConfig(BaseModel):
     enabled: bool = False
     mode: Literal["PAPER", "SHADOW", "LIVE"] = "PAPER"
-    primary_adapter: Literal["native_uniswap_v3", "native_uniswap_v3_live", "v3utils", "krystal"] = "native_uniswap_v3"
-    fallback_adapter: Literal["native_uniswap_v3", "native_uniswap_v3_live", "v3utils", "krystal"] = "native_uniswap_v3"
+    primary_adapter: Literal[
+        "uniswap_v3_simulate", "uniswap_v3_live", "v3utils_live", "krystal",
+        # Legacy aliases (deprecated, kept for backward compat)
+        "native_uniswap_v3", "native_uniswap_v3_live", "v3utils",
+    ] = "uniswap_v3_simulate"
+    fallback_adapter: Literal[
+        "uniswap_v3_simulate", "uniswap_v3_live", "v3utils_live", "krystal",
+        # Legacy aliases (deprecated, kept for backward compat)
+        "native_uniswap_v3", "native_uniswap_v3_live", "v3utils",
+    ] = "uniswap_v3_simulate"
     allow_live_mode: bool = False
     idempotency_ttl_seconds: int = Field(default=86_400, ge=60)
     per_position_cooldown_seconds: int = Field(default=1_800, ge=0)
@@ -344,8 +352,44 @@ class ExecutionConfig(BaseModel):
             raise ValueError("execution.mode=LIVE requires execution.allow_live_mode=true")
         if self.primary_adapter == "krystal" and not self.krystal_enabled:
             raise ValueError("execution.primary_adapter=krystal requires execution.krystal_enabled=true")
-        if self.primary_adapter == "v3utils" and not self.v3utils_enabled:
-            raise ValueError("execution.primary_adapter=v3utils requires execution.v3utils_enabled=true")
+        if self.primary_adapter in ("v3utils", "v3utils_live") and not self.v3utils_enabled:
+            raise ValueError("execution.primary_adapter=v3utils_live requires execution.v3utils_enabled=true")
+        return self
+
+
+class HedgerPolicyConfig(BaseModel):
+    kill_switch: bool = False
+    min_rebalance_notional_usd: float = Field(default=100.0, ge=0.0)
+    max_notional_usd_per_order: float = Field(default=2_000.0, ge=0.0)
+    max_daily_notional_usd: float = Field(default=10_000.0, ge=0.0)
+    max_slippage_bps: int = Field(default=100, ge=0, le=10_000)
+
+
+class HedgerConfig(BaseModel):
+    enabled: bool = False
+    mode: Literal["PAPER", "SHADOW", "LIVE"] = "PAPER"
+    allow_live_mode: bool = False
+    connector: Literal["none", "hummingbot"] = "none"
+    connector_timeout_seconds: float = Field(default=8.0, ge=1.0)
+    hummingbot_base_url: str = "http://127.0.0.1:15888"
+    hummingbot_api_key_env: str = "HUMMINGBOT_API_KEY"
+    hummingbot_exchange: str = "binance_perpetual"
+    hummingbot_market_map: dict[str, str] = Field(default_factory=dict)
+    hummingbot_health_path: str = "/health"
+    hummingbot_markets_path: str = "/api/v1/markets"
+    hummingbot_ticker_path: str = "/api/v1/ticker"
+    mock_exposures: List[dict] = Field(default_factory=list)
+    exposure_max_age_seconds: int = Field(default=900, ge=0)
+    min_cycle_interval_seconds: int = Field(default=300, ge=0)
+    per_symbol_cooldown_seconds: int = Field(default=1_800, ge=0)
+    default_hedge_ratio: float = Field(default=1.0, ge=0.0, le=1.0)
+    idempotency_ttl_seconds: int = Field(default=86_400, ge=60)
+    policy: HedgerPolicyConfig = Field(default_factory=HedgerPolicyConfig)
+
+    @model_validator(mode="after")
+    def _validate_mode(self) -> "HedgerConfig":
+        if self.mode == "LIVE" and not self.allow_live_mode:
+            raise ValueError("hedger.mode=LIVE requires hedger.allow_live_mode=true")
         return self
 
 
@@ -500,6 +544,7 @@ class ScoutConfig(BaseModel):
     defillama_provider: DeFiLlamaProviderConfig = Field(default_factory=DeFiLlamaProviderConfig)
     tick_density: TickDensityConfig = Field(default_factory=TickDensityConfig)
     execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
+    hedger: HedgerConfig = Field(default_factory=HedgerConfig)
     strategy_sim: StrategySimConfig = Field(default_factory=StrategySimConfig)
     token_buckets: TokenBuckets = Field(default_factory=TokenBuckets)
     risk_policy: StableRiskPolicy = Field(default_factory=StableRiskPolicy)

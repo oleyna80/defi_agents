@@ -1,0 +1,14 @@
+[Unit]
+Description=Hummingbot Shadow Mock API (User Mode)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/projects/defi_agents
+EnvironmentFile=%h/projects/defi_agents/.env
+ExecStart=%h/projects/defi_agents/.venv/bin/python %h/projects/defi_agents/scripts/hummingbot_shadow_mock.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

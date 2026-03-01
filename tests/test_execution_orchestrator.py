@@ -141,3 +141,71 @@ def test_orchestrator_live_mode_records_exec_failure_on_safe_stub():
     assert report.counters.exec_ok == 0
     assert report.counters.exec_fail == 1
     assert report.exec_fail_reason_counts.get("LIVE_EXECUTION_NOT_IMPLEMENTED") == 1
+
+
+def test_orchestrator_live_blocks_stale_states_by_policy():
+    cfg = ExecutionConfig()
+    trigger = TriggerEngine(cfg)
+
+    def _fake_evaluate(_state: PositionState, now_ts: int | None = None) -> ActionIntent:
+        return ActionIntent(
+            intent_id=f"intent:{now_ts or 0}",
+            action="COMPOUND",
+            chain="Arbitrum",
+            position_ref="pos-stale",
+            expected_net_usd=10.0,
+            metadata={
+                "estimated_gas_usd": 1.0,
+                "slippage_bps": 10,
+                "to_address": "0x1234567890123456789012345678901234567890",
+                "data_hex": "0xabc123",
+                "stale_position_data": True,
+            },
+        )
+
+    trigger.evaluate_position = _fake_evaluate  # type: ignore[method-assign]
+    orchestrator = ExecutionOrchestrator(
+        mode="LIVE",
+        trigger_engine=trigger,
+        policy_guard=PolicyGuard(cfg.policy),
+        adapter=NativeUniswapV3Adapter(),
+    )
+    report = _run(orchestrator.run_states([_state()], now_ts=1700000000))
+    assert report.counters.intent_count == 1
+    assert report.counters.blocked_by_policy == 1
+    assert len(report.tx_plans) == 0
+    assert report.policy_block_reason_counts.get("STALE_POSITION_DATA") == 1
+
+
+def test_orchestrator_shadow_allows_stale_states():
+    cfg = ExecutionConfig()
+    trigger = TriggerEngine(cfg)
+
+    def _fake_evaluate(_state: PositionState, now_ts: int | None = None) -> ActionIntent:
+        return ActionIntent(
+            intent_id=f"intent:{now_ts or 0}",
+            action="COMPOUND",
+            chain="Arbitrum",
+            position_ref="pos-stale-shadow",
+            expected_net_usd=10.0,
+            metadata={
+                "estimated_gas_usd": 1.0,
+                "slippage_bps": 10,
+                "to_address": "0x1234567890123456789012345678901234567890",
+                "data_hex": "0xabc123",
+                "stale_position_data": True,
+            },
+        )
+
+    trigger.evaluate_position = _fake_evaluate  # type: ignore[method-assign]
+    orchestrator = ExecutionOrchestrator(
+        mode="SHADOW",
+        trigger_engine=trigger,
+        policy_guard=PolicyGuard(cfg.policy),
+        adapter=NativeUniswapV3Adapter(),
+    )
+    report = _run(orchestrator.run_states([_state()], now_ts=1700000000))
+    assert report.counters.intent_count == 1
+    assert report.counters.blocked_by_policy == 0
+    assert len(report.tx_plans) == 1
+    assert report.counters.sim_ok == 1

@@ -39,6 +39,10 @@ class PositionState(BaseModel):
     v3utils_compound_params: dict[str, Any] | None = None
     v3utils_rebalance_params: dict[str, Any] | None = None
     tx_value_wei: int = Field(default=0, ge=0)
+    data_freshness_at: int | None = Field(default=None, ge=0)
+    stale: bool = False
+    stale_reason_codes: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     @property
     def out_of_range(self) -> bool:

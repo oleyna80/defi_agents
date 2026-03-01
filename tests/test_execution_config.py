@@ -108,7 +108,7 @@ def test_sample_scout_config_includes_execution_block():
     cfg = ScoutConfig.from_file(ROOT / "docs/memory-bank/scout_config.json")
     assert isinstance(cfg.execution.enabled, bool)
     assert cfg.execution.mode in {"PAPER", "SHADOW", "LIVE"}
-    assert cfg.execution.primary_adapter == "native_uniswap_v3"
+    assert cfg.execution.primary_adapter == "uniswap_v3_simulate"
     assert cfg.execution.rebalance_edge_decay_bps == 250
     assert isinstance(cfg.execution.mock_positions, list)
     assert cfg.execution.krystal_timeout_seconds == 8.0

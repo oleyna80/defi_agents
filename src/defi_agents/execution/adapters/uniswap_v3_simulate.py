@@ -51,7 +51,7 @@ class NativeUniswapV3Adapter:
             reason_codes=[],
             estimated_gas_used=tx.gas_estimate,
             estimated_gas_usd=tx.gas_estimate_usd,
-            metadata={"adapter": "native_uniswap_v3"},
+            metadata={"adapter": "uniswap_v3_simulate"},
         )
 
     async def execute(self, tx: TxPlan) -> ExecutionReceipt:
@@ -59,7 +59,7 @@ class NativeUniswapV3Adapter:
             ok=False,
             chain=tx.chain,
             reason_codes=["LIVE_EXECUTION_NOT_IMPLEMENTED"],
-            metadata={"adapter": "native_uniswap_v3"},
+            metadata={"adapter": "uniswap_v3_simulate"},
         )
 
     def _build_tx(self, intent: ActionIntent, *, tx_kind: str) -> TxPlan:

@@ -18,4 +18,5 @@
 - 016-scout-my-pools-monitor-v1.md
 - 017-tick-density-scanner-v1.md
 - 018-lp-autocompound-autorebalance-v1.md
+- 020-delta-hedger-poc-v1.md
 - (add specs here)

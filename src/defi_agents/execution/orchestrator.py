@@ -40,7 +40,12 @@ class ExecutionOrchestrator:
             if intent.action == "SKIP":
                 continue
 
-            decision = self.policy_guard.evaluate(intent, counters=report.counters, now_ts=now_ts)
+            decision = self.policy_guard.evaluate(
+                intent,
+                enforce_stale_guard=self.mode == "LIVE",
+                counters=report.counters,
+                now_ts=now_ts,
+            )
             if not decision.allowed:
                 self._bump_reasons(report.policy_block_reason_counts, decision.reason_codes)
                 continue

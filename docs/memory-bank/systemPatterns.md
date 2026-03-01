@@ -2,6 +2,54 @@
 
 ## Architecture Decisions
 - YYYY-MM-DD: <Decision> - <Rationale>
+- 2026-02-26: SHADOW hedge gate can use local connector mock service to decouple runtime validation from external exchange uptime:
+  - lightweight HTTP mock (`scripts/hummingbot_shadow_mock.py`) exposes `health/markets/ticker` contracts expected by `HummingbotShadowConnector`,
+  - service is run as user unit (`hummingbot-shadow-mock.service`) and can be enabled/disabled independently from `defi-hedger.timer`,
+  - real Hummingbot endpoint remains preferred for connector-readiness, but mock path is accepted for deterministic gate warm-up and regression on host.
+  Rationale: enables reproducible SHADOW telemetry (`sim_ok`, reason taxonomy, no-crash checks) even when external connector infra is not yet provisioned.
+
+- 2026-02-26: Hedger shadow/runtime telemetry uses parseable summary lines and windowed gate script:
+  - worker entrypoint `hedger_main.py` emits deterministic counters in `Hedger summary:` logs,
+  - gate script `scripts/hedger_shadow_gate_report.sh` aggregates 24h cycles/sim/connectivity metrics from `journalctl`,
+  - no connector or connector exceptions are fail-safe counted (`CONNECTOR_UNCONFIGURED` / `CONNECTOR_EXCEPTION`) rather than treated as silent success.
+  Rationale: Phase D gate requires objective, scriptable evidence for GO/NO-GO without coupling to scout runtime logs.
+
+- 2026-02-26: Hedger orchestration separates intent generation from connector simulation:
+  - `HedgeCalculator` generates deterministic intents/counters from exposure inputs,
+  - `HedgerOrchestrator` applies mode semantics (`PAPER` no simulation, `SHADOW` simulation-only),
+  - connector failures are reason-counted and never raise uncaught exceptions from per-intent processing.
+  Rationale: preserves deterministic strategy logic while isolating unstable connector surfaces behind fail-safe boundaries.
+
+- 2026-02-26: Hedger connector readiness is modeled as staged health probe + shadow simulation:
+  - health probe runs explicit stages (`auth` -> `instrument` -> `bbo`) and returns typed status object,
+  - shadow simulation consumes the same connector path and enforces slippage caps before reporting `ok`,
+  - connector failures map to deterministic reason codes (`AUTH_FAILED`, `MARKET_UNSUPPORTED`, `BBO_UNAVAILABLE`, `CONNECTOR_HTTP_*`, etc.) instead of exceptions escaping to runtime.
+  Rationale: supports safe rollout gates and auditable NO-ACTION outcomes while external connector contracts are unstable.
+
+- 2026-02-26: Hedger decision engine uses deterministic delta-to-intent pipeline with fail-safe skip taxonomy:
+  - action order: policy/data guards -> threshold/cooldown -> hedge side selection,
+  - positive LP delta maps to `SHORT` hedge, negative delta maps to `LONG`,
+  - policy/data failures emit explicit `SKIP` reasons (`KILL_SWITCH_ENABLED`, `MAX_*`, `EXPOSURE_STALE`, `MARK_PRICE_MISSING`) and never attempt implicit hedge.
+  Rationale: keep hedge behavior auditable and safe before connector/live execution stages.
+
+- 2026-02-26: Hedger configuration is fail-closed by default and isolated from scout loop:
+  - `ScoutConfig.hedger` defaults to `enabled=false`, `mode=PAPER`, `connector=none`,
+  - `LIVE` mode is blocked unless explicit `hedger.allow_live_mode=true`,
+  - policy limits (`max_notional_per_order`, `max_daily_notional`, `kill_switch`) are first-class config contract.
+  Rationale: hedge execution path carries liquidation/funding risk and must require explicit operator opt-in with hard limits.
+
+- 2026-02-26: Delta hedger exploration follows isolated-worker pattern:
+  - hedge PoC runtime is a separate process/module boundary from scout/execution loop,
+  - hedge path is limited to `PAPER/SHADOW` until dedicated spec gate,
+  - connector/data degradation must default to `NO_ACTION` (fail-safe).
+  Rationale: hedging introduces liquidation/basis/funding risk and must not increase blast radius of core production loop.
+
+- 2026-02-26: Open-source reuse follows a license-first boundary policy:
+  - direct in-tree code reuse is allowed only for permissive licenses (`MIT`, `Apache-2.0`),
+  - copyleft/source-available stacks (`AGPL`, `GPL`, `BUSL`) are reference-only for core runtime,
+  - repos with unclear license metadata are blocked until explicit legal clarification.
+  Rationale: preserve delivery speed from ecosystem patterns without introducing licensing risk into the production codebase.
+
 - 2026-02-23: Structured `v3utils` payloads are simulation-validated before live send:
   - for structured compound/rebalance payloads, adapter `simulate()` checks expected selector and target contract consistency,
   - mismatches are fail-safe rejected with explicit reason codes (`V3UTILS_SELECTOR_MISMATCH`, `V3UTILS_CONTRACT_MISMATCH`).

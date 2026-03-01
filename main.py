@@ -33,6 +33,7 @@ from defi_agents.lp.tick_provider import TickProviderError, UniswapV3TickProvide
 from defi_agents.lp.rpc_helper import fetch_slot0_tick
 from defi_agents.lp.models import DataQuality
 from defi_agents.lp.volatility import estimate_vol
+from defi_agents.tracker import ArbitrumUniswapV3PositionReader
 from defi_agents.execution import (
     ExecutionOrchestrator,
     FailoverExecutionAdapter,
@@ -182,20 +183,69 @@ def _mark_telegram_no_opps_heartbeat_sent() -> None:
     cache.set("last_sent_at", int(time()), ttl_seconds=365 * 24 * 3600)
 
 
-def _load_execution_mock_states(config: ScoutConfig) -> list[PositionState]:
+def _load_execution_mock_states(
+    config: ScoutConfig,
+    *,
+    mark_stale: bool = False,
+    stale_reason: str = "STALE_POSITION_DATA",
+) -> list[PositionState]:
     states: list[PositionState] = []
     for idx, raw in enumerate(list(getattr(config.execution, "mock_positions", []) or [])):
         if not isinstance(raw, dict):
             logger.warning("Execution mock position skipped: idx=%s reason=INVALID_SHAPE", idx)
             continue
         try:
-            states.append(PositionState(**raw))
+            state = PositionState(**raw)
+            if mark_stale:
+                state.stale = True
+                if stale_reason and stale_reason not in state.stale_reason_codes:
+                    state.stale_reason_codes.append(stale_reason)
+            states.append(state)
         except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "Execution mock position skipped: idx=%s reason=VALIDATION_ERROR err=%s",
                 idx,
                 exc.__class__.__name__,
             )
+    return states
+
+
+async def _load_execution_states(config: ScoutConfig) -> list[PositionState]:
+    wallet_address = os.getenv("WALLET_ADDRESS", "").strip()
+    rpc_url = os.getenv("RPC_URL_ARBITRUM", "").strip()
+
+    if not wallet_address:
+        logger.warning("Execution state source fallback: reason=WALLET_ADDRESS_MISSING source=mock_positions")
+        return _load_execution_mock_states(config, mark_stale=True)
+    if not rpc_url:
+        logger.warning("Execution state source fallback: reason=RPC_URL_ARBITRUM_MISSING source=mock_positions")
+        return _load_execution_mock_states(config, mark_stale=True)
+
+    reader = ArbitrumUniswapV3PositionReader(rpc_url=rpc_url)
+    try:
+        states = await reader.load_active_position_states(wallet_address)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Execution state source fallback: reason=POSITION_READER_ERROR err=%s source=mock_positions",
+            exc.__class__.__name__,
+        )
+        return _load_execution_mock_states(config, mark_stale=True)
+
+    if not states:
+        logger.warning("Execution state source fallback: reason=NO_ACTIVE_POSITIONS source=mock_positions")
+        return _load_execution_mock_states(config, mark_stale=True)
+
+    stale_count = sum(1 for state in states if state.stale)
+    if stale_count > 0:
+        logger.warning(
+            "Execution state quality: source=position_reader stale_states=%s reason=STALE_POSITION_DATA mode=%s",
+            stale_count,
+            config.execution.mode,
+        )
+    logger.info(
+        "Execution states loaded: source=position_reader chain=Arbitrum active_states=%s",
+        len(states),
+    )
     return states
 
 
@@ -216,7 +266,7 @@ def _build_execution_adapter(config: ScoutConfig):
                 api_key=api_key,
                 timeout_seconds=exec_cfg.krystal_timeout_seconds,
             )
-        if name == "native_uniswap_v3_live":
+        if name in ("native_uniswap_v3_live", "uniswap_v3_live"):
             rpc_urls: dict[str, str] = {}
             for chain, env_name in dict(exec_cfg.native_live_rpc_env_by_chain).items():
                 rpc_url = os.getenv(str(env_name), "").strip()
@@ -228,7 +278,7 @@ def _build_execution_adapter(config: ScoutConfig):
                 receipt_timeout_seconds=exec_cfg.native_live_receipt_timeout_seconds,
                 receipt_poll_seconds=exec_cfg.native_live_receipt_poll_seconds,
             )
-        if name == "v3utils":
+        if name in ("v3utils", "v3utils_live"):
             if not exec_cfg.v3utils_enabled:
                 raise RuntimeError("V3UTILS_DISABLED")
             rpc_urls: dict[str, str] = {}
@@ -245,6 +295,7 @@ def _build_execution_adapter(config: ScoutConfig):
                 receipt_timeout_seconds=exec_cfg.native_live_receipt_timeout_seconds,
                 receipt_poll_seconds=exec_cfg.native_live_receipt_poll_seconds,
             )
+        # "native_uniswap_v3" | "uniswap_v3_simulate" → simulate adapter (PAPER/SHADOW baseline)
         return NativeUniswapV3Adapter()
 
     if strict_live:
@@ -904,9 +955,9 @@ async def run_sentinel_cycle() -> None:
 
         # --- Execution loop (Spec 018, isolated and optional) ---
         if config.execution.enabled:
-            mock_states = _load_execution_mock_states(config)
-            if not mock_states:
-                logger.info("Execution enabled but no valid mock positions configured; loop skipped.")
+            states = await _load_execution_states(config)
+            if not states:
+                logger.info("Execution enabled but no valid position states available; loop skipped.")
             else:
                 execution_orchestrator = ExecutionOrchestrator(
                     mode=config.execution.mode,
@@ -914,14 +965,14 @@ async def run_sentinel_cycle() -> None:
                     policy_guard=PolicyGuard(config.execution.policy),
                     adapter=_build_execution_adapter(config),
                 )
-                execution_report = await execution_orchestrator.run_states(mock_states)
+                execution_report = await execution_orchestrator.run_states(states)
                 ec = execution_report.counters
                 logger.info(
                     "Execution summary: mode=%s states=%s tx_plans=%s intents=%s blocked_by_policy=%s "
                     "sim_ok=%s sim_fail=%s exec_ok=%s exec_fail=%s "
                     "policy_blocks=%s sim_fail_reasons=%s exec_fail_reasons=%s",
                     execution_report.mode,
-                    len(mock_states),
+                    len(states),
                     len(execution_report.tx_plans),
                     ec.intent_count,
                     ec.blocked_by_policy,

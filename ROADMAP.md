@@ -281,6 +281,7 @@ DoD: Оператор видит полную картину каждой поз
   - `docs/specs/018-lp-autocompound-autorebalance-v1.md`
   - `docs/plans/018-lp-autocompound-autorebalance-v1-plan.md`
   - `docs/plans/019-v3utils-reuse-execution-plan.md` (execution module reuse track)
+  - `docs/research/2026-02-open-source-reuse-matrix.md` (license-aware reuse matrix)
   - `docs/runbooks/execution-loop-rollout-v1.md`
 
 - **Execution track status (2026-02-23):**
@@ -303,9 +304,10 @@ DoD: Оператор видит полную картину каждой поз
 
 **Open-source reference:**
 - `revert-finance/compoundor` (Solidity, audited) — autocompound smart contracts
-- `revert-finance/compoundor-js` (JS/MIT) — compounder bot implementation
+- `revert-finance/compoundor-js` (license to be confirmed) — compounder bot implementation
 - `KrystalDeFi/v3utils` (fork of revert-finance/v3utils) — V3Utils + V3Automation: zap-in, compound, adjust, zap-out
 - `code-423n4/2024-06-krystal-defi` — Code4rena audit of Krystal contracts
+- Reuse policy: direct code import only for permissive licenses (`MIT`/`Apache-2.0`); AGPL/GPL/BUSL repos are reference-only in core runtime.
 
 DoD: Paper mode → shadow mode → live mode escalation. Kill-switch в 1 click.
 
@@ -331,6 +333,11 @@ DoD: Оператор видит portfolio-level риск + может сказ�
 > [!CAUTION]
 > Самый рискованный слой (ликвидации, funding, basis risk). Запускать поэтапно:
 > advisory/paper mode → shadow → авто-исполнение.
+
+- **PoC Plan (started):**
+  - `docs/plans/020-delta-hedger-hummingbot-poc-plan.md`
+  - Текущий формат: isolated worker в `PAPER/SHADOW`, без LIVE-исполнения и без coupling к `main.py`.
+  - Status (2026-02-27): 24h SHADOW gate passed (`cycles=88`, `sim_ok=176`, `sim_fail=0`, `connector_errors=0`, no `FATAL/Traceback/CRITICAL`). Next: formalize Spec 020 scope and move from mock connector to real venue sandbox readiness checks.
 
 - [ ] **Funding Rate Monitor:** Отслеживание funding rates на CEX/perp DEX
 - [ ] **Hedge Calculator:** Optimal hedge ratio based on LP delta exposure

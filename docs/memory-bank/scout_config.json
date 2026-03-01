@@ -294,8 +294,8 @@
     "execution": {
       "enabled": true,
       "mode": "SHADOW",
-      "primary_adapter": "native_uniswap_v3",
-      "fallback_adapter": "native_uniswap_v3",
+      "primary_adapter": "uniswap_v3_simulate",
+      "fallback_adapter": "uniswap_v3_simulate",
       "allow_live_mode": false,
       "idempotency_ttl_seconds": 86400,
       "per_position_cooldown_seconds": 1800,
@@ -363,6 +363,61 @@
         "max_daily_gas_usd": 100.0,
         "min_expected_net_usd": 2.0,
         "kill_switch": false
+      }
+    },
+    "hedger": {
+      "enabled": true,
+      "mode": "SHADOW",
+      "allow_live_mode": false,
+      "connector": "hummingbot",
+      "connector_timeout_seconds": 8.0,
+      "hummingbot_base_url": "http://127.0.0.1:15888",
+      "hummingbot_api_key_env": "HUMMINGBOT_API_KEY",
+      "hummingbot_exchange": "binance_perpetual",
+      "hummingbot_market_map": {},
+      "hummingbot_health_path": "/health",
+      "hummingbot_markets_path": "/api/v1/markets",
+      "hummingbot_ticker_path": "/api/v1/ticker",
+      "mock_exposures": [
+        {
+          "chain": "Base",
+          "position_ref": "hedge-shadow-eth",
+          "symbol": "ETH",
+          "delta_usd": 1500.0,
+          "mark_price_usd": 2800.0,
+          "snapshot_ts": 0,
+          "freshness_age_seconds": 30
+        },
+        {
+          "chain": "Base",
+          "position_ref": "hedge-shadow-btc",
+          "symbol": "BTC",
+          "delta_usd": -900.0,
+          "mark_price_usd": 52000.0,
+          "snapshot_ts": 0,
+          "freshness_age_seconds": 30
+        },
+        {
+          "chain": "Base",
+          "position_ref": "hedge-shadow-stale",
+          "symbol": "ETH",
+          "delta_usd": 1200.0,
+          "mark_price_usd": 2800.0,
+          "snapshot_ts": 0,
+          "freshness_age_seconds": 99999
+        }
+      ],
+      "exposure_max_age_seconds": 900,
+      "min_cycle_interval_seconds": 300,
+      "per_symbol_cooldown_seconds": 1800,
+      "default_hedge_ratio": 1.0,
+      "idempotency_ttl_seconds": 86400,
+      "policy": {
+        "kill_switch": false,
+        "min_rebalance_notional_usd": 100.0,
+        "max_notional_usd_per_order": 2000.0,
+        "max_daily_notional_usd": 10000.0,
+        "max_slippage_bps": 100
       }
     },
     "token_buckets": {

@@ -4,7 +4,7 @@ from time import time
 from typing import Any
 
 from ..models import ActionIntent, SimulationResult, TxPlan
-from .native_live import NativeLiveExecutionAdapter
+from .uniswap_v3_live import NativeLiveExecutionAdapter
 
 V3UTILS_UPSTREAM_REPO = "https://github.com/KrystalDeFi/v3utils"
 V3UTILS_UPSTREAM_COMMIT = "33f487253051c3d6f439dc911b0e415b28b4cc9c"

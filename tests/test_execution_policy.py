@@ -125,3 +125,18 @@ def test_policy_skip_intent_is_allowed():
     decision = guard.evaluate(_intent(action="SKIP"), now_ts=1700000000)
     assert decision.allowed is True
     assert decision.reason_codes == []
+
+
+def test_policy_enforces_stale_guard_only_when_enabled():
+    guard = PolicyGuard(ExecutionPolicyConfig())
+    intent = _intent(
+        expected_net_usd=10.0,
+        metadata={"estimated_gas_usd": 1.0, "slippage_bps": 10, "stale_position_data": True},
+    )
+
+    decision_shadow = guard.evaluate(intent, enforce_stale_guard=False, now_ts=1700000000)
+    assert decision_shadow.allowed is True
+
+    decision_live = guard.evaluate(intent, enforce_stale_guard=True, now_ts=1700000001)
+    assert decision_live.allowed is False
+    assert "STALE_POSITION_DATA" in decision_live.reason_codes

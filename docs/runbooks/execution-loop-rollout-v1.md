@@ -135,8 +135,8 @@ Before enabling `LIVE`, set a strict canary profile in `docs/memory-bank/scout_c
 
 - `execution.mode="LIVE"`
 - `execution.allow_live_mode=true`
-- `execution.primary_adapter="native_uniswap_v3_live"`
-- `execution.fallback_adapter="native_uniswap_v3"`
+- `execution.primary_adapter="uniswap_v3_live"`
+- `execution.fallback_adapter="uniswap_v3_simulate"`
 - `execution.policy.max_daily_txs=1`
 - `execution.policy.max_daily_gas_usd=5.0`
 - `execution.policy.max_gas_usd_per_tx=5.0`

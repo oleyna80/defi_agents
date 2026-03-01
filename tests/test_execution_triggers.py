@@ -146,3 +146,26 @@ def test_trigger_passes_position_manager_into_intent_metadata():
     assert intent.action == "COMPOUND"
     assert intent.metadata.get("position_manager") == "0x1111111111111111111111111111111111111111"
     assert intent.metadata.get("compound_data_hex") == "0xabc123"
+
+
+def test_trigger_passes_stale_metadata_into_intent():
+    engine = _engine(compound_min_fees_usd=5.0)
+    state = PositionState(
+        chain="Arbitrum",
+        position_ref="pos-stale",
+        current_tick=100,
+        lower_tick=80,
+        upper_tick=120,
+        unclaimed_fees_usd=9.0,
+        estimated_compound_gas_usd=1.0,
+        stale=True,
+        stale_reason_codes=["STALE_POSITION_DATA"],
+        data_freshness_at=1699999800,
+        metadata={"token_id": 42},
+    )
+    intent = engine.evaluate_position(state, now_ts=1700000000)
+    assert intent.action == "COMPOUND"
+    assert intent.metadata.get("stale_position_data") is True
+    assert intent.metadata.get("stale_reason_codes") == ["STALE_POSITION_DATA"]
+    assert intent.metadata.get("data_freshness_at") == 1699999800
+    assert intent.metadata.get("state_metadata", {}).get("token_id") == 42
