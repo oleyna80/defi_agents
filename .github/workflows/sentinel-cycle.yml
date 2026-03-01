@@ -1,7 +1,11 @@
 name: Sentinel Cycle
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # Оставляем только ручной запуск кнопки
+  # push:             <-- Закомментировали
+  #   branches: [ "main" ]
+  # schedule:         <-- Закомментировали (ГЛАВНОЕ)
+  #   - cron: '*/15 * * * *'
 
 concurrency:
   group: sentinel-cycle
