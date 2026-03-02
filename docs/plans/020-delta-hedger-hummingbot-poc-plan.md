@@ -30,9 +30,10 @@ Validate that delta-hedging can be implemented as an **isolated worker** (outsid
   - input: normalized LP exposure snapshot (net delta per asset),
   - logic: target hedge ratio calculator,
   - output: simulated hedge intents/orders + risk metrics.
-- Validate connector readiness for one venue pair:
-  - CEX path: Binance Futures (testnet/sandbox if available),
-  - DEX perp fallback candidate: Hyperliquid (read-only checks first).
+- Validate connector readiness for primary/fallback perp venues:
+  - primary path: Hyperliquid (testnet/sandbox readiness first),
+  - fallback for Arbitrum exposures: GMX v2,
+  - for other networks, analogous perp venues may be used based on chain coverage/liquidity under the same fail-safe policy.
 - Produce deterministic logs/metrics for gate decision.
 
 ## 4. Out of Scope

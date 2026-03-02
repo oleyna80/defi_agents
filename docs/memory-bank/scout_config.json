@@ -302,44 +302,7 @@
       "compound_min_fees_usd": 5.0,
       "rebalance_min_range_utilization": 0.15,
       "rebalance_edge_decay_bps": 250,
-      "mock_positions": [
-        {
-          "chain": "Base",
-          "position_ref": "shadow-compound-1",
-          "current_tick": 100,
-          "lower_tick": 80,
-          "upper_tick": 120,
-          "unclaimed_fees_usd": 9.5,
-          "estimated_compound_gas_usd": 1.2,
-          "expected_slippage_bps": 35,
-          "position_manager": "0x1111111111111111111111111111111111111111",
-          "compound_data_hex": "0xabc123"
-        },
-        {
-          "chain": "Base",
-          "position_ref": "shadow-rebalance-1",
-          "current_tick": 130,
-          "lower_tick": 80,
-          "upper_tick": 120,
-          "expected_rebalance_net_usd": 12.0,
-          "estimated_rebalance_gas_usd": 1.8,
-          "expected_slippage_bps": 45,
-          "position_manager": "0x2222222222222222222222222222222222222222",
-          "rebalance_data_hex": "0xdef456"
-        },
-        {
-          "chain": "Base",
-          "position_ref": "shadow-blocked-net-1",
-          "current_tick": 100,
-          "lower_tick": 80,
-          "upper_tick": 120,
-          "unclaimed_fees_usd": 5.2,
-          "estimated_compound_gas_usd": 4.0,
-          "expected_slippage_bps": 40,
-          "position_manager": "0x3333333333333333333333333333333333333333",
-          "compound_data_hex": "0xaaa111"
-        }
-      ],
+      "mock_positions": [],
       "krystal_enabled": false,
       "krystal_base_url": "https://cloud-api.krystal.app",
       "krystal_api_key_env": "KRYSTAL_CLOUD_API_KEY",

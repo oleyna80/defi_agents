@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import time
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
@@ -8,6 +9,12 @@ from typing import Any, Awaitable, Callable
 import httpx
 
 from ..execution.models import PositionState
+from .position_baseline import (
+    ENTRY_BASELINE_MALFORMED,
+    ENTRY_BASELINE_MISSING,
+    FileBackedPositionBaselineProvider,
+    PositionEntryBaselineProvider,
+)
 
 RequestFn = Callable[[str, dict[str, Any], float], Awaitable[dict[str, Any]]]
 PriceRequestFn = Callable[[list[str], float], Awaitable[dict[str, Any]]]
@@ -15,7 +22,9 @@ PriceRequestFn = Callable[[list[str], float], Awaitable[dict[str, Any]]]
 ARBITRUM_CHAIN_NAME = "Arbitrum"
 UNISWAP_V3_POSITION_MANAGER_ARBITRUM = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
 UNISWAP_V3_FACTORY_ARBITRUM = "0x1F98431c8aD98523631AE4a59f267346ea31F984"
-COINGECKO_TOKEN_PRICE_URL = "https://api.coingecko.com/api/v3/simple/token_price/arbitrum-one"
+COINGECKO_TOKEN_PRICE_URL = (
+    "https://api.coingecko.com/api/v3/simple/token_price/arbitrum-one"
+)
 
 # ABI selectors (keccak(function_signature)[:4])
 _BALANCE_OF_SELECTOR = "0x70a08231"  # balanceOf(address)
@@ -61,25 +70,33 @@ class ArbitrumUniswapV3PositionReader:
         price_ttl_seconds: int = 60,
         request_fn: RequestFn | None = None,
         price_request_fn: PriceRequestFn | None = None,
+        baseline_provider: PositionEntryBaselineProvider | None = None,
         now_fn: Callable[[], float] | None = None,
     ) -> None:
         rpc = (rpc_url or "").strip()
         if not rpc:
             raise ValueError("RPC_URL_MISSING")
         self.rpc_url = rpc
-        self.position_manager_address = self._normalize_address(position_manager_address)
+        self.position_manager_address = self._normalize_address(
+            position_manager_address
+        )
         self.factory_address = self._normalize_address(factory_address)
         self.timeout_seconds = max(1.0, float(timeout_seconds))
         self.stale_after_seconds = max(30, int(stale_after_seconds))
         self.price_ttl_seconds = max(10, int(price_ttl_seconds))
         self._request_fn = request_fn
         self._price_request_fn = price_request_fn
+        self._baseline_provider = (
+            baseline_provider or FileBackedPositionBaselineProvider()
+        )
         self._now_fn = now_fn or time.time
         self._pool_cache: dict[tuple[str, str, int], str] = {}
         self._token_decimals_cache: dict[str, int] = {}
         self._token_price_cache: dict[str, tuple[float | None, int]] = {}
 
-    async def load_active_position_states(self, wallet_address: str) -> list[PositionState]:
+    async def load_active_position_states(
+        self, wallet_address: str
+    ) -> list[PositionState]:
         owner = self._normalize_address(wallet_address)
         if not owner:
             return []
@@ -109,20 +126,46 @@ class ArbitrumUniswapV3PositionReader:
         now_ts = int(self._now_fn())
         states: list[PositionState] = []
         for raw, current_tick, stale_reasons in active_positions:
+            position_ref = f"uni-v3:{raw.token_id}"
             is_stale = len(stale_reasons) > 0
-            freshness_at = now_ts if not is_stale else max(0, now_ts - self.stale_after_seconds - 1)
-            unclaimed_fees_usd, fee_reason_codes = await self._compute_unclaimed_fees_usd(raw)
+            freshness_at = (
+                now_ts
+                if not is_stale
+                else max(0, now_ts - self.stale_after_seconds - 1)
+            )
+            unclaimed_fees_usd, fee_reason_codes = (
+                await self._compute_unclaimed_fees_usd(raw)
+            )
+            valuation_tick = (
+                current_tick if current_tick is not None else raw.tick_lower
+            )
+            position_value_usd, valuation_reason_codes, amount_token0, amount_token1 = (
+                await self._compute_position_value_usd(
+                    raw,
+                    valuation_tick,
+                )
+            )
+            pnl_hodl_metadata = self._build_pnl_hodl_metadata(
+                position_ref=position_ref,
+                token0=raw.token0,
+                token1=raw.token1,
+                position_value_usd=position_value_usd,
+                unclaimed_fees_usd=unclaimed_fees_usd,
+                valuation_reason_codes=valuation_reason_codes,
+            )
 
             states.append(
                 PositionState(
                     chain=ARBITRUM_CHAIN_NAME,
-                    position_ref=f"uni-v3:{raw.token_id}",
-                    current_tick=current_tick if current_tick is not None else raw.tick_lower,
+                    position_ref=position_ref,
+                    current_tick=(
+                        current_tick if current_tick is not None else raw.tick_lower
+                    ),
                     lower_tick=raw.tick_lower,
                     upper_tick=raw.tick_upper,
                     liquidity=float(raw.liquidity),
                     unclaimed_fees_usd=unclaimed_fees_usd,
-                    position_value_usd=0.0,
+                    position_value_usd=position_value_usd,
                     position_manager=self.position_manager_address,
                     data_freshness_at=freshness_at,
                     stale=is_stale,
@@ -135,11 +178,75 @@ class ArbitrumUniswapV3PositionReader:
                         "tokens_owed_0": str(raw.tokens_owed_0),
                         "tokens_owed_1": str(raw.tokens_owed_1),
                         "fee_reason_codes": fee_reason_codes,
+                        "valuation_reason_codes": valuation_reason_codes,
+                        "position_amount_token0": f"{amount_token0:.18f}",
+                        "position_amount_token1": f"{amount_token1:.18f}",
+                        "position_value_source": "LIQUIDITY_TICK_MODEL_V1",
+                        **pnl_hodl_metadata,
                     },
                 )
             )
 
         return states
+
+    def _build_pnl_hodl_metadata(
+        self,
+        *,
+        position_ref: str,
+        token0: str,
+        token1: str,
+        position_value_usd: float,
+        unclaimed_fees_usd: float,
+        valuation_reason_codes: list[str],
+    ) -> dict[str, Any]:
+        lookup = self._baseline_provider.lookup(position_ref)
+        baseline = lookup.baseline
+        if baseline is None:
+            reason = str(lookup.reason_code or ENTRY_BASELINE_MISSING)
+            return {
+                "pnl_reason_codes": [reason],
+                "hodl_reason_codes": [reason],
+            }
+
+        if len(valuation_reason_codes) > 0:
+            reason_codes = sorted(
+                set([*valuation_reason_codes, "POSITION_VALUE_UNAVAILABLE"])
+            )
+            return {
+                "pnl_reason_codes": reason_codes,
+                "hodl_reason_codes": reason_codes,
+            }
+
+        current_price_0 = self._get_cached_price_usd(token0)
+        current_price_1 = self._get_cached_price_usd(token1)
+        if current_price_0 is None or current_price_1 is None:
+            return {
+                "pnl_reason_codes": ["STALE_PRICE"],
+                "hodl_reason_codes": ["STALE_PRICE"],
+            }
+
+        entry_value_usd = baseline.entry_value_usd
+        hodl_value_usd = (baseline.entry_token0_amount * current_price_0) + (
+            baseline.entry_token1_amount * current_price_1
+        )
+        net_pnl_usd = (position_value_usd + unclaimed_fees_usd) - entry_value_usd
+        pnl_vs_hodl_usd = (position_value_usd + unclaimed_fees_usd) - hodl_value_usd
+
+        values = [entry_value_usd, hodl_value_usd, net_pnl_usd, pnl_vs_hodl_usd]
+        if any((not math.isfinite(v) for v in values)):
+            return {
+                "pnl_reason_codes": [ENTRY_BASELINE_MALFORMED],
+                "hodl_reason_codes": [ENTRY_BASELINE_MALFORMED],
+            }
+
+        return {
+            "entry_value_usd": entry_value_usd,
+            "hodl_value_usd": hodl_value_usd,
+            "net_pnl_usd": net_pnl_usd,
+            "pnl_vs_hodl_usd": pnl_vs_hodl_usd,
+            "pnl_reason_codes": [],
+            "hodl_reason_codes": [],
+        }
 
     async def _read_balance(self, owner: str) -> int:
         data = self._BALANCE_OF(owner)
@@ -179,8 +286,12 @@ class ArbitrumUniswapV3PositionReader:
             tokens_owed_1=self._decode_uint_word(words[11]),
         )
 
-    async def _read_current_tick(self, position: _RawPosition) -> tuple[int | None, list[str]]:
-        pool_address = await self._get_pool(position.token0, position.token1, position.fee)
+    async def _read_current_tick(
+        self, position: _RawPosition
+    ) -> tuple[int | None, list[str]]:
+        pool_address = await self._get_pool(
+            position.token0, position.token1, position.fee
+        )
         if not pool_address:
             return None, ["STALE_POSITION_DATA"]
 
@@ -207,7 +318,9 @@ class ArbitrumUniswapV3PositionReader:
             self._pool_cache[key] = pool
         return pool
 
-    async def _compute_unclaimed_fees_usd(self, raw: _RawPosition) -> tuple[float, list[str]]:
+    async def _compute_unclaimed_fees_usd(
+        self, raw: _RawPosition
+    ) -> tuple[float, list[str]]:
         reason_codes: list[str] = []
         decimals_0 = await self._get_token_decimals(raw.token0)
         decimals_1 = await self._get_token_decimals(raw.token1)
@@ -221,9 +334,77 @@ class ArbitrumUniswapV3PositionReader:
             reason_codes.append("STALE_PRICE")
             return 0.0, reason_codes
 
-        amount_0 = float(raw.tokens_owed_0) / float(10 ** decimals_0)
-        amount_1 = float(raw.tokens_owed_1) / float(10 ** decimals_1)
+        amount_0 = float(raw.tokens_owed_0) / float(10**decimals_0)
+        amount_1 = float(raw.tokens_owed_1) / float(10**decimals_1)
         return (amount_0 * price_0) + (amount_1 * price_1), reason_codes
+
+    async def _compute_position_value_usd(
+        self,
+        raw: _RawPosition,
+        current_tick: int,
+    ) -> tuple[float, list[str], float, float]:
+        reason_codes: list[str] = []
+        decimals_0 = await self._get_token_decimals(raw.token0)
+        decimals_1 = await self._get_token_decimals(raw.token1)
+        if decimals_0 is None or decimals_1 is None:
+            reason_codes.append("TOKEN_DECIMALS_MISSING")
+            return 0.0, reason_codes, 0.0, 0.0
+
+        amount_raw_0, amount_raw_1 = self._compute_raw_position_amounts(
+            liquidity=raw.liquidity,
+            current_tick=current_tick,
+            tick_lower=raw.tick_lower,
+            tick_upper=raw.tick_upper,
+        )
+        if amount_raw_0 < 0.0 or amount_raw_1 < 0.0:
+            reason_codes.append("POSITION_MATH_INVALID")
+            return 0.0, reason_codes, 0.0, 0.0
+
+        price_0 = self._get_cached_price_usd(raw.token0)
+        price_1 = self._get_cached_price_usd(raw.token1)
+        if price_0 is None or price_1 is None:
+            reason_codes.append("STALE_PRICE")
+            return 0.0, reason_codes, 0.0, 0.0
+
+        amount_0 = amount_raw_0 / float(10**decimals_0)
+        amount_1 = amount_raw_1 / float(10**decimals_1)
+        position_value_usd = (amount_0 * price_0) + (amount_1 * price_1)
+        return max(0.0, position_value_usd), reason_codes, amount_0, amount_1
+
+    @staticmethod
+    def _compute_raw_position_amounts(
+        *,
+        liquidity: int,
+        current_tick: int,
+        tick_lower: int,
+        tick_upper: int,
+    ) -> tuple[float, float]:
+        if liquidity <= 0 or tick_lower >= tick_upper:
+            return 0.0, 0.0
+
+        sqrt_lower = math.pow(1.0001, tick_lower / 2.0)
+        sqrt_upper = math.pow(1.0001, tick_upper / 2.0)
+        if sqrt_lower <= 0.0 or sqrt_upper <= 0.0 or sqrt_upper <= sqrt_lower:
+            return 0.0, 0.0
+
+        amount0_raw = 0.0
+        amount1_raw = 0.0
+        liq = float(liquidity)
+
+        if current_tick <= tick_lower:
+            amount0_raw = liq * ((sqrt_upper - sqrt_lower) / (sqrt_lower * sqrt_upper))
+        elif current_tick >= tick_upper:
+            amount1_raw = liq * (sqrt_upper - sqrt_lower)
+        else:
+            sqrt_current = math.pow(1.0001, current_tick / 2.0)
+            if sqrt_current <= 0.0:
+                return 0.0, 0.0
+            amount0_raw = liq * (
+                (sqrt_upper - sqrt_current) / (sqrt_current * sqrt_upper)
+            )
+            amount1_raw = liq * (sqrt_current - sqrt_lower)
+
+        return max(0.0, amount0_raw), max(0.0, amount1_raw)
 
     async def _prefetch_token_prices(self, positions: list[_RawPosition]) -> None:
         unique_tokens = {raw.token0.lower() for raw in positions}
@@ -232,7 +413,9 @@ class ArbitrumUniswapV3PositionReader:
             return
 
         now_ts = int(self._now_fn())
-        to_fetch = [token for token in unique_tokens if self._should_fetch_price(token, now_ts)]
+        to_fetch = [
+            token for token in unique_tokens if self._should_fetch_price(token, now_ts)
+        ]
         if not to_fetch:
             return
 
@@ -267,7 +450,9 @@ class ArbitrumUniswapV3PositionReader:
 
         # CoinGecko free tier allows 1 contract address per request — query one at a time.
         merged: dict[str, Any] = {}
-        async with httpx.AsyncClient(timeout=self.timeout_seconds, http2=False) as client:
+        async with httpx.AsyncClient(
+            timeout=self.timeout_seconds, http2=False
+        ) as client:
             for token in tokens:
                 try:
                     params = {"contract_addresses": token, "vs_currencies": "usd"}
@@ -340,12 +525,16 @@ class ArbitrumUniswapV3PositionReader:
 
     async def _post_json(self, payload: dict[str, Any]) -> dict[str, Any]:
         if self._request_fn is not None:
-            response = await self._request_fn(self.rpc_url, payload, self.timeout_seconds)
+            response = await self._request_fn(
+                self.rpc_url, payload, self.timeout_seconds
+            )
             if isinstance(response, dict):
                 return response
             raise PositionReaderError("RPC_INVALID_RESPONSE")
         try:
-            async with httpx.AsyncClient(timeout=self.timeout_seconds, http2=False) as client:
+            async with httpx.AsyncClient(
+                timeout=self.timeout_seconds, http2=False
+            ) as client:
                 resp = await client.post(self.rpc_url, json=payload)
                 resp.raise_for_status()
                 body = resp.json()
@@ -373,7 +562,7 @@ class ArbitrumUniswapV3PositionReader:
         raw = result_hex[2:] if result_hex.startswith("0x") else result_hex
         if len(raw) < expected_min_words * 64 or len(raw) % 64 != 0:
             return None
-        return [raw[i:i + 64] for i in range(0, len(raw), 64)]
+        return [raw[i : i + 64] for i in range(0, len(raw), 64)]
 
     @staticmethod
     def _decode_uint(result_hex: str) -> int:
@@ -388,7 +577,7 @@ class ArbitrumUniswapV3PositionReader:
     def _decode_int_word(word_hex: str) -> int:
         value = int(word_hex or "0", 16)
         if value >= (1 << 255):
-            value -= (1 << 256)
+            value -= 1 << 256
         return value
 
     @staticmethod
@@ -418,7 +607,11 @@ class ArbitrumUniswapV3PositionReader:
 
     @classmethod
     def _TOKEN_OF_OWNER_BY_INDEX(cls, owner: str, index: int) -> str:
-        return _TOKEN_OF_OWNER_BY_INDEX_SELECTOR + cls._encode_address_word(owner) + cls._encode_uint_word(index)
+        return (
+            _TOKEN_OF_OWNER_BY_INDEX_SELECTOR
+            + cls._encode_address_word(owner)
+            + cls._encode_uint_word(index)
+        )
 
     @classmethod
     def _POSITIONS(cls, token_id: int) -> str:

@@ -1,0 +1,13 @@
+{
+  "schema_version": "v1",
+  "description": "Entry baselines for real-position PnL/HODL computation. Runtime reads only `positions` map.",
+  "positions": {},
+  "example_positions": {
+    "uni-v3:123456789": {
+      "entry_token0_amount": 1500.0,
+      "entry_token1_amount": 0.75,
+      "entry_price_token0_usd": 1.0,
+      "entry_price_token1_usd": 3200.0
+    }
+  }
+}

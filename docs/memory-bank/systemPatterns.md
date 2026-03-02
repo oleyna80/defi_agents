@@ -2,6 +2,30 @@
 
 ## Architecture Decisions
 - YYYY-MM-DD: <Decision> - <Rationale>
+- 2026-03-01: Real-position P&L/HODL in reader path uses deterministic file-backed entry baseline provider with explicit reason-coded degradation:
+  - baseline source is `docs/memory-bank/position_entry_baselines.json` with deterministic key `position_ref=uni-v3:<token_id>`,
+  - reader emits `entry_value_usd`, `hodl_value_usd`, `net_pnl_usd`, `pnl_vs_hodl_usd` only when baseline and valuation inputs are valid,
+  - baseline source/entry failures are explicit and non-throwing (`ENTRY_BASELINE_MISSING`, `ENTRY_BASELINE_INCOMPLETE`, `ENTRY_BASELINE_MALFORMED`), preserving fail-safe reader-only NO-ACTION semantics.
+  Rationale: close Phase 3.0 integrity gap for real-position analytics without introducing hidden sync side effects, fake P&L values, or execution-path regressions.
+
+- 2026-03-01: Real-position valuation is introduced as a staged integrity contract before full P&L/HODL:
+  - `ArbitrumUniswapV3PositionReader` computes `position_value_usd` from on-chain liquidity + ticks (`LIQUIDITY_TICK_MODEL_V1`),
+  - valuation quality is explicit in reason-codes (`TOKEN_DECIMALS_MISSING`, `STALE_PRICE`, `POSITION_MATH_INVALID`) instead of silent zeros,
+  - unrealized `P&L/HODL` stays fail-transparent via explicit baseline-gap reason (`ENTRY_BASELINE_MISSING`) until entry snapshot/history ingestion is implemented.
+  Rationale: closes the most critical state-integrity gap for execution decisions now, without faking `P&L/HODL` before reliable entry baselines exist.
+
+- 2026-03-01: Deprecated config fields can be retained as explicit legacy-only schema contracts after runtime migration:
+  - `execution.mock_positions` remains in `ExecutionConfig` for backward-compatible config shape,
+  - field is explicitly marked deprecated in schema (`json_schema_extra.deprecated=true`) and documented as runtime-ignored,
+  - sample runtime config must not seed deprecated operational payloads to avoid operator drift.
+  Rationale: preserve non-breaking config loads while making the new runtime source of truth (reader-only execution states) unambiguous.
+
+- 2026-03-01: Execution state source for LP execution loop is fail-closed and reader-only (no mock fallback in runtime):
+  - `main.py::_load_execution_states()` now returns empty state-set when wallet/RPC/reader data is unavailable,
+  - execution loop is skipped safely on empty state-set; it does not load `execution.mock_positions` fallback,
+  - stale-state protection remains explicit via `STALE_POSITION_DATA` reason path (warning telemetry + LIVE policy block).
+  Rationale: Gate-3/LIVE readiness requires removing hidden mock dependency while preserving fail-safe `NO_ACTION` behavior under degraded data conditions.
+
 - 2026-02-26: SHADOW hedge gate can use local connector mock service to decouple runtime validation from external exchange uptime:
   - lightweight HTTP mock (`scripts/hummingbot_shadow_mock.py`) exposes `health/markets/ticker` contracts expected by `HummingbotShadowConnector`,
   - service is run as user unit (`hummingbot-shadow-mock.service`) and can be enabled/disabled independently from `defi-hedger.timer`,

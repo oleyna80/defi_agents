@@ -42,6 +42,7 @@ PoC-v1 ограничен безопасной зоной `PAPER/SHADOW` и по
 - Tech stack: Python async + typed pydantic contracts.
 - Runtime constraint: Hedger остается отдельным worker и не встраивается в `main.py` production cycle.
 - Connector constraint: для PoC допускается локальный mock-сервис; для следующего этапа нужен sandbox/real venue readiness.
+- Venue baseline: `Hyperliquid` — primary; `GMX v2` — fallback для Arbitrum. Для других сетей допускаются аналогичные perp venues по chain coverage/liquidity при неизменном fail-safe контуре.
 
 ## 6. Out of Scope
 - LIVE hedge execution.
@@ -58,7 +59,7 @@ PoC-v1 ограничен безопасной зоной `PAPER/SHADOW` и по
 ## 8. Risks / Open Questions
 - R-001: Расхождение поведения mock и real venue (market metadata, BBO shape).
 - R-002: Недооценка slippage/funding в PoC может завысить perceived readiness.
-- OQ-001: Какой первый production venue для sandbox validation (Binance futures vs Hyperliquid)?
+- OQ-001: Достаточно ли для v1 зафиксировать venue baseline как `Hyperliquid` (primary) + `GMX v2` (Arbitrum fallback), а для остальных сетей выбирать аналогичные perp venues по chain coverage/liquidity?
 - OQ-002: Какие минимальные hedge-notional и cooldown пороги зафиксировать для v1 default?
 
 ## Approvals

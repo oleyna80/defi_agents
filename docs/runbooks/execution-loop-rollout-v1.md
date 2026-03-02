@@ -21,7 +21,7 @@ Required safe defaults before SHADOW:
 - `execution.mode="SHADOW"`
 - `execution.allow_live_mode=false`
 - `execution.policy.kill_switch=false`
-- optional deterministic dry inputs: `execution.mock_positions`
+- `execution.mock_positions` retained only for backward-compatible config shape; current runtime state source is reader-only (`WALLET_ADDRESS` + `RPC_URL_ARBITRUM` via position reader).
 
 ## 2) Reload and start scheduler
 

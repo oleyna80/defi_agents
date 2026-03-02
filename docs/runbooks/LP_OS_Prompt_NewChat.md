@@ -75,7 +75,7 @@ Kill-switch сейчас — ручной флаг в конфиге. **Нужн
 ### TriggerEngine (`src/defi_agents/execution/triggers.py`)
 Триггеры: `OUT_OF_RANGE`, `LOW_RANGE_UTILIZATION`, `EDGE_DECAY`, `COMPOUND_DUE`
 
-⚠️ **КРИТИЧНО:** TriggerEngine сейчас работает на `mock_positions` (`main.py:185`, `main.py:907`). Это главная проблема — весь execution pipeline без реальных данных. **Первая задача — заменить mock_positions на Real Position Reader.**
+✅ **Статус обновлён:** execution state source в runtime уже reader-only (через `main.py::_load_execution_states()`), fallback на `execution.mock_positions` удалён (fail-closed). Текущий фокус Фазы 0: закрыть DoD на реальных позициях (P&L валидация + 48h SHADOW gate).
 
 ### Scheduler
 Сейчас: systemd timer раз в 15 минут (`deploy/systemd/defi-sentinel.timer`).  
@@ -84,7 +84,7 @@ Kill-switch сейчас — ручной флаг в конфиге. **Нужн
 ### Hedger PoC (Plan 020)
 - 88 циклов за 24ч, sim_ok=176, sim_fail=0, connector_errors=0
 - Текущий connector: `hummingbot-shadow-mock` (абстрактный мок)
-- **ИЗМЕНЕНИЕ:** следующий шаг — Hyperliquid testnet коннектор (НЕ Binance Futures sandbox как было в плане)
+- Следующий шаг: `Hyperliquid` testnet (primary) + `GMX v2` fallback для Arbitrum; для других сетей допускаются аналогичные perp venues по chain coverage/liquidity.
 - LIVE для hedger прямо запрещён в Spec 020 до завершения тестирования
 
 ### Gate-3 Canary (условия перехода в LIVE)
@@ -179,7 +179,7 @@ receipt     = web3.eth.wait_for_transaction_receipt(tx_hash)
 ## Текущие фазы разработки
 
 ```
-Фаза 0    (2–3 нед.) — Real Position Reader (Arbitrum + Uni v3, замена mock_positions)
+Фаза 0    (2–3 нед.) — Real Position Reader (Arbitrum + Uni v3, runtime reader-only без mock fallback)
                        Tracker: P&L, HODL, IL, Journal
                        Базовый дашборд
 
@@ -210,7 +210,7 @@ receipt     = web3.eth.wait_for_transaction_receipt(tx_hash)
 
 ## Текущая задача (Фаза 0)
 
-**Цель:** Заменить `mock_positions` в `main.py` на Real Position Reader для Arbitrum + Uniswap v3.
+**Цель:** Закрыть DoD Real Position Reader для Arbitrum + Uniswap v3 после перевода runtime на reader-only path.
 
 **Что должен делать Position Reader:**
 1. Подключиться к кошельку (адрес из `.env`)
@@ -219,7 +219,7 @@ receipt     = web3.eth.wait_for_transaction_receipt(tx_hash)
 4. Получить `slot0` пула → `current_price`, `current_tick`
 5. Получить `feeGrowth + tokensOwed` → накопленные fees
 6. Определить статус: `in_range` если `tickLower ≤ currentTick ≤ tickUpper`
-7. Заменить `mock_positions` в `main.py:185` и `main.py:907`
+7. Подтвердить reader-only path в `main.py::_load_execution_states()` и отсутствие runtime fallback на `execution.mock_positions`
 
 **Источники данных:**
 - Позиции: Alchemy NFT API / `eth_call NonfungiblePositionManager`
@@ -229,7 +229,7 @@ receipt     = web3.eth.wait_for_transaction_receipt(tx_hash)
 - Исторические цены: CoinGecko Historical API по timestamp tx
 
 **DoD Фазы 0:**
-- [ ] mock_positions заменён реальным reader
+- [x] runtime fallback на `execution.mock_positions` удалён; execution state source = reader-only
 - [ ] P&L совпадает с ручным расчётом на ≥ 3 реальных позициях (отклонение < 1%)
 - [ ] HODL benchmark считается корректно
 - [ ] Statuse in/out_of_range обновляется в реальном времени
@@ -255,11 +255,9 @@ receipt     = web3.eth.wait_for_transaction_receipt(tx_hash)
 - `docs/specs/018-lp-autocompound-autorebalance-v1.md` — Spec execution layer
 - `docs/plans/018-lp-autocompound-autorebalance-v1-plan.md` — Plan с Gate-3
 - `docs/specs/020-delta-hedger-poc-v1.md` — Spec hedger (LIVE запрещён)
-- `docs/plans/020-delta-hedger-hummingbot-poc-plan.md` — Plan hedger (обновить: Binance → Hyperliquid)
+- `docs/plans/020-delta-hedger-hummingbot-poc-plan.md` — Plan hedger (`Hyperliquid` primary + `GMX v2` fallback для Arbitrum)
 - `docs/runbooks/execution-loop-rollout-v1.md` — 24h shadow gate операционная дисциплина
 - `docs/memory-bank/scout_config.json:359` — SSOT параметры PolicyGuard
 - `LP_OS_ТехЗадание_v1.1.docx` — Полное актуальное ТЗ
 
 ---
-
-Что делаем дальше?

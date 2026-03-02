@@ -29,6 +29,28 @@ def test_execution_defaults_safe():
     assert cfg.execution.native_live_receipt_poll_seconds == 1.5
     assert cfg.execution.native_live_rpc_env_by_chain["Base"] == "BASE_RPC_URL"
     assert cfg.execution.policy.kill_switch is False
+    assert (
+        cfg.execution.__class__.model_fields["mock_positions"].json_schema_extra
+        == {"deprecated": True}
+    )
+
+
+def test_execution_mock_positions_retained_for_backward_compatibility():
+    cfg = ScoutConfig(
+        execution={
+            "mock_positions": [
+                {
+                    "chain": "Arbitrum",
+                    "position_ref": "legacy:1",
+                    "current_tick": 0,
+                    "lower_tick": -10,
+                    "upper_tick": 10,
+                }
+            ]
+        }
+    )
+    assert len(cfg.execution.mock_positions) == 1
+    assert cfg.execution.mock_positions[0]["position_ref"] == "legacy:1"
 
 
 def test_execution_live_mode_requires_explicit_allow():
@@ -110,5 +132,5 @@ def test_sample_scout_config_includes_execution_block():
     assert cfg.execution.mode in {"PAPER", "SHADOW", "LIVE"}
     assert cfg.execution.primary_adapter == "uniswap_v3_simulate"
     assert cfg.execution.rebalance_edge_decay_bps == 250
-    assert isinstance(cfg.execution.mock_positions, list)
+    assert cfg.execution.mock_positions == []
     assert cfg.execution.krystal_timeout_seconds == 8.0

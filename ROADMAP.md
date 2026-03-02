@@ -253,13 +253,14 @@
 ### Phase 3.0 — Real Position Reader (LP_OS Critical Path, P0)
 *Gate-3/LIVE блокер: execution не должен зависеть от `mock_positions`.*
 
-- [ ] **Replace mock state with real on-chain position reads (Arbitrum + Uniswap v3):**
+- [x] **Replace mock state with real on-chain position reads (Arbitrum + Uniswap v3):**
     - убрать зависимость execution-контура от `execution.mock_positions`,
     - читать позиции через `NonfungiblePositionManager` + `slot0()` + fee fields.
 - [ ] **Position state integrity:**
-    - корректный `in_range/out_of_range` статус в реальном времени,
-    - `P&L` и `HODL benchmark` для реальных позиций.
-- [ ] **Stale data safety gate:**
+    - [x] корректный `in_range/out_of_range` статус в реальном времени,
+    - [x] `position_value_usd` из on-chain liquidity+tick (`LIQUIDITY_TICK_MODEL_V1`) с quality reason-codes,
+    - [ ] `P&L` и `HODL benchmark` для реальных позиций.
+- [x] **Stale data safety gate:**
     - блокировать LIVE execution при `STALE_POSITION_DATA`,
     - добавить явные reason-codes в policy/report path.
 - [ ] **DoD для Gate-3 readiness:**
@@ -363,7 +364,7 @@ DoD: Оператор видит portfolio-level риск + может сказ�
 - [ ] **Funding Rate Monitor:** Отслеживание funding rates на CEX/perp DEX
 - [ ] **Hedge Calculator:** Optimal hedge ratio based on LP delta exposure
 - [ ] **Paper Trading Mode:** Симуляция hedging без реального исполнения
-- [ ] **CEX Integration:** API connection (Binance/Hyperliquid) для hedge execution
+- [ ] **Perp Venue Integration:** API connection (`Hyperliquid` primary, `GMX v2` fallback для Arbitrum) для hedge execution; для других сетей допускаются аналогичные perp venue по chain coverage/liquidity.
 - [ ] **Basis Tracker:** Мониторинг basis risk (spot vs futures)
 - [ ] **Liquidation Guard:** Pre-emptive de-leverage при приближении к ликвидации
 

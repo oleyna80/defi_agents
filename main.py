@@ -184,57 +184,30 @@ def _mark_telegram_no_opps_heartbeat_sent() -> None:
     cache.set("last_sent_at", int(time()), ttl_seconds=365 * 24 * 3600)
 
 
-def _load_execution_mock_states(
-    config: ScoutConfig,
-    *,
-    mark_stale: bool = False,
-    stale_reason: str = "STALE_POSITION_DATA",
-) -> list[PositionState]:
-    states: list[PositionState] = []
-    for idx, raw in enumerate(list(getattr(config.execution, "mock_positions", []) or [])):
-        if not isinstance(raw, dict):
-            logger.warning("Execution mock position skipped: idx=%s reason=INVALID_SHAPE", idx)
-            continue
-        try:
-            state = PositionState(**raw)
-            if mark_stale:
-                state.stale = True
-                if stale_reason and stale_reason not in state.stale_reason_codes:
-                    state.stale_reason_codes.append(stale_reason)
-            states.append(state)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(
-                "Execution mock position skipped: idx=%s reason=VALIDATION_ERROR err=%s",
-                idx,
-                exc.__class__.__name__,
-            )
-    return states
-
-
 async def _load_execution_states(config: ScoutConfig) -> list[PositionState]:
     wallet_address = os.getenv("WALLET_ADDRESS", "").strip()
     rpc_url = os.getenv("RPC_URL_ARBITRUM", "").strip()
 
     if not wallet_address:
-        logger.warning("Execution state source fallback: reason=WALLET_ADDRESS_MISSING source=mock_positions")
-        return _load_execution_mock_states(config, mark_stale=True)
+        logger.warning("Execution state source unavailable: reason=WALLET_ADDRESS_MISSING source=position_reader")
+        return []
     if not rpc_url:
-        logger.warning("Execution state source fallback: reason=RPC_URL_ARBITRUM_MISSING source=mock_positions")
-        return _load_execution_mock_states(config, mark_stale=True)
+        logger.warning("Execution state source unavailable: reason=RPC_URL_ARBITRUM_MISSING source=position_reader")
+        return []
 
     reader = ArbitrumUniswapV3PositionReader(rpc_url=rpc_url)
     try:
         states = await reader.load_active_position_states(wallet_address)
     except Exception as exc:  # noqa: BLE001
         logger.warning(
-            "Execution state source fallback: reason=POSITION_READER_ERROR err=%s source=mock_positions",
+            "Execution state source unavailable: reason=POSITION_READER_ERROR err=%s source=position_reader",
             exc.__class__.__name__,
         )
-        return _load_execution_mock_states(config, mark_stale=True)
+        return []
 
     if not states:
-        logger.warning("Execution state source fallback: reason=NO_ACTIVE_POSITIONS source=mock_positions")
-        return _load_execution_mock_states(config, mark_stale=True)
+        logger.warning("Execution state source empty: reason=NO_ACTIVE_POSITIONS source=position_reader")
+        return []
 
     stale_count = sum(1 for state in states if state.stale)
     if stale_count > 0:

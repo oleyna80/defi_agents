@@ -19,4 +19,5 @@
 - 018-lp-autocompound-autorebalance-v1-plan.md
 - 019-v3utils-reuse-execution-plan.md
 - 020-delta-hedger-hummingbot-poc-plan.md
+- 021-phase3-position-pnl-hodl-roo-task.md
 - (add plans here)

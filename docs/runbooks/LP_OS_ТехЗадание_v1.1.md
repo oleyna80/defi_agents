@@ -68,9 +68,9 @@ hummingbot\-shadow\-mock, 88 циклов без ошибок за 24ч
 
 Слой 0: Tracker
 
-❌ Не начат
+🟡 В работе
 
-Работает на mock\_positions — критический путь
+Reader-only state source уже в runtime (Arbitrum Uniswap v3); fallback на mock\_positions удалён. Критический путь: закрыть P\&L/HODL DoD на реальных позициях.
 
 Слой 1: Intelligence
 
@@ -336,7 +336,7 @@ fees\_earned\_usd > gas\_cost × 3 ИЛИ fees > $50 ИЛИ 24ч
 
 Compound
 
-⚠️  Сейчас TriggerEngine работает на mock\_positions\. Первый приоритет \(Фаза 0\) — подключить Real Position Reader\.
+✅  Execution state source переведён на reader-only path \(fail-closed, без runtime fallback на mock\_positions\). Фокус Фазы 0: закрыть DoD real-position валидации \(P&L + SHADOW gate\)\.
 
 ## __2\.5 Hedger PoC \(Plan 020\)__
 
@@ -354,7 +354,7 @@ hummingbot\-shadow\-mock \(абстрактный, не реальная бир�
 
 Запланированный venue
 
-Binance Futures sandbox → ИЗМЕНИТЬ на Hyperliquid testnet \(см\. раздел 7\.3\)
+Hyperliquid testnet \(primary\) + GMX v2 для Arbitrum \(fallback\); для других сетей допускаются аналогичные perp venues по chain coverage/liquidity \(см\. раздел 7\.3\)
 
 LIVE статус
 
@@ -557,7 +557,7 @@ __Stale data guard__
 
 __Критический путь__
 
-Real Position Reader = замена mock\_positions в main\.py:185 и main\.py:907\.
+Real Position Reader = reader-only execution state source в runtime \(main.py::_load_execution_states\), без fallback на mock\_positions\.
 
 Без него невозможен LIVE execution\. Это первое что строим\.
 
@@ -571,7 +571,7 @@ Real Position Reader = замена mock\_positions в main\.py:185 и main\.py:
 4. Получить текущий slot0 пула: sqrtPriceX96, tick → вычислить current\_price
 5. Получить накопленные fees: positions\(\) → feeGrowth \+ tokensOwed
 6. Определить статус: in\_range если tickLower ≤ currentTick ≤ tickUpper
-7. Заменить mock\_positions в main\.py на вызов этого reader
+7. Подтвердить reader-only path в runtime и отсутствие fallback на mock\_positions в execution loop
 
 ## __5\.2 Источники данных по приоритету__
 
@@ -1201,9 +1201,7 @@ Fail\-closed
 
 __Изменение в Plan 020__
 
-Следующий шаг: НЕ Binance Futures sandbox\.
-
-Следующий шаг: Hyperliquid testnet коннектор \(заменить hummingbot\-shadow\-mock\)\.
+Следующий шаг: Hyperliquid testnet коннектор \(primary, замена hummingbot\-shadow\-mock\)\.
 
 GMX v2 — fallback для позиций на Arbitrum где Hyperliquid может быть неудобен\.
 
@@ -1331,13 +1329,13 @@ __Position Reader__
 
 2–3 нед\.
 
-- Real Position Reader: Arbitrum \+ Uniswap v3 \(замена mock\_positions\)
+- Real Position Reader: Arbitrum \+ Uniswap v3 \(runtime reader-only path, без mock fallback\)
 - Синхронизация истории кошелька через Alchemy Transaction API
 - Tracker: P&L, Gross IL, HODL benchmark, Fee APR
 - Position Journal: теги, тезисы, заметки
 - Stale data guard \+ backoff rules
 - Базовый веб\-дашборд: сводка портфеля \+ статус позиций \+ opportunity cost \(заглушка\)
-- DoD: mock\_positions заменён, P&L верен на ≥ 3 реальных позициях
+- DoD: runtime reader-only path подтверждён; P&L верен на ≥ 3 реальных позициях
 
 __Фаза 0\.5__
 
@@ -1606,4 +1604,3 @@ __Критерий добавления__
 Нет документации / молодой протокол → ждём или форкаем похожий адаптер\.
 
 LP Operating System  •  Техническое задание v1\.1  •  Февраль 2026
-

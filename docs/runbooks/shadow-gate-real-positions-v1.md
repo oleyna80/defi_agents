@@ -125,9 +125,9 @@ Execution summary: mode=SHADOW states=N tx_plans=... sim_ok=... exec_ok=0 ...
 
 Если `WALLET_ADDRESS` не задан на VPS → появится:
 ```
-Execution state source fallback: reason=WALLET_ADDRESS_MISSING source=mock_positions
+Execution state source unavailable: reason=WALLET_ADDRESS_MISSING source=position_reader
 ```
-Это нормально для mock-режима, но не пройдёт Gate.
+Это fail-closed поведение: execution loop будет пропущен, fallback на `mock_positions` больше не используется.
 
 ---
 

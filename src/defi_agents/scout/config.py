@@ -325,7 +325,14 @@ class ExecutionConfig(BaseModel):
     compound_min_fees_usd: float = Field(default=5.0, ge=0.0)
     rebalance_min_range_utilization: float = Field(default=0.15, ge=0.0, le=1.0)
     rebalance_edge_decay_bps: int = Field(default=250, ge=0, le=10_000)
-    mock_positions: List[dict] = Field(default_factory=list)
+    mock_positions: List[dict] = Field(
+        default_factory=list,
+        description=(
+            "DEPRECATED: kept only for backward-compatible config shape. "
+            "Runtime execution-state source is reader-only and ignores this field."
+        ),
+        json_schema_extra={"deprecated": True},
+    )
     krystal_enabled: bool = False
     krystal_base_url: str = "https://cloud-api.krystal.app"
     krystal_api_key_env: str = "KRYSTAL_CLOUD_API_KEY"
