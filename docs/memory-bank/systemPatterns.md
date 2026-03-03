@@ -2,6 +2,18 @@
 
 ## Architecture Decisions
 - YYYY-MM-DD: <Decision> - <Rationale>
+- 2026-03-02: Gate-3 evidence intake for reader/SHADOW is script-driven instead of ad-hoc log parsing:
+  - `scripts/gate3_evidence_report.py` is the canonical evidence snapshot command (`make gate3-evidence-report`),
+  - parser logic is centralized in `src/defi_agents/execution/gate3_evidence.py`,
+  - output includes both preflight blockers (`wallet_set`, `rpc_set`, baseline count) and runtime counters (`reader_ok`, `sim_fail`, `errors`) with explicit gate booleans.
+  Rationale: avoid manual counting drift and keep Gate-3 PASS/FAIL decisions reproducible.
+
+- 2026-03-02: Test gate for async suites is fail-fast by plugin contract, not warning-based:
+  - `pytest.ini` requires `pytest-asyncio` (`required_plugins=pytest-asyncio`),
+  - asyncio execution uses strict mode (`--asyncio-mode=strict`),
+  - environments without async plugin now fail explicitly instead of silently skipping async tests.
+  Rationale: prevent false-green CI/local runs where async coverage is unintentionally dropped.
+
 - 2026-03-01: Real-position P&L/HODL in reader path uses deterministic file-backed entry baseline provider with explicit reason-coded degradation:
   - baseline source is `docs/memory-bank/position_entry_baselines.json` with deterministic key `position_ref=uni-v3:<token_id>`,
   - reader emits `entry_value_usd`, `hodl_value_usd`, `net_pnl_usd`, `pnl_vs_hodl_usd` only when baseline and valuation inputs are valid,

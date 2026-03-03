@@ -267,6 +267,11 @@
     - минимум 3 реальные позиции с отклонением расчёта `P&L < 1%` от ручной проверки,
     - стабильная работа reader path в SHADOW без runtime failures.
 
+- **Gate-3 evidence status (2026-03-02):** `FAIL` (insufficient evidence in repo-local artifacts)
+    - в текущем evidence pack нет подтверждённых `>=3` реальных позиций с заполненным `pnl_vs_hodl`;
+    - нет подтверждения SHADOW-критерия из runbook (`reader_ok >= 90` в 48h окне);
+    - reader-only fail-closed контракт подтверждён, но этого недостаточно для PASS Gate-3.
+
 DoD: Gate-3 canary и любой `LIVE` execution остаются заблокированными до закрытия Phase 3.0.
 
 ### Phase 3.1 — Strategy Calibration + Forward Simulation (P1)
@@ -306,7 +311,7 @@ DoD: Оператор видит полную картину каждой поз
 
 - **Execution track status (2026-02-23):**
   - Spec 018 approved; implementation phases A-F completed (contracts, triggers, policy, adapters, orchestrator).
-  - Phase G SHADOW gate passed (24h): `runs=85`, `execution_summaries=85`, `errors=0`, `sim_fail=0`, `exec_fail=0`.
+  - Phase G SHADOW gate passed (24h, historical execution-track gate): `runs=85`, `execution_summaries=85`, `errors=0`, `sim_fail=0`, `exec_fail=0`.
   - Phase H prep: kill-switch drill passed in controlled LIVE profile (`KILL_SWITCH_ENABLED` hard-block confirmed), rollback to SHADOW verified.
   - LP_OS alignment: Gate-3/LIVE remains blocked by unresolved Phase 3.0 (`Real Position Reader`, no mock dependency).
   - Added LIVE-capable native path `native_uniswap_v3_live` (RPC `eth_sendRawTransaction` + receipt polling for pre-signed tx payloads).

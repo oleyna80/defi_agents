@@ -162,6 +162,18 @@ echo "errors=$(journalctl --user -u defi-sentinel.service --since '48 hours ago'
 echo "reader_ok=$(journalctl --user -u defi-sentinel.service --since '48 hours ago' --no-pager | grep -c 'source=position_reader')"
 ```
 
+Альтернатива (автоматизированный snapshot в JSON):
+
+```bash
+cd ~/projects/defi_agents
+make gate3-evidence-report
+```
+
+Команда агрегирует в одном выводе:
+- preflight (`wallet_set`, `rpc_set`, `baseline_positions_count`);
+- counters (`execution_cycles`, `reader_ok`, `sim_ok`, `sim_fail`, `errors`);
+- gate checks (`reader_ok_threshold_pass`, `errors_zero_pass`, `sim_fail_zero_pass`).
+
 ---
 
 ## Gate-2 DoD (условия прохождения)

@@ -1,17 +1,43 @@
-# Agent SDD Template Pack
+# DeFi Agents
 
-This folder is a reusable template for agent-driven Spec-Driven Development (SDD).
-Copy the contents into a new project root, then ask an agent to follow the
-project bootstrap workflow.
+Репозиторий для **Universal DeFi Agent**: мониторинг, оценка и автоматизация DeFi-позиций с fail-safe подходом, reader-only критическими путями и staged rollout (`PAPER -> SHADOW -> LIVE`).
 
-Quick start:
-1. Copy this folder contents into your project root.
-2. Open `AGENTS.md` and `CLAUDE.md` and fill the project-specific sections.
-3. Ask the agent to run `.agent/workflows/project-bootstrap.md`.
+## Назначение
 
-Notes:
-- Memory Bank lives in `docs/memory-bank/`.
-- Specs live in `docs/specs/`.
-- Plans live in `docs/plans/`.
-- Rules/roles/skills/workflows live in `.agent/`.
-- VPS/subdomain deployment pack lives in `deploy/vps/`.
+- Поиск и оценка DeFi-возможностей (Scout + risk/freshness).
+- Мониторинг существующих позиций и состояния execution/hedger контуров.
+- Подготовка и оркестрация execution-интентов через адаптеры с policy-gate.
+- Операторская дисциплина через runbooks, планы и Memory Bank.
+
+## Основные модули
+
+- `main.py` — основной цикл Sentinel.
+- `src/defi_agents/scout/` — discovery, фильтрация, скоринг кандидатов.
+- `src/defi_agents/freshness/` — re-check свежести/дивергенции данных.
+- `src/defi_agents/security/` — security screening и policy tags.
+- `src/defi_agents/execution/` — trigger/policy/orchestrator/adapter слой.
+- `src/defi_agents/tracker/` — reader-only state source и метрики позиций.
+- `src/defi_agents/hedger/` + `hedger_main.py` — изолированный hedger worker (PAPER/SHADOW).
+- `tests/` — регрессионный pytest-набор.
+
+## Запуск
+
+```bash
+make setup
+make run
+```
+
+Для hedger worker:
+
+```bash
+make hedger-run
+```
+
+## Тестирование
+
+```bash
+pytest -q
+make test
+```
+
+`pytest.ini` включает strict markers и регистрирует `asyncio` marker, чтобы test gate падал на неизвестных маркерах и не допускал тихих предупреждений по async-тестам.

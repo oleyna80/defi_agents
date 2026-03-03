@@ -26,7 +26,7 @@ __Изменения относительно v1\.0__
 
 ✦ Обновлён раздел 7\.3: Hedger venue → Hyperliquid \(вместо Binance Futures\)
 
-✦ Обновлён раздел 11: Фазы — с учётом критического пути через mock\_positions
+✦ Обновлён раздел 11: Фазы — с учётом reader-only критического пути \(без runtime fallback на mock\_positions\)
 
 ✦ Добавлена: Глоссарий терминов P&L / IL
 
@@ -220,17 +220,17 @@ Calldata builder для V3Utils контракта \+ live transport от uniswa
 
 krystal
 
-krystal\_reader
+krystal
 
-Read\-only: парсинг позиций и данных\. Перемещён из execution в data/reader слой
+Execution adapter для build/simulate path \(non-live\); не является runtime-источником execution state
 
-❌ Перемещён
+❌ Discovery-only для execution API \(LIVE unavailable\)
 
 __Рефакторинг__
 
 Переименование — 10 минут работы, но сильно снижает когнитивную нагрузку для агентов\.
 
-Krystal adapter: убрать из execution chain, переместить в /reader/krystal\_reader\.py как источник данных о позициях\.
+Krystal adapter migration в reader-слой — отдельный backlog-трек \(в рамках v1\.1 не выполнено\).
 
 Объединять адаптеры НЕ нужно — у каждого своя ответственность\.
 
@@ -735,17 +735,17 @@ __Definition of Done — Фаза 0__
 
 ✅ mock\_positions заменён на реальный reader в main\.py
 
-✅ P&L совпадает с ручным расчётом для ≥ 3 реальных позиций \(отклонение < 1%\)
+❌ P&L совпадает с ручным расчётом для ≥ 3 реальных позиций \(отклонение < 1%\)
 
-✅ HODL benchmark считается корректно на known positions
+❌ HODL benchmark считается корректно на known positions
 
 ✅ Статус in/out\_of\_range обновляется в реальном времени
 
-✅ История транзакций импортирована корректно
+❌ История транзакций импортирована корректно
 
 ✅ Stale data guard работает \(тест: отключить RPC → проверить флаг\)
 
-✅ Dashboard главный экран: сводка портфеля \+ статус позиций \+ opportunity cost
+❌ Dashboard главный экран: сводка портфеля \+ статус позиций \+ opportunity cost
 
 # __6\. Дизайн главного экрана дашборда__
 
@@ -1335,7 +1335,7 @@ __Position Reader__
 - Position Journal: теги, тезисы, заметки
 - Stale data guard \+ backoff rules
 - Базовый веб\-дашборд: сводка портфеля \+ статус позиций \+ opportunity cost \(заглушка\)
-- DoD: runtime reader-only path подтверждён; P&L верен на ≥ 3 реальных позициях
+- DoD: runtime reader-only path подтверждён; P&L/HODL валидация на ≥ 3 реальных позициях остаётся открытой
 
 __Фаза 0\.5__
 

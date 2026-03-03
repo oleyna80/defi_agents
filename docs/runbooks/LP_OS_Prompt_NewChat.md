@@ -58,7 +58,7 @@ Flow: `trigger → policy_check → build_tx_plan → simulate → execute`
 | `native_uniswap_v3` | `uniswap_v3_simulate` | PAPER/SHADOW baseline + calldata builder + fallback |
 | `native_uniswap_v3_live` | `uniswap_v3_live` | LIVE transport: eth_sendRawTransaction |
 | `v3utils` | `v3utils_live` | V3Utils calldata + live transport |
-| `krystal` | `krystal_reader` | Переместить в /reader/ — только read-only данные |
+| `krystal` | `krystal` | Execution adapter для build/simulate (non-live); runtime execution-state source остаётся reader-only |
 
 ### PolicyGuard (`src/defi_agents/execution/policy.py`)
 Параметры (SSOT `scout_config.json`):

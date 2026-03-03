@@ -20,4 +20,5 @@
 - 019-v3utils-reuse-execution-plan.md
 - 020-delta-hedger-hummingbot-poc-plan.md
 - 021-phase3-position-pnl-hodl-roo-task.md
+- 022-process-sync-and-test-gate-roo-task.md
 - (add plans here)

@@ -1,4 +1,4 @@
-.PHONY: setup install test run hedger-run live-l3 lint clean dry-run krystal-probe hedger-gate-report
+.PHONY: setup install test run hedger-run live-l3 lint clean dry-run krystal-probe hedger-gate-report gate3-evidence-report
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -29,6 +29,9 @@ krystal-probe:
 
 hedger-gate-report:
 	./scripts/hedger_shadow_gate_report.sh "24 hours ago"
+
+gate3-evidence-report:
+	PYTHONPATH=src $(PYTHON) scripts/gate3_evidence_report.py --window "48 hours ago"
 
 test:
 	PYTHONPATH=src $(PYTEST) -v tests/

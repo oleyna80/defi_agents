@@ -77,7 +77,24 @@ Gate:
 - `shadow_metrics` appears on every (or near every) cycle with picks
 - SHADOW channel receives digest at configured interval
 
-## 5.1 `/recheck` smoke (optional, proxy mode)
+## 5.1) Gate-3 evidence linkage (reader-only path)
+
+For Gate-3 Evidence Pack use this runbook together with:
+
+- `docs/runbooks/shadow-gate-real-positions-v1.md`
+- `docs/reports/gate3-evidence-YYYY-MM-DD.md`
+
+Current Gate-3 evidence expectations:
+
+- at least 3 real reader-backed positions with `pnl_vs_hodl` fields recorded;
+- SHADOW stability evidence for the current N-cycle threshold from runbook/roadmap
+  (`reader_ok >= 90` in the 48h gate window);
+- no fail-open behavior (reader unavailability must remain explicit reason-coded skip path,
+  not silent mock fallback).
+
+Do not mark Gate-3 as PASS when these evidence conditions are not met.
+
+## 5.2 `/recheck` smoke (optional, proxy mode)
 
 In Telegram SHADOW chat send:
 
