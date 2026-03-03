@@ -2,6 +2,12 @@
 
 ## Architecture Decisions
 - YYYY-MM-DD: <Decision> - <Rationale>
+- 2026-03-03: Gate-3 evidence collector is position-aware and emits both window-level and position-level pass signals in a single JSON snapshot:
+  - log-window counters remain (`reader_ok`, `sim_fail`, `errors`),
+  - reader samples are embedded as `position_samples` with computed `position_pnl_usd/hodl_pnl_usd/pnl_vs_hodl_usd`,
+  - minimum valid positions are enforced via `position_samples_min_pass` (`--min-positions`, default `3`).
+  Rationale: eliminate split evidence collection (manual reader dump + separate gate report) and keep Gate-3 decision artifacts deterministic.
+
 - 2026-03-02: Gate-3 evidence intake for reader/SHADOW is script-driven instead of ad-hoc log parsing:
   - `scripts/gate3_evidence_report.py` is the canonical evidence snapshot command (`make gate3-evidence-report`),
   - parser logic is centralized in `src/defi_agents/execution/gate3_evidence.py`,

@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import json
 
+from defi_agents.execution.models import PositionState
 from defi_agents.execution.gate3_evidence import (
+    build_position_sample,
+    count_valid_position_samples,
     parse_execution_summary_line,
     read_baseline_positions_count,
     summarize_log_lines,
+    summarize_position_samples,
 )
 
 
@@ -65,3 +69,82 @@ def test_read_baseline_positions_count_handles_shapes(tmp_path) -> None:
 
     path.write_text("{bad json", encoding="utf-8")
     assert read_baseline_positions_count(path) == 0
+
+
+def test_build_position_sample_valid_values() -> None:
+    state = PositionState(
+        chain="Arbitrum",
+        position_ref="uni-v3:1",
+        current_tick=1,
+        lower_tick=0,
+        upper_tick=2,
+        data_freshness_at=12345,
+        metadata={
+            "entry_value_usd": 100.0,
+            "hodl_value_usd": 120.0,
+            "net_pnl_usd": 15.0,
+            "pnl_vs_hodl_usd": -5.0,
+            "pnl_reason_codes": [],
+        },
+    )
+    sample = build_position_sample(state)
+    assert sample["position_id"] == "uni-v3:1"
+    assert sample["as_of_ts"] == 12345
+    assert sample["position_pnl_usd"] == 15.0
+    assert sample["hodl_pnl_usd"] == 20.0
+    assert sample["pnl_vs_hodl_usd"] == -5.0
+    assert sample["reason_codes"] == []
+    assert sample["is_valid"] is True
+
+
+def test_build_position_sample_invalid_when_reason_codes_or_missing_values() -> None:
+    state = PositionState(
+        chain="Arbitrum",
+        position_ref="uni-v3:2",
+        current_tick=1,
+        lower_tick=0,
+        upper_tick=2,
+        data_freshness_at=12346,
+        metadata={
+            "entry_value_usd": 100.0,
+            "hodl_value_usd": 120.0,
+            "net_pnl_usd": 15.0,
+            "pnl_vs_hodl_usd": None,
+            "pnl_reason_codes": ["ENTRY_BASELINE_MISSING"],
+        },
+    )
+    sample = build_position_sample(state)
+    assert sample["position_id"] == "uni-v3:2"
+    assert sample["is_valid"] is False
+    assert sample["reason_codes"] == ["ENTRY_BASELINE_MISSING"]
+
+
+def test_summarize_position_samples_counts_valid() -> None:
+    valid = PositionState(
+        chain="Arbitrum",
+        position_ref="uni-v3:ok",
+        current_tick=1,
+        lower_tick=0,
+        upper_tick=2,
+        data_freshness_at=1,
+        metadata={
+            "entry_value_usd": 100.0,
+            "hodl_value_usd": 110.0,
+            "net_pnl_usd": 5.0,
+            "pnl_vs_hodl_usd": -5.0,
+            "pnl_reason_codes": [],
+        },
+    )
+    invalid = PositionState(
+        chain="Arbitrum",
+        position_ref="uni-v3:bad",
+        current_tick=1,
+        lower_tick=0,
+        upper_tick=2,
+        data_freshness_at=2,
+        metadata={"pnl_reason_codes": ["ENTRY_BASELINE_MISSING"]},
+    )
+    samples, valid_count = summarize_position_samples([valid, invalid])
+    assert len(samples) == 2
+    assert valid_count == 1
+    assert count_valid_position_samples(samples) == 1

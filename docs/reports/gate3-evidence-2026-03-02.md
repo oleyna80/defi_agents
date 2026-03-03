@@ -35,7 +35,7 @@ Collected in this repository session: **1 / 3** real positions.
 
 | position_id | as_of_ts | position_pnl_usd | hodl_pnl_usd | pnl_vs_hodl_usd | reason_code |
 |---|---|---:|---:|---:|---|
-| `uni-v3:5340024` | `1772541767` | `-10.3341` | `-9.2831` | `-1.0511` | `[]` |
+| `uni-v3:5340024` | `1772543586` | `-11.8432` | `-10.2487` | `-1.5945` | `[]` |
 
 ## SHADOW Stability Check
 
@@ -68,6 +68,7 @@ Executed:
   "unit": "defi-sentinel.service",
   "window": "48 hours ago",
   "reader_threshold": 90,
+  "min_positions": 3,
   "preflight": {
     "wallet_set": true,
     "rpc_set": true,
@@ -83,10 +84,24 @@ Executed:
     "exec_ok": 0,
     "exec_fail": 0
   },
+  "position_samples": [
+    {
+      "position_id": "uni-v3:5340024",
+      "as_of_ts": 1772543586,
+      "position_pnl_usd": -11.843228760516638,
+      "hodl_pnl_usd": -10.248718372383564,
+      "pnl_vs_hodl_usd": -1.5945103881330738,
+      "reason_codes": [],
+      "is_valid": true
+    }
+  ],
+  "position_samples_count": 1,
+  "position_samples_valid_count": 1,
   "gate_checks": {
     "reader_ok_threshold_pass": false,
     "errors_zero_pass": true,
-    "sim_fail_zero_pass": true
+    "sim_fail_zero_pass": true,
+    "position_samples_min_pass": false
   }
 }
 ```

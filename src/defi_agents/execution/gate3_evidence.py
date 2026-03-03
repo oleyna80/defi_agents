@@ -4,7 +4,9 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
+
+from .models import PositionState
 
 
 _EXEC_SUMMARY_RE = re.compile(
@@ -96,3 +98,60 @@ def read_baseline_positions_count(path: str | Path) -> int:
     if not isinstance(positions, dict):
         return 0
     return len(positions)
+
+
+def build_position_sample(state: PositionState) -> dict[str, Any]:
+    metadata = state.metadata if isinstance(state.metadata, dict) else {}
+
+    entry_value_usd = _to_float_or_none(metadata.get("entry_value_usd"))
+    hodl_value_usd = _to_float_or_none(metadata.get("hodl_value_usd"))
+    position_pnl_usd = _to_float_or_none(metadata.get("net_pnl_usd"))
+    pnl_vs_hodl_usd = _to_float_or_none(metadata.get("pnl_vs_hodl_usd"))
+    reason_codes_raw = metadata.get("pnl_reason_codes")
+    reason_codes = (
+        [str(code) for code in reason_codes_raw]
+        if isinstance(reason_codes_raw, list)
+        else []
+    )
+    hodl_pnl_usd = (
+        (hodl_value_usd - entry_value_usd)
+        if (entry_value_usd is not None and hodl_value_usd is not None)
+        else None
+    )
+    is_valid = (
+        pnl_vs_hodl_usd is not None
+        and position_pnl_usd is not None
+        and hodl_pnl_usd is not None
+        and len(reason_codes) == 0
+    )
+
+    return {
+        "position_id": state.position_ref,
+        "as_of_ts": state.data_freshness_at,
+        "position_pnl_usd": position_pnl_usd,
+        "hodl_pnl_usd": hodl_pnl_usd,
+        "pnl_vs_hodl_usd": pnl_vs_hodl_usd,
+        "reason_codes": reason_codes,
+        "is_valid": is_valid,
+    }
+
+
+def summarize_position_samples(states: Iterable[PositionState]) -> tuple[list[dict[str, Any]], int]:
+    samples = [build_position_sample(state) for state in states]
+    valid_count = count_valid_position_samples(samples)
+    return samples, valid_count
+
+
+def count_valid_position_samples(samples: Iterable[dict[str, Any]]) -> int:
+    return sum(1 for sample in samples if sample.get("is_valid") is True)
+
+
+def _to_float_or_none(value: Any) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
