@@ -5,6 +5,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from defi_agents.notifier import TelegramNotifier
+from defi_agents.lp.models import (
+    EntryActionability,
+    EntryConfidenceBand,
+    EntryRecommendation,
+)
 from defi_agents.scout.models import (
     LendingSnapshot,
     LendingSnapshotItem,
@@ -104,12 +109,26 @@ def test_report_sorts_by_pair_categories():
     notifier = TelegramNotifier()
     message = notifier._format_report(
         [
-            _result(priority=PriorityTier.COIN_COIN, bucket="WARN/SECURITY", symbol="WETH-WBTC"),
-            _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol="ETH-USDC"),
-            _result(priority=PriorityTier.LOW_VOLATILITY, bucket="SAFE", symbol="USDC-USDT"),
+            _result(
+                priority=PriorityTier.COIN_COIN,
+                bucket="WARN/SECURITY",
+                symbol="WETH-WBTC",
+            ),
+            _result(
+                priority=PriorityTier.COIN_STABLE,
+                bucket="WARN/REPUTATION",
+                symbol="ETH-USDC",
+            ),
+            _result(
+                priority=PriorityTier.LOW_VOLATILITY, bucket="SAFE", symbol="USDC-USDT"
+            ),
         ]
     )
-    assert message.find("1) Stable/Stable") < message.find("2) Token/Stable") < message.find("3) Token/Token")
+    assert (
+        message.find("1) Stable/Stable")
+        < message.find("2) Token/Stable")
+        < message.find("3) Token/Token")
+    )
 
 
 def test_notifier_uses_custom_chat_id_env(monkeypatch):
@@ -130,7 +149,9 @@ def test_notifier_prefix_applied_once():
 
 def test_extract_recheck_pool_id_parses_command():
     assert TelegramNotifier._extract_recheck_pool_id("/recheck abc-123") == "abc-123"
-    assert TelegramNotifier._extract_recheck_pool_id("/recheck@MyBot abc-123") == "abc-123"
+    assert (
+        TelegramNotifier._extract_recheck_pool_id("/recheck@MyBot abc-123") == "abc-123"
+    )
     assert TelegramNotifier._extract_recheck_pool_id("/recheck") is None
     assert TelegramNotifier._extract_recheck_pool_id("/start") is None
 
@@ -139,9 +160,21 @@ def test_report_filters_non_target_tokens():
     notifier = TelegramNotifier()
     message = notifier._format_report(
         [
-            _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol="WETH-USDC"),
-            _result(priority=PriorityTier.COIN_COIN, bucket="WARN/SECURITY", symbol="WETH-AERO"),
-            _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol="XAUT-USDC"),
+            _result(
+                priority=PriorityTier.COIN_STABLE,
+                bucket="WARN/REPUTATION",
+                symbol="WETH-USDC",
+            ),
+            _result(
+                priority=PriorityTier.COIN_COIN,
+                bucket="WARN/SECURITY",
+                symbol="WETH-AERO",
+            ),
+            _result(
+                priority=PriorityTier.COIN_STABLE,
+                bucket="WARN/REPUTATION",
+                symbol="XAUT-USDC",
+            ),
         ]
     )
     assert "`WETH-USDC`" in message
@@ -153,7 +186,12 @@ def test_report_includes_volume_ratio_when_available():
     notifier = TelegramNotifier()
     message = notifier._format_report(
         [
-            _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol="WETH-USDC", volume_24h_usd=2_000_000),
+            _result(
+                priority=PriorityTier.COIN_STABLE,
+                bucket="WARN/REPUTATION",
+                symbol="WETH-USDC",
+                volume_24h_usd=2_000_000,
+            ),
         ]
     )
     assert "Vol24h" in message
@@ -164,8 +202,18 @@ def test_report_respects_top_n_per_section():
     notifier = TelegramNotifier(top_n_per_section=1)
     message = notifier._format_report(
         [
-            _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol="WETH-USDC", apy=12.0),
-            _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol="WETH-USDT", apy=11.0),
+            _result(
+                priority=PriorityTier.COIN_STABLE,
+                bucket="WARN/REPUTATION",
+                symbol="WETH-USDC",
+                apy=12.0,
+            ),
+            _result(
+                priority=PriorityTier.COIN_STABLE,
+                bucket="WARN/REPUTATION",
+                symbol="WETH-USDT",
+                apy=11.0,
+            ),
         ]
     )
     assert "`WETH-USDC`" in message
@@ -213,7 +261,11 @@ def test_report_includes_turnover_snapshot_section():
     )
     message = notifier._format_report(
         [
-            _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol="WETH-USDC"),
+            _result(
+                priority=PriorityTier.COIN_STABLE,
+                bucket="WARN/REPUTATION",
+                symbol="WETH-USDC",
+            ),
         ],
         turnover_snapshot=[candidate],
     )
@@ -241,7 +293,11 @@ def test_report_blocks_are_section_aligned():
     )
     blocks = notifier._format_report_blocks(
         [
-            _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol="WETH-USDC"),
+            _result(
+                priority=PriorityTier.COIN_STABLE,
+                bucket="WARN/REPUTATION",
+                symbol="WETH-USDC",
+            ),
         ],
         turnover_snapshot=[turnover_candidate],
     )
@@ -283,8 +339,18 @@ def test_report_blocks_include_directional_sections():
         }
     )
     snapshot = YieldDirectionSnapshot(
-        lp_top=[LendingSnapshotItem(candidate=lp_candidate, metric_name="vol_to_tvl", metric_value_pct=3.0)],
-        lending_supply_top=[LendingSnapshotItem(candidate=supply_candidate, metric_name="supply_apy", metric_value_pct=3.4)],
+        lp_top=[
+            LendingSnapshotItem(
+                candidate=lp_candidate, metric_name="vol_to_tvl", metric_value_pct=3.0
+            )
+        ],
+        lending_supply_top=[
+            LendingSnapshotItem(
+                candidate=supply_candidate,
+                metric_name="supply_apy",
+                metric_value_pct=3.4,
+            )
+        ],
     )
     blocks = notifier._format_report_blocks([], directional_snapshot=snapshot)
     joined = "\n".join(blocks)
@@ -373,14 +439,28 @@ def test_report_includes_lending_snapshot_section():
         }
     )
     snapshot = LendingSnapshot(
-        best_eth_supply=LendingSnapshotItem(candidate=candidate_eth, metric_name="supply_apy", metric_value_pct=4.5),
-        best_gho_supply=LendingSnapshotItem(candidate=candidate_gho, metric_name="supply_apy", metric_value_pct=5.2),
-        lowest_eurc_borrow=LendingSnapshotItem(candidate=candidate_eurc, metric_name="borrow_apr", metric_value_pct=1.9),
-        lowest_usdc_borrow=LendingSnapshotItem(candidate=candidate_usdc, metric_name="borrow_apr", metric_value_pct=2.3),
+        best_eth_supply=LendingSnapshotItem(
+            candidate=candidate_eth, metric_name="supply_apy", metric_value_pct=4.5
+        ),
+        best_gho_supply=LendingSnapshotItem(
+            candidate=candidate_gho, metric_name="supply_apy", metric_value_pct=5.2
+        ),
+        lowest_eurc_borrow=LendingSnapshotItem(
+            candidate=candidate_eurc, metric_name="borrow_apr", metric_value_pct=1.9
+        ),
+        lowest_usdc_borrow=LendingSnapshotItem(
+            candidate=candidate_usdc, metric_name="borrow_apr", metric_value_pct=2.3
+        ),
         lowest_borrow_by_symbol={
-            "EURC": LendingSnapshotItem(candidate=candidate_eurc, metric_name="borrow_apr", metric_value_pct=1.9),
-            "USDC": LendingSnapshotItem(candidate=candidate_usdc, metric_name="borrow_apr", metric_value_pct=2.3),
-            "DAI": LendingSnapshotItem(candidate=candidate_dai, metric_name="borrow_apr", metric_value_pct=1.7),
+            "EURC": LendingSnapshotItem(
+                candidate=candidate_eurc, metric_name="borrow_apr", metric_value_pct=1.9
+            ),
+            "USDC": LendingSnapshotItem(
+                candidate=candidate_usdc, metric_name="borrow_apr", metric_value_pct=2.3
+            ),
+            "DAI": LendingSnapshotItem(
+                candidate=candidate_dai, metric_name="borrow_apr", metric_value_pct=1.7
+            ),
         },
     )
     message = notifier._format_report([], lending_snapshot=snapshot)
@@ -435,13 +515,21 @@ def test_pool_link_uses_explorer_for_address_like_pool_id():
         },
         flags=[],
     )
-    assert notifier._pool_link(result) == "https://basescan.org/address/0x1111111111111111111111111111111111111111"
+    assert (
+        notifier._pool_link(result)
+        == "https://basescan.org/address/0x1111111111111111111111111111111111111111"
+    )
 
 
 def test_report_is_chunked_for_telegram_limits():
     notifier = TelegramNotifier()
     many = [
-        _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol="WETH-USDC", apy=10.0 + i)
+        _result(
+            priority=PriorityTier.COIN_STABLE,
+            bucket="WARN/REPUTATION",
+            symbol="WETH-USDC",
+            apy=10.0 + i,
+        )
         for i in range(80)
     ]
     message = notifier._format_report(many)
@@ -452,15 +540,17 @@ def test_report_is_chunked_for_telegram_limits():
 
 def test_tags_included_when_flag_enabled():
     notifier = TelegramNotifier(include_tags=True)
-    message = notifier._format_report([
-        _result(
-            priority=PriorityTier.LOW_VOLATILITY,
-            bucket="SAFE",
-            stable_tier="T1",
-            pair_class="USD_STABLE_STABLE",
-            fx_exposure="false",
-        )
-    ])
+    message = notifier._format_report(
+        [
+            _result(
+                priority=PriorityTier.LOW_VOLATILITY,
+                bucket="SAFE",
+                stable_tier="T1",
+                pair_class="USD_STABLE_STABLE",
+                fx_exposure="false",
+            )
+        ]
+    )
     assert "Tier:T1" in message
     assert "Class:USD_STABLE_STABLE" in message
     assert "FX_RISK" not in message
@@ -470,15 +560,17 @@ def test_tags_included_when_flag_enabled():
 
 def test_fx_risk_tag_included():
     notifier = TelegramNotifier(include_tags=True)
-    message = notifier._format_report([
-        _result(
-            priority=PriorityTier.COIN_STABLE,
-            bucket="WARN/REPUTATION",
-            stable_tier="T2",
-            pair_class="FX_STABLE",
-            fx_exposure="true",
-        )
-    ])
+    message = notifier._format_report(
+        [
+            _result(
+                priority=PriorityTier.COIN_STABLE,
+                bucket="WARN/REPUTATION",
+                stable_tier="T2",
+                pair_class="FX_STABLE",
+                fx_exposure="true",
+            )
+        ]
+    )
     assert "Tier:T2" in message
     assert "Class:FX_STABLE" in message
     assert "FX_RISK" in message
@@ -487,15 +579,17 @@ def test_fx_risk_tag_included():
 
 def test_tags_not_included_when_flag_disabled():
     notifier = TelegramNotifier(include_tags=False)
-    message = notifier._format_report([
-        _result(
-            priority=PriorityTier.LOW_VOLATILITY,
-            bucket="SAFE",
-            stable_tier="T1",
-            pair_class="USD_STABLE_STABLE",
-            fx_exposure="false",
-        )
-    ])
+    message = notifier._format_report(
+        [
+            _result(
+                priority=PriorityTier.LOW_VOLATILITY,
+                bucket="SAFE",
+                stable_tier="T1",
+                pair_class="USD_STABLE_STABLE",
+                fx_exposure="false",
+            )
+        ]
+    )
     assert "Tier:T1" not in message
     assert "Class:USD_STABLE_STABLE" not in message
     assert "FX_RISK" not in message
@@ -505,20 +599,22 @@ def test_tags_not_included_when_flag_disabled():
 
 def test_strategy_fields_hidden_when_not_ok():
     notifier = TelegramNotifier()
-    message = notifier._format_report([
-        _result(
-            priority=PriorityTier.COIN_COIN,
-            bucket="WARN/REPUTATION",
-            symbol="WETH-WBTC",
-            sim_status="PARTIAL",
-            sim_best_strategy="clmm_range_harvest",
-            sim_fit_score="0",
-            sim_exp_net_apy_min="0.00",
-            sim_exp_net_apy_max="0.00",
-            sim_risk_score="100",
-            sim_required_data_missing="volume24h,fees24h",
-        )
-    ])
+    message = notifier._format_report(
+        [
+            _result(
+                priority=PriorityTier.COIN_COIN,
+                bucket="WARN/REPUTATION",
+                symbol="WETH-WBTC",
+                sim_status="PARTIAL",
+                sim_best_strategy="clmm_range_harvest",
+                sim_fit_score="0",
+                sim_exp_net_apy_min="0.00",
+                sim_exp_net_apy_max="0.00",
+                sim_risk_score="100",
+                sim_required_data_missing="volume24h,fees24h",
+            )
+        ]
+    )
     assert "BestStrategy" not in message
     assert "SimStatus" not in message
     assert "FitScore" not in message
@@ -529,19 +625,21 @@ def test_strategy_fields_hidden_when_not_ok():
 
 def test_strategy_fields_visible_when_ok():
     notifier = TelegramNotifier()
-    message = notifier._format_report([
-        _result(
-            priority=PriorityTier.COIN_COIN,
-            bucket="WARN/REPUTATION",
-            symbol="WETH-WBTC",
-            sim_status="OK",
-            sim_best_strategy="clmm_range_harvest",
-            sim_fit_score="42",
-            sim_exp_net_apy_min="5.00",
-            sim_exp_net_apy_max="9.00",
-            sim_risk_score="25",
-        )
-    ])
+    message = notifier._format_report(
+        [
+            _result(
+                priority=PriorityTier.COIN_COIN,
+                bucket="WARN/REPUTATION",
+                symbol="WETH-WBTC",
+                sim_status="OK",
+                sim_best_strategy="clmm_range_harvest",
+                sim_fit_score="42",
+                sim_exp_net_apy_min="5.00",
+                sim_exp_net_apy_max="9.00",
+                sim_risk_score="25",
+            )
+        ]
+    )
     assert "BestStrategy:clmm_range_harvest" in message
     assert "SimStatus:OK" in message
     assert "FitScore:42" in message
@@ -551,18 +649,30 @@ def test_strategy_fields_visible_when_ok():
 
 def test_report_includes_confidence_tag():
     notifier = TelegramNotifier(show_source_confidence=True)
-    message = notifier._format_report([
-        _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol="WETH-USDC"),
-    ])
+    message = notifier._format_report(
+        [
+            _result(
+                priority=PriorityTier.COIN_STABLE,
+                bucket="WARN/REPUTATION",
+                symbol="WETH-USDC",
+            ),
+        ]
+    )
     assert "Conf `AGGREGATOR_ONLY`" in message
     assert "⚪" in message
 
 
 def test_confidence_tag_hidden_when_disabled():
     notifier = TelegramNotifier(show_source_confidence=False)
-    message = notifier._format_report([
-        _result(priority=PriorityTier.COIN_STABLE, bucket="WARN/REPUTATION", symbol="WETH-USDC"),
-    ])
+    message = notifier._format_report(
+        [
+            _result(
+                priority=PriorityTier.COIN_STABLE,
+                bucket="WARN/REPUTATION",
+                symbol="WETH-USDC",
+            ),
+        ]
+    )
     assert "Conf" not in message
 
 
@@ -583,7 +693,13 @@ def test_directional_section_includes_confidence():
         }
     )
     snapshot = YieldDirectionSnapshot(
-        lending_supply_top=[LendingSnapshotItem(candidate=supply_candidate, metric_name="supply_apy", metric_value_pct=3.4)],
+        lending_supply_top=[
+            LendingSnapshotItem(
+                candidate=supply_candidate,
+                metric_name="supply_apy",
+                metric_value_pct=3.4,
+            )
+        ],
     )
     blocks = notifier._format_report_blocks([], directional_snapshot=snapshot)
     joined = "\n".join(blocks)
@@ -593,18 +709,20 @@ def test_directional_section_includes_confidence():
 
 def test_market_signals_hidden_when_disabled():
     notifier = TelegramNotifier(show_market_signals=False)
-    message = notifier._format_report([
-        _result(
-            priority=PriorityTier.COIN_STABLE,
-            bucket="WARN/REPUTATION",
-            symbol="WETH-USDC",
-            metadata_overrides={
-                "apy_vs_mean_30d_pct": "33.33",
-                "stability_factor": "0.9000",
-                "stability_signals": "OUTLIER,APY_VS_30D_HIGH",
-            },
-        ),
-    ])
+    message = notifier._format_report(
+        [
+            _result(
+                priority=PriorityTier.COIN_STABLE,
+                bucket="WARN/REPUTATION",
+                symbol="WETH-USDC",
+                metadata_overrides={
+                    "apy_vs_mean_30d_pct": "33.33",
+                    "stability_factor": "0.9000",
+                    "stability_signals": "OUTLIER,APY_VS_30D_HIGH",
+                },
+            ),
+        ]
+    )
     assert "APYvs30d" not in message
     assert "StabF" not in message
     assert "Flags:" not in message
@@ -612,18 +730,20 @@ def test_market_signals_hidden_when_disabled():
 
 def test_market_signals_visible_when_enabled():
     notifier = TelegramNotifier(show_market_signals=True)
-    message = notifier._format_report([
-        _result(
-            priority=PriorityTier.COIN_STABLE,
-            bucket="WARN/REPUTATION",
-            symbol="WETH-USDC",
-            metadata_overrides={
-                "apy_vs_mean_30d_pct": "33.33",
-                "stability_factor": "0.9000",
-                "stability_signals": "OUTLIER,APY_VS_30D_HIGH",
-            },
-        ),
-    ])
+    message = notifier._format_report(
+        [
+            _result(
+                priority=PriorityTier.COIN_STABLE,
+                bucket="WARN/REPUTATION",
+                symbol="WETH-USDC",
+                metadata_overrides={
+                    "apy_vs_mean_30d_pct": "33.33",
+                    "stability_factor": "0.9000",
+                    "stability_signals": "OUTLIER,APY_VS_30D_HIGH",
+                },
+            ),
+        ]
+    )
     assert "APYvs30d:+33.3%" in message
     assert "StabF:0.9000" in message
     assert "Flags:OUTLIER,APY_VS_30D_HIGH" in message
@@ -721,3 +841,44 @@ def test_report_hides_my_pools_alerts_when_disabled():
     joined = "\n".join(blocks)
     assert "My Pools — Health" in joined
     assert "My Pools — Alerts" not in joined
+
+
+def test_report_blocks_include_lp_entry_recommendations_section():
+    notifier = TelegramNotifier()
+    recs = [
+        EntryRecommendation(
+            chain="Base",
+            project="aerodrome-slipstream",
+            pair="WETH-USDC",
+            fee_tier=500,
+            suggested_range_lower_tick=-120,
+            suggested_range_upper_tick=120,
+            confidence=EntryConfidenceBand.HIGH,
+            reasons=["OK"],
+            watchlist_reason=None,
+            actionability=EntryActionability.ACTIONABLE,
+            rank_v1=6.125,
+            source_pool_id="pool-1",
+        ),
+        EntryRecommendation(
+            chain="Ethereum",
+            project="uniswap-v3",
+            pair="WETH-USDT",
+            fee_tier=3000,
+            suggested_range_lower_tick=None,
+            suggested_range_upper_tick=None,
+            confidence=EntryConfidenceBand.LOW,
+            reasons=["INVALID_OR_MISSING_RANGE"],
+            watchlist_reason="INVALID_OR_MISSING_RANGE",
+            actionability=EntryActionability.WATCHLIST,
+            rank_v1=0.0,
+            source_pool_id="pool-2",
+        ),
+    ]
+    blocks = notifier._format_report_blocks([], entry_recommendations=recs)
+    joined = "\n".join(blocks)
+    assert "LP Entry Recommendations" in joined
+    assert "- Actionable:" in joined
+    assert "- Watchlist:" in joined
+    assert "Range: [-120,120]" in joined
+    assert "reason `INVALID_OR_MISSING_RANGE`" in joined

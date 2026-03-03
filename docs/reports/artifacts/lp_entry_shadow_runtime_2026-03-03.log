@@ -1,0 +1,41 @@
+2026-03-03 18:17:18,285 - INFO - Sentinel - DeepSeek provider initialized.
+2026-03-03 18:17:18,285 - INFO - Sentinel - Shadow mode enabled: chat_id_env=TELEGRAM_SHADOW_CHAT_ID digest_interval=21600s
+2026-03-03 18:17:18,286 - INFO - Sentinel - Starting Global Scout Cycle (chains: ALL).
+2026-03-03 18:17:32,687 - INFO - defi_agents.scout.scout - Funnel metrics: raw=305 heuristics=131 addressable_selected=40 missing_address=32 missing_chain_id=49 addressable_total=82 security_counts={'trusted': 0, 'pass': 0, 'warn': 40, 'block': 0, 'unknown': 0} top_reasons=[('REPUTATION_UNAVAILABLE', 40), ('PROXY_CONTRACT', 11), ('HIDDEN_OWNER', 7), ('TACTICAL_DISABLED', 5), ('COST_DOMINATED', 1)] lindy_softened=0 exploration_slots=15 tactical_filtered=5 capacity_filtered=0 cost_filtered=1 blacklist_filtered=0 liquidity_filtered=0 universe_filtered=0 unsupported_non_evm=28 missing_chain_top=[('Sui', 11), ('Aptos', 6), ('Cardano', 6), ('Monad', 5), ('Flare', 4)] results=34 deduped=30
+2026-03-03 18:17:32,687 - INFO - defi_agents.scout.scout - Stablecoin risk policy: tier_counts={'UNKNOWN': 31, 'T1': 8, 'T2': 1} pair_class_counts={'TOKEN_TOKEN': 31, 'TOKEN_STABLE': 8, 'FX_STABLE': 1}
+2026-03-03 18:17:32,688 - INFO - Sentinel - DEX discovery: llama=305 uniswap_new=0 filtered=0 errors=0 timeouts=0 total=305 enabled=True
+2026-03-03 18:17:32,688 - INFO - Sentinel - DeFiLlama provider: pools requests=1 success=1 timeouts=0 errors=0 parse_errors=0 cache_hits=0
+2026-03-03 18:17:32,688 - INFO - Sentinel - Lending snapshot: best_eth_supply=8.72% best_btc_supply=0.22% best_gho_supply=n/a lowest_stable_borrow=n/a lowest_eurc_borrow=n/a lowest_usdc_borrow=n/a
+2026-03-03 18:17:32,693 - WARNING - Sentinel - Tick density provider init failed: venue=uniswap chain=Base err=ValueError msg=Missing env `GRAPH_API_KEY` required to resolve Graph subgraph id.
+2026-03-03 18:17:32,693 - WARNING - Sentinel - Tick density provider init failed: venue=uniswap chain=Ethereum err=ValueError msg=Missing env `GRAPH_API_KEY` required to resolve Graph subgraph id.
+2026-03-03 18:17:32,693 - WARNING - Sentinel - Tick density provider init failed: venue=uniswap chain=Optimism err=ValueError msg=Missing env `GRAPH_API_KEY` required to resolve Graph subgraph id.
+2026-03-03 18:17:32,693 - WARNING - Sentinel - Tick density provider init failed: venue=uniswap chain=Arbitrum err=ValueError msg=Missing env `GRAPH_API_KEY` required to resolve Graph subgraph id.
+2026-03-03 18:17:32,693 - WARNING - Sentinel - Tick density provider init failed: venue=uniswap chain=Polygon err=ValueError msg=Missing env `GRAPH_API_KEY` required to resolve Graph subgraph id.
+2026-03-03 18:17:32,693 - WARNING - Sentinel - Tick density provider init failed: venue=aerodrome chain=Base err=ValueError msg=Missing env `GRAPH_API_KEY` for endpoint template expansion.
+2026-03-03 18:17:32,693 - INFO - Sentinel - Tick density scan: scanned=0 ok=0 degraded_count=0 skipped=30 discovery_scanned=0 discovery_ok=0 discovery_degraded=0 discovery_skipped=0 pits_found_count=0 confident_pit_count=0 scan_ms_total=0 scan_duration_p95_ms=0 enabled=True shadow=True
+2026-03-03 18:17:33,740 - INFO - Sentinel - StrategySim summary: simulated=30 ok=0 partial=16 unsupported=14 watchlist_missing=16 downgraded=0 best_strategy_dist=clmm_range_harvest:7,stable_stable_fee_capture:1,yield_bearing_stable_core:4,single_sided_lending:4
+2026-03-03 18:17:33,778 - INFO - Sentinel - LP entry stability telemetry: entry_total=30 entry_actionable=0 entry_watchlist=30 entry_watchlist_insufficient_history=0 entry_topn_churn=0.0000
+2026-03-03 18:17:40,240 - INFO - Sentinel - Execution states loaded: source=position_reader chain=Arbitrum active_states=1
+2026-03-03 18:17:40,241 - INFO - Sentinel - Execution summary: mode=SHADOW states=1 tx_plans=0 intents=1 blocked_by_policy=0 sim_ok=0 sim_fail=0 exec_ok=0 exec_fail=0 policy_blocks={} sim_fail_reasons={} exec_fail_reasons={}
+2026-03-03 18:17:40,242 - INFO - Sentinel - Final filters: eligible=30 profit_ok=11 safe=0 warn=30 safe_min_score=10.00 warn_min_score=0.00 min_monthly_profit_usd=5.00
+2026-03-03 18:17:40,246 - INFO - Sentinel - Shadow metrics: captured=30 evaluated=0 pending=30 median_ape_proxy=0.00 p75_ape_proxy=0.00 directional_accuracy_proxy=0.00 rmse_normalized_proxy=0.00
+2026-03-03 18:17:40,465 - WARNING - root - Telegram getUpdates failed: status=404
+2026-03-03 18:17:40,466 - INFO - Sentinel - Freshness summary: rechecked=4 fresh=4 stale=0 unverified=26 diverged=4 downgraded=0 aave_checked=0 aave_ok=0 aave_timeout=0 aave_error=0 aave_schema_mismatch=0 aave_addr_mismatch=0 morpho_checked=4 morpho_ok=4 morpho_timeout=0 morpho_error=0 morpho_schema_mismatch=0 morpho_addr_mismatch=0 recheck_enabled=True strict=False
+2026-03-03 18:17:40,466 - INFO - Sentinel - Freshness divergence: provider=morpho_direct samples=4 apy_p50=121.71 apy_p90=136.65 tvl_p50=98.50 tvl_p90=99.48
+2026-03-03 18:17:40,594 - WARNING - root - Telegram send failed (1/3): status=404. Retry in 2s.
+2026-03-03 18:17:42,633 - WARNING - root - Telegram send failed (2/3): status=404. Retry in 4s.
+2026-03-03 18:17:46,670 - WARNING - root - Telegram send failed (3/3): status=404. Retry in 6s.
+2026-03-03 18:17:46,670 - ERROR - root - Telegram notification failed after retries.
+2026-03-03 18:17:46,817 - WARNING - root - Telegram send failed (1/3): status=404. Retry in 2s.
+2026-03-03 18:17:48,849 - WARNING - root - Telegram send failed (2/3): status=404. Retry in 4s.
+2026-03-03 18:17:52,881 - WARNING - root - Telegram send failed (3/3): status=404. Retry in 6s.
+2026-03-03 18:17:52,882 - ERROR - root - Telegram notification failed after retries.
+2026-03-03 18:17:53,016 - WARNING - root - Telegram send failed (1/3): status=404. Retry in 2s.
+2026-03-03 18:17:55,061 - WARNING - root - Telegram send failed (2/3): status=404. Retry in 4s.
+2026-03-03 18:17:59,112 - WARNING - root - Telegram send failed (3/3): status=404. Retry in 6s.
+2026-03-03 18:17:59,113 - ERROR - root - Telegram notification failed after retries.
+2026-03-03 18:17:59,315 - WARNING - root - Telegram send failed (1/3): status=404. Retry in 2s.
+2026-03-03 18:18:01,351 - WARNING - root - Telegram send failed (2/3): status=404. Retry in 4s.
+2026-03-03 18:18:03,158 - WARNING - root - Telegram send failed (3/3): status=404. Retry in 6s.
+2026-03-03 18:18:03,159 - ERROR - root - Telegram notification failed after retries.
+2026-03-03 18:18:03,161 - INFO - Sentinel - Reported 30 opportunities (safe=0 warn=30 actionable=0 watchlist=30 shadow=True).

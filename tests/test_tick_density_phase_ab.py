@@ -17,7 +17,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from defi_agents.lp.band_depth import tick_to_price
-from defi_agents.lp.models import DataQuality, DegradationReason, PitType, PoolState, TickData
+from defi_agents.lp.models import (
+    DataQuality,
+    DegradationReason,
+    PitType,
+    PoolState,
+    TickData,
+)
 from defi_agents.lp.pit_classifier import (
     PitInfo,
     PriceBin,
@@ -51,7 +57,9 @@ async def test_rpc_slot0_returns_tick_from_valid_response() -> None:
     mock_client.__aexit__.return_value = False
 
     with patch("defi_agents.lp.rpc_helper.httpx.AsyncClient", return_value=mock_client):
-        tick = await fetch_slot0_tick("https://rpc.example.com", "0x1234567890abcdef1234567890abcdef12345678")
+        tick = await fetch_slot0_tick(
+            "https://rpc.example.com", "0x1234567890abcdef1234567890abcdef12345678"
+        )
 
     assert tick == tick_value
 
@@ -75,7 +83,9 @@ async def test_rpc_slot0_negative_tick() -> None:
     mock_client.__aexit__.return_value = False
 
     with patch("defi_agents.lp.rpc_helper.httpx.AsyncClient", return_value=mock_client):
-        tick = await fetch_slot0_tick("https://rpc.example.com", "0x1234567890abcdef1234567890abcdef12345678")
+        tick = await fetch_slot0_tick(
+            "https://rpc.example.com", "0x1234567890abcdef1234567890abcdef12345678"
+        )
 
     assert tick == tick_value
 
@@ -91,7 +101,9 @@ async def test_rpc_slot0_timeout_returns_none() -> None:
     mock_client.__aexit__.return_value = False
 
     with patch("defi_agents.lp.rpc_helper.httpx.AsyncClient", return_value=mock_client):
-        tick = await fetch_slot0_tick("https://rpc.example.com", "0x1234567890abcdef1234567890abcdef12345678")
+        tick = await fetch_slot0_tick(
+            "https://rpc.example.com", "0x1234567890abcdef1234567890abcdef12345678"
+        )
 
     assert tick is None
 
@@ -146,12 +158,14 @@ def test_find_liquidity_pits_with_synthetic_pit() -> None:
     bins = []
     for i in range(-10, 11):
         liq = 100.0 if abs(i) > 1 else 1.0  # pit at center
-        bins.append(PriceBin(
-            bin_index=i,
-            lower_price=1.0 + i * 0.01,
-            upper_price=1.0 + (i + 1) * 0.01,
-            liquidity_usd=liq,
-        ))
+        bins.append(
+            PriceBin(
+                bin_index=i,
+                lower_price=1.0 + i * 0.01,
+                upper_price=1.0 + (i + 1) * 0.01,
+                liquidity_usd=liq,
+            )
+        )
 
     pits = find_liquidity_pits(bins, pit_threshold=0.5, min_consecutive=3)
     assert len(pits) >= 1
@@ -161,7 +175,12 @@ def test_find_liquidity_pits_with_synthetic_pit() -> None:
 def test_find_liquidity_pits_no_pit_uniform_liquidity() -> None:
     """Uniform liquidity → no pits detected."""
     bins = [
-        PriceBin(bin_index=i, lower_price=1.0 + i * 0.01, upper_price=1.0 + (i + 1) * 0.01, liquidity_usd=100.0)
+        PriceBin(
+            bin_index=i,
+            lower_price=1.0 + i * 0.01,
+            upper_price=1.0 + (i + 1) * 0.01,
+            liquidity_usd=100.0,
+        )
         for i in range(-10, 11)
     ]
     pits = find_liquidity_pits(bins, pit_threshold=0.5, min_consecutive=3)
@@ -172,8 +191,14 @@ def test_suggest_range_tick_spacing_aligned() -> None:
     """Verify suggested range boundaries are multiples of tickSpacing."""
     state = _make_pool_state(tick=0, fee_tier=3000)
     state = PoolState(
-        pool_address="0xpool", tick=0, liquidity=10_000_000, sqrt_price_x96=0,
-        fee_tier=3000, tick_spacing=60, token0_decimals=18, token1_decimals=18,
+        pool_address="0xpool",
+        tick=0,
+        liquidity=10_000_000,
+        sqrt_price_x96=0,
+        fee_tier=3000,
+        tick_spacing=60,
+        token0_decimals=18,
+        token1_decimals=18,
     )
     pit = PitInfo(
         pit_type=PitType.CONFIDENT_PIT,
@@ -189,15 +214,41 @@ def test_suggest_range_tick_spacing_aligned() -> None:
     assert sr.width_pct > 0
 
 
+def test_suggest_range_with_volatility_keeps_valid_order() -> None:
+    state = PoolState(
+        pool_address="0xpool",
+        tick=0,
+        liquidity=10_000_000,
+        sqrt_price_x96=0,
+        fee_tier=500,
+        tick_spacing=10,
+        token0_decimals=18,
+        token1_decimals=18,
+    )
+    pit = PitInfo(
+        pit_type=PitType.CONFIDENT_PIT,
+        center_tick=0,
+        width_ticks=4,
+        distance_to_spot_pct=0.0,
+        depth_ratio=0.25,
+    )
+    sr = suggest_range(pit, state, daily_vol=0.03)
+    assert sr.lower_tick < sr.upper_tick
+    assert sr.lower_tick % 10 == 0
+    assert sr.upper_tick % 10 == 0
+
+
 # --- Config Tests ---
 
 
 def test_tick_density_config_new_fields() -> None:
     """Verify new config fields are present and have correct defaults."""
-    cfg = ScoutConfig.model_validate({
-        "min_tvl_usd": 100_000,
-        "tick_density": {"enabled": True},
-    })
+    cfg = ScoutConfig.model_validate(
+        {
+            "min_tvl_usd": 100_000,
+            "tick_density": {"enabled": True},
+        }
+    )
     assert cfg.tick_density.max_scan_candidates == 10
     assert cfg.tick_density.rpc_timeout_seconds == pytest.approx(3.0)
     assert "Ethereum" in cfg.tick_density.rpc_url_env_map
@@ -207,11 +258,13 @@ def test_tick_density_config_new_fields() -> None:
 
 def test_tick_density_config_custom_rpc_env() -> None:
     """Verify custom rpc_url_env_map is accepted."""
-    cfg = ScoutConfig.model_validate({
-        "min_tvl_usd": 100_000,
-        "tick_density": {
-            "enabled": True,
-            "rpc_url_env_map": {"Arbitrum": "MY_ARB_RPC"},
-        },
-    })
+    cfg = ScoutConfig.model_validate(
+        {
+            "min_tvl_usd": 100_000,
+            "tick_density": {
+                "enabled": True,
+                "rpc_url_env_map": {"Arbitrum": "MY_ARB_RPC"},
+            },
+        }
+    )
     assert cfg.tick_density.rpc_url_env_map == {"Arbitrum": "MY_ARB_RPC"}

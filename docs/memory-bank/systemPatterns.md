@@ -2,6 +2,73 @@
 
 ## Architecture Decisions
 - YYYY-MM-DD: <Decision> - <Rationale>
+- 2026-03-03: LP Entry actionable contract must be LP-scoped before ranking, not applied to the whole report shortlist:
+  - `EntryRecommendation` input should be explicitly filtered to LP-eligible candidates (`yield_type=lp_fees` + range/tick-capable venue path),
+  - telemetry must expose coverage chain `input -> lp-eligible -> range-ready` to localize where actionable candidates are lost,
+  - generic fallback reasons (`REPORT_GROUP_WATCHLIST`) are not sufficient for actionable-enablement diagnostics and must be replaced by deterministic reason taxonomy.
+  Rationale: current evidence shows `actionable_ratio=0` is primarily a scope/coverage issue (many candidates never enter valid range path), not only ranking/calibration.
+
+- 2026-03-03: LP Entry actionable-enablement telemetry is reason-coded and blocker-aware as a deterministic runtime/evidence contract:
+  - runtime emits cycle-level `watchlist_reason_counts` for LP entry output (machine codes only; free-text reasons are normalized to deterministic fallback),
+  - tick-density readiness emits explicit blocker counters (`GRAPH_API_KEY_MISSING`, provider/subgraph init/schema blockers) as separate telemetry line,
+  - shadow-calibration snapshot aggregates both reason and blocker counters and evaluates explicit gate `actionable_ratio_positive_pass` (`actionable_ratio > 0`),
+  - when actionable gate fails, report tooling must emit top-3 watchlist reasons for operator triage.
+  Rationale: convert `all WATCHLIST` diagnosis from ad-hoc log reading into deterministic, machine-parseable evidence while preserving fail-safe downgrade behavior.
+
+- 2026-03-03: Calibration phase can be closed with a `KEEP` decision when full evidence gate passes without retune:
+  - phase closure criterion is deterministic gate pass on required window (`telemetry_min_cycles`, error-free parsing/runtime),
+  - parameter changes are optional and only justified when evidence indicates improvement need,
+  - `KEEP` is a valid outcome when current defaults already satisfy gate checks.
+  Rationale: avoid unnecessary parameter drift and preserve stable fail-safe behavior.
+
+- 2026-03-03: Calibration gate thresholds are validated as a hard contract before evaluation:
+  - threshold bundle creation fails fast on invalid values (`telemetry_min_cycles < 1`, any ratio/churn threshold outside `[0,1]`, or `max_topn_churn_avg > max_topn_churn_p95`),
+  - CLI returns structured JSON error for invalid threshold inputs instead of silently producing misleading gate results.
+  Rationale: prevent operator/config mistakes from generating false pass/fail calibration evidence.
+
+- 2026-03-03: LP Entry SHADOW calibration evidence is evaluated via deterministic telemetry snapshot gates, and controlled retune is blocked when evidence window is insufficient:
+  - telemetry parser targets only explicit runtime signature `LP entry stability telemetry: ...` and computes fixed aggregates/gates,
+  - gate contract includes explicit booleans (`errors_zero_pass`, `telemetry_min_cycles_pass`, churn/history ratio checks) with CLI-configurable safe defaults,
+  - when baseline FAIL is caused by missing telemetry volume (e.g., `cycles_with_entry_telemetry=0`), decision stays `KEEP` (no config retune) to avoid parameter fitting on absent data.
+  Rationale: preserve fail-safe, evidence-first calibration discipline and keep retune actions reversible and justified by sufficient SHADOW observations.
+
+- 2026-03-03: Stability gate observation counting uses cycle observation time from history rows, not upstream source timestamps:
+  - `save_to_history()` writes wall-clock cycle timestamp into history `timestamp`,
+  - stability window checks (`>=N observations / H hours`) now reflect actual repeated cycle observations,
+  - stale provider timestamps no longer force false `INSUFFICIENT_STABILITY_HISTORY` downgrades.
+  Rationale: provider/source timestamps are freshness signals, not reliable evidence of repeated runtime observations in the gate window.
+
+- 2026-03-03: LP Entry Recommendation P1 adds history-backed stability gating and deterministic Top-N churn telemetry as a separate layer on top of existing fail-safe contract:
+  - actionable eligibility now requires minimum history observations in a rolling window (`stability_min_observations`, `stability_observation_window_hours`) sourced from `docs/memory-bank/history.csv`,
+  - insufficient history explicitly downgrades to `WATCHLIST` with reason `INSUFFICIENT_STABILITY_HISTORY`,
+  - runtime emits deterministic counters `entry_total`, `entry_actionable`, `entry_watchlist`, `entry_watchlist_insufficient_history`, `entry_topn_churn`,
+  - previous Top-N snapshot is persisted via cache namespace (`lp_entry_topn_stability`) to compute churn between cycles.
+  Rationale: improve recommendation stability and observability for shadow calibration without changing the existing fail-safe downgrade policy for degraded/stale/diverged/invalid-range states.
+
+- 2026-03-03: LP Entry rank/confidence calibration remains config-driven and reversible, with no auto-optimization:
+  - calibration knobs are centralized in `ScoutConfig.lp_entry_calibration`,
+  - scoring knobs are limited to factor/threshold parameters (`source_confidence_factors`, confidence thresholds, rank powers, economics cap),
+  - runtime only consumes configured values; it does not mutate thresholds based on runtime outcomes.
+  Rationale: keep P1 calibration safe and operator-controlled while preserving fail-closed behavior and rollback simplicity.
+
+- 2026-03-03: For critical P0 implementation tracks, Roo orchestration uses a paired-skill pattern:
+  - one skill defines strict implementation scope/order (`implementation-contract`),
+  - second skill defines mandatory verification matrix and fail-safe assertions (`test-gate-contract`).
+  Rationale: reduces scope drift between plan and code and keeps handoff/review deterministic across multi-agent execution.
+
+- 2026-03-03: Decision-grade LP allocation features follow a strict stage order `task-definition -> research-gate -> implementation` before any runtime wiring:
+  - target output must be fixed upfront as explicit contract (`network + protocol + pair + range + confidence/reasons`),
+  - research phase produces scoring/range policy and gap map as separate artifact,
+  - development starts only after policy sign-off to avoid iterative drift between roadmap and code.
+  Rationale: current code already has partial scanner primitives, but without contract-first gating it is easy to ship inconsistent output-hooks that do not close the product goal.
+
+- 2026-03-03: LP entry recommendation in runtime follows a fail-closed two-lane contract (`ACTIONABLE` vs `WATCHLIST`) with deterministic Top-N ordering:
+  - scanner metadata is SSOT for range fields (`pit_type`, `pits_found`, `suggested_range_lower_tick`, `suggested_range_upper_tick`),
+  - recommendation rank is deterministic (`rank_v1`) with stable tie-breakers and explicit confidence bands,
+  - any degraded tick quality, stale/diverged confidence, or invalid/missing range is force-downgraded to `WATCHLIST`,
+  - notifier renders a dedicated `LP Entry Recommendations` block without replacing existing Decision View blocks.
+  Rationale: keep P0 behavior transparent and auditable while preventing false-actionable suggestions under partial/invalid data.
+
 - 2026-03-03: Gate-3 evidence collector is position-aware and emits both window-level and position-level pass signals in a single JSON snapshot:
   - log-window counters remain (`reader_ok`, `sim_fail`, `errors`),
   - reader samples are embedded as `position_samples` with computed `position_pnl_usd/hodl_pnl_usd/pnl_vs_hodl_usd`,

@@ -36,7 +36,16 @@ class ReportingConfig(BaseModel):
     telegram_directional_lp_min_vol_to_tvl: float = Field(default=1.0, ge=0.0)
     telegram_directional_lending_min_tvl_usd: float = Field(default=100_000.0, ge=0.0)
     telegram_directional_borrow_symbols: List[str] = Field(
-        default_factory=lambda: ["USDC", "USDT", "DAI", "USDS", "EURC", "GHO", "FRAX", "LUSD"]
+        default_factory=lambda: [
+            "USDC",
+            "USDT",
+            "DAI",
+            "USDS",
+            "EURC",
+            "GHO",
+            "FRAX",
+            "LUSD",
+        ]
     )
     telegram_directional_staking_min_tvl_usd: float = Field(default=100_000.0, ge=0.0)
     telegram_directional_staking_min_apy: float = Field(default=0.0, ge=0.0)
@@ -55,7 +64,9 @@ class ReportingConfig(BaseModel):
     telegram_recheck_change_threshold_pct: float = Field(default=20.0, ge=0.0)
     # Daily liveness signal when no candidates pass report gates.
     telegram_no_opportunities_heartbeat_enabled: bool = True
-    telegram_no_opportunities_heartbeat_interval_seconds: int = Field(default=86_400, ge=0)
+    telegram_no_opportunities_heartbeat_interval_seconds: int = Field(
+        default=86_400, ge=0
+    )
 
 
 class MyPoolTargetConfig(BaseModel):
@@ -67,9 +78,13 @@ class MyPoolTargetConfig(BaseModel):
     @model_validator(mode="after")
     def _validate_target(self) -> "MyPoolTargetConfig":
         has_pool_id = bool((self.pool_id or "").strip())
-        has_chain_address = bool((self.chain or "").strip()) and bool((self.address or "").strip())
+        has_chain_address = bool((self.chain or "").strip()) and bool(
+            (self.address or "").strip()
+        )
         if not has_pool_id and not has_chain_address:
-            raise ValueError("my_pools_monitor.pools[] requires `pool_id` or (`chain` + `address`)")
+            raise ValueError(
+                "my_pools_monitor.pools[] requires `pool_id` or (`chain` + `address`)"
+            )
         return self
 
 
@@ -88,6 +103,7 @@ class MyPoolsMonitorConfig(BaseModel):
 
 class AssetUniverseConfig(BaseModel):
     """Asset universe filter applied at Scout intake stage (cost/noise control)."""
+
     intake_target_assets_only: bool = False
 
 
@@ -159,7 +175,9 @@ class InvestorProfile(BaseModel):
     @property
     def deployable_capital_usd(self) -> float:
         months = max(0.0, float(self.horizon_days) / 30.0)
-        return max(0.0, self.initial_capital_usd + (self.monthly_contribution_usd * months))
+        return max(
+            0.0, self.initial_capital_usd + (self.monthly_contribution_usd * months)
+        )
 
     @property
     def benchmark_threshold_apy(self) -> float:
@@ -182,10 +200,16 @@ class CapacityGuards(BaseModel):
 
 class TokenBuckets(BaseModel):
     """Stablecoin classification buckets for risk policy."""
+
     stablecoins_usd: List[str] = Field(
         default_factory=lambda: [
-            "USDC", "USDT", "DAI", "USDS",  # T1
-            "crvUSD", "GHO", "PYUSD",       # T2
+            "USDC",
+            "USDT",
+            "DAI",
+            "USDS",  # T1
+            "crvUSD",
+            "GHO",
+            "PYUSD",  # T2
         ]
     )
     stablecoins_eur: List[str] = Field(
@@ -200,6 +224,7 @@ class TokenBuckets(BaseModel):
 
 class StableRiskPolicy(BaseModel):
     """Stablecoin risk policy configuration."""
+
     enabled: bool = False
     apply_scoring_penalties: bool = False
     stable_tier_weights: dict[str, float] = Field(
@@ -220,9 +245,7 @@ class FreshnessConfig(BaseModel):
     max_apy_divergence_pct: float = 25.0
     max_tvl_divergence_pct: float = 20.0
     graph_api_key_env: str = "GRAPH_API_KEY"
-    uniswap_subgraph_endpoints: dict[str, str] = Field(
-        default_factory=dict
-    )
+    uniswap_subgraph_endpoints: dict[str, str] = Field(default_factory=dict)
     uniswap_subgraph_ids: dict[str, str] = Field(
         default_factory=lambda: {
             "Ethereum": "5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV",
@@ -236,12 +259,8 @@ class FreshnessConfig(BaseModel):
             "Avalanche": "4iA7jQX3U7zFfD6J2Wf6ByfQX7Qd8L1nY3mA6P7Y5b5M",
         }
     )
-    aerodrome_subgraph_endpoints: dict[str, str] = Field(
-        default_factory=dict
-    )
-    aerodrome_subgraph_ids: dict[str, str] = Field(
-        default_factory=dict
-    )
+    aerodrome_subgraph_endpoints: dict[str, str] = Field(default_factory=dict)
+    aerodrome_subgraph_ids: dict[str, str] = Field(default_factory=dict)
     aave_direct_enabled: bool = False
     aave_direct_timeout_seconds: int = 8
     aave_direct_api_key_env: str = "AAVE_DIRECT_API_KEY"
@@ -292,9 +311,7 @@ class FreshnessConfig(BaseModel):
         }
     )
     # Allowlist map: SYMBOL -> Morpho market unique key (per chain).
-    morpho_direct_market_keys: dict[str, dict[str, str]] = Field(
-        default_factory=dict
-    )
+    morpho_direct_market_keys: dict[str, dict[str, str]] = Field(default_factory=dict)
 
 
 class ExecutionPolicyConfig(BaseModel):
@@ -310,14 +327,24 @@ class ExecutionConfig(BaseModel):
     enabled: bool = False
     mode: Literal["PAPER", "SHADOW", "LIVE"] = "PAPER"
     primary_adapter: Literal[
-        "uniswap_v3_simulate", "uniswap_v3_live", "v3utils_live", "krystal",
+        "uniswap_v3_simulate",
+        "uniswap_v3_live",
+        "v3utils_live",
+        "krystal",
         # Legacy aliases (deprecated, kept for backward compat)
-        "native_uniswap_v3", "native_uniswap_v3_live", "v3utils",
+        "native_uniswap_v3",
+        "native_uniswap_v3_live",
+        "v3utils",
     ] = "uniswap_v3_simulate"
     fallback_adapter: Literal[
-        "uniswap_v3_simulate", "uniswap_v3_live", "v3utils_live", "krystal",
+        "uniswap_v3_simulate",
+        "uniswap_v3_live",
+        "v3utils_live",
+        "krystal",
         # Legacy aliases (deprecated, kept for backward compat)
-        "native_uniswap_v3", "native_uniswap_v3_live", "v3utils",
+        "native_uniswap_v3",
+        "native_uniswap_v3_live",
+        "v3utils",
     ] = "uniswap_v3_simulate"
     allow_live_mode: bool = False
     idempotency_ttl_seconds: int = Field(default=86_400, ge=60)
@@ -356,11 +383,20 @@ class ExecutionConfig(BaseModel):
     @model_validator(mode="after")
     def _validate_execution_mode(self) -> "ExecutionConfig":
         if self.mode == "LIVE" and not self.allow_live_mode:
-            raise ValueError("execution.mode=LIVE requires execution.allow_live_mode=true")
+            raise ValueError(
+                "execution.mode=LIVE requires execution.allow_live_mode=true"
+            )
         if self.primary_adapter == "krystal" and not self.krystal_enabled:
-            raise ValueError("execution.primary_adapter=krystal requires execution.krystal_enabled=true")
-        if self.primary_adapter in ("v3utils", "v3utils_live") and not self.v3utils_enabled:
-            raise ValueError("execution.primary_adapter=v3utils_live requires execution.v3utils_enabled=true")
+            raise ValueError(
+                "execution.primary_adapter=krystal requires execution.krystal_enabled=true"
+            )
+        if (
+            self.primary_adapter in ("v3utils", "v3utils_live")
+            and not self.v3utils_enabled
+        ):
+            raise ValueError(
+                "execution.primary_adapter=v3utils_live requires execution.v3utils_enabled=true"
+            )
         return self
 
 
@@ -402,6 +438,7 @@ class HedgerConfig(BaseModel):
 
 class StrategySimConfig(BaseModel):
     """Strategy simulation configuration (v1)."""
+
     enabled: bool = False
     max_candidates: int = 20
     supported_tiers: List[str] = Field(default_factory=lambda: ["T1", "T2"])
@@ -431,7 +468,9 @@ class UniswapV3NewPoolsConfig(BaseModel):
 
 
 class DexDiscoveryConfig(BaseModel):
-    uniswap_v3_new_pools: UniswapV3NewPoolsConfig = Field(default_factory=UniswapV3NewPoolsConfig)
+    uniswap_v3_new_pools: UniswapV3NewPoolsConfig = Field(
+        default_factory=UniswapV3NewPoolsConfig
+    )
 
 
 class InspectorTargetConfig(BaseModel):
@@ -531,6 +570,36 @@ class TickDensityConfig(BaseModel):
     )
 
 
+class LpEntryCalibrationConfig(BaseModel):
+    """Config-driven knobs for LP Entry P1 stability/calibration loop (shadow-safe)."""
+
+    stability_enabled: bool = True
+    stability_history_path: str = "docs/memory-bank/history.csv"
+    stability_min_observations: int = Field(default=3, ge=0)
+    stability_observation_window_hours: int = Field(default=6, ge=1)
+    source_confidence_factors: Dict[str, float] = Field(
+        default_factory=lambda: {
+            "VERIFIED": 1.0,
+            "AGGREGATOR_ONLY": 0.85,
+            "DIVERGED": 0.25,
+            "STALE": 0.15,
+        }
+    )
+    rank_confidence_power: float = Field(default=1.0, ge=0.0)
+    rank_economics_power: float = Field(default=1.0, ge=0.0)
+    economics_cap_usd: float = Field(default=100.0, ge=0.0)
+    confidence_high_min_factor: float = Field(default=0.95, ge=0.0, le=1.0)
+    confidence_medium_min_factor: float = Field(default=0.70, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def _validate_confidence_thresholds(self) -> "LpEntryCalibrationConfig":
+        if self.confidence_medium_min_factor > self.confidence_high_min_factor:
+            raise ValueError(
+                "lp_entry_calibration.confidence_medium_min_factor must be <= confidence_high_min_factor"
+            )
+        return self
+
+
 class ScoutConfig(BaseModel):
     min_tvl_usd: float = Field(default=1_000_000, ge=100_000)
     min_apy: float = 0.0
@@ -548,11 +617,16 @@ class ScoutConfig(BaseModel):
     freshness: FreshnessConfig = Field(default_factory=FreshnessConfig)
     dex_discovery: DexDiscoveryConfig = Field(default_factory=DexDiscoveryConfig)
     inspector: InspectorConfig = Field(default_factory=InspectorConfig)
-    defillama_provider: DeFiLlamaProviderConfig = Field(default_factory=DeFiLlamaProviderConfig)
+    defillama_provider: DeFiLlamaProviderConfig = Field(
+        default_factory=DeFiLlamaProviderConfig
+    )
     tick_density: TickDensityConfig = Field(default_factory=TickDensityConfig)
     execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
     hedger: HedgerConfig = Field(default_factory=HedgerConfig)
     strategy_sim: StrategySimConfig = Field(default_factory=StrategySimConfig)
+    lp_entry_calibration: LpEntryCalibrationConfig = Field(
+        default_factory=LpEntryCalibrationConfig
+    )
     token_buckets: TokenBuckets = Field(default_factory=TokenBuckets)
     risk_policy: StableRiskPolicy = Field(default_factory=StableRiskPolicy)
     confidence_factors: Dict[str, float] = Field(

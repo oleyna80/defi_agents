@@ -21,4 +21,11 @@
 - 020-delta-hedger-hummingbot-poc-plan.md
 - 021-phase3-position-pnl-hodl-roo-task.md
 - 022-process-sync-and-test-gate-roo-task.md
+- 024-lp-entry-recommendation-v1-plan.md
+- 025-lp-entry-research-roo-task.md
+- 026-lp-entry-implementation-roo-task.md
+- 027-lp-entry-stability-calibration-roo-task.md
+- 028-lp-entry-shadow-evidence-calibration-roo-task.md
+- 029-lp-entry-actionable-enablement-roo-task.md
+- 030-lp-entry-lp-scope-range-coverage-roo-task.md
 - (add plans here)

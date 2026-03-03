@@ -18,19 +18,60 @@ from .scout.models import (
     ScoutResult,
     YieldDirectionSnapshot,
 )
+from .lp.models import EntryRecommendation, EntryActionability
 
 
 class TelegramNotifier:
     _ALLOWED_STABLES = {
-        "USDC", "USDT", "DAI", "USDS", "FRAX", "LUSD", "USDE", "GHO", "PYUSD", "CRVUSD",
-        "EURS", "EURC", "AGEUR", "EURE", "FDUSD", "TUSD", "USDP", "USDD", "USD0", "USD1",
-        "RLUSD", "USDG", "USDY", "SUSDS", "SDAI", "USDBC",
+        "USDC",
+        "USDT",
+        "DAI",
+        "USDS",
+        "FRAX",
+        "LUSD",
+        "USDE",
+        "GHO",
+        "PYUSD",
+        "CRVUSD",
+        "EURS",
+        "EURC",
+        "AGEUR",
+        "EURE",
+        "FDUSD",
+        "TUSD",
+        "USDP",
+        "USDD",
+        "USD0",
+        "USD1",
+        "RLUSD",
+        "USDG",
+        "USDY",
+        "SUSDS",
+        "SDAI",
+        "USDBC",
     }
     _ALLOWED_BTC = {
-        "BTC", "WBTC", "WBTC.B", "CBBTC", "TBTC", "RENBTC", "SBTC", "BTCB", "LBTC",
+        "BTC",
+        "WBTC",
+        "WBTC.B",
+        "CBBTC",
+        "TBTC",
+        "RENBTC",
+        "SBTC",
+        "BTCB",
+        "LBTC",
     }
     _ALLOWED_ETH = {
-        "ETH", "WETH", "STETH", "WSTETH", "RETH", "CBETH", "EETH", "WEETH", "METH", "SETH",
+        "ETH",
+        "WETH",
+        "STETH",
+        "WSTETH",
+        "RETH",
+        "CBETH",
+        "EETH",
+        "WEETH",
+        "METH",
+        "SETH",
     }
     _ALLOWED_GOLD = {"XAUT", "PAXG", "PAXGOLD"}
 
@@ -45,9 +86,13 @@ class TelegramNotifier:
     ) -> None:
         self.token = os.getenv("TELEGRAM_BOT_TOKEN")
         configured_chat = os.getenv(chat_id_env) if chat_id_env else None
-        self.chat_id = configured_chat or os.getenv("TELEGRAM_CHAT_ID") or os.getenv("CHAT_ID")
+        self.chat_id = (
+            configured_chat or os.getenv("TELEGRAM_CHAT_ID") or os.getenv("CHAT_ID")
+        )
         self.include_tags = include_tags
-        self.top_n_per_section = int(top_n_per_section) if isinstance(top_n_per_section, int) else 0
+        self.top_n_per_section = (
+            int(top_n_per_section) if isinstance(top_n_per_section, int) else 0
+        )
         self.show_source_confidence = show_source_confidence
         self.show_market_signals = show_market_signals
         self.message_prefix = (message_prefix or "").strip()
@@ -59,6 +104,7 @@ class TelegramNotifier:
         turnover_snapshot: List[ScoutCandidate] | None = None,
         directional_snapshot: YieldDirectionSnapshot | None = None,
         my_pools_report: MyPoolsMonitorReport | None = None,
+        entry_recommendations: List[EntryRecommendation] | None = None,
     ) -> None:
         blocks = self._format_report_blocks(
             results,
@@ -66,6 +112,7 @@ class TelegramNotifier:
             turnover_snapshot=turnover_snapshot,
             directional_snapshot=directional_snapshot,
             my_pools_report=my_pools_report,
+            entry_recommendations=entry_recommendations,
         )
         for block in blocks:
             for chunk in self._chunk_message(block):
@@ -104,11 +151,15 @@ class TelegramNotifier:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(url, params=params)
             if not response.is_success:
-                logging.warning("Telegram getUpdates failed: status=%s", response.status_code)
+                logging.warning(
+                    "Telegram getUpdates failed: status=%s", response.status_code
+                )
                 return [], offset
             payload = response.json()
         except Exception as exc:  # noqa: BLE001
-            logging.warning("Telegram getUpdates request error: %s", exc.__class__.__name__)
+            logging.warning(
+                "Telegram getUpdates request error: %s", exc.__class__.__name__
+            )
             return [], offset
 
         updates = payload.get("result", []) if isinstance(payload, dict) else []
@@ -125,12 +176,20 @@ class TelegramNotifier:
                 continue
             update_id = update.get("update_id")
             if isinstance(update_id, int):
-                max_update_id = update_id if max_update_id is None else max(max_update_id, update_id)
+                max_update_id = (
+                    update_id
+                    if max_update_id is None
+                    else max(max_update_id, update_id)
+                )
             message = update.get("message")
             if not isinstance(message, dict):
                 continue
             chat = message.get("chat")
-            chat_id = str(chat.get("id")) if isinstance(chat, dict) and chat.get("id") is not None else None
+            chat_id = (
+                str(chat.get("id"))
+                if isinstance(chat, dict) and chat.get("id") is not None
+                else None
+            )
             if expected_chat and chat_id and chat_id != expected_chat:
                 continue
             text = message.get("text")
@@ -149,7 +208,11 @@ class TelegramNotifier:
             print(text_to_send)
             return False
         url = f"https://api.telegram.org/bot{self.token}/sendMessage"
-        payload = {"chat_id": self.chat_id, "text": text_to_send, "parse_mode": "Markdown"}
+        payload = {
+            "chat_id": self.chat_id,
+            "text": text_to_send,
+            "parse_mode": "Markdown",
+        }
         async with httpx.AsyncClient(timeout=10.0) as client:
             for attempt in range(1, retries + 1):
                 try:
@@ -188,7 +251,9 @@ class TelegramNotifier:
         return f"{self.message_prefix}\n{text}"
 
     @staticmethod
-    def _extract_recheck_pool_id(text: object, *, command: str = "/recheck") -> str | None:
+    def _extract_recheck_pool_id(
+        text: object, *, command: str = "/recheck"
+    ) -> str | None:
         if not isinstance(text, str):
             return None
         raw = text.strip()
@@ -210,6 +275,7 @@ class TelegramNotifier:
         turnover_snapshot: List[ScoutCandidate] | None = None,
         directional_snapshot: YieldDirectionSnapshot | None = None,
         my_pools_report: MyPoolsMonitorReport | None = None,
+        entry_recommendations: List[EntryRecommendation] | None = None,
     ) -> str:
         lines = [
             "*Scout Report — Decision View*",
@@ -217,6 +283,7 @@ class TelegramNotifier:
             "",
         ]
         self._append_my_pools_sections(lines, my_pools_report)
+        self._append_entry_recommendations(lines, entry_recommendations)
         self._append_directional_snapshot(lines, directional_snapshot)
         if not (directional_snapshot and directional_snapshot.has_any()):
             self._append_lending_snapshot(lines, lending_snapshot)
@@ -251,6 +318,7 @@ class TelegramNotifier:
         turnover_snapshot: List[ScoutCandidate] | None = None,
         directional_snapshot: YieldDirectionSnapshot | None = None,
         my_pools_report: MyPoolsMonitorReport | None = None,
+        entry_recommendations: List[EntryRecommendation] | None = None,
         *,
         max_len: int = 3500,
     ) -> List[str]:
@@ -271,6 +339,12 @@ class TelegramNotifier:
         if my_pools_sections:
             sections.extend(my_pools_sections)
 
+        lp_entry_sections = self._format_entry_recommendation_sections(
+            entry_recommendations
+        )
+        if lp_entry_sections:
+            sections.extend(lp_entry_sections)
+
         directional_sections = self._format_directional_sections(directional_snapshot)
         if directional_sections:
             sections.extend(directional_sections)
@@ -285,7 +359,9 @@ class TelegramNotifier:
             if turnover_lines:
                 sections.append(turnover_lines)
 
-        sections.extend(self._format_opportunity_section_lines(results, max_len=max_len))
+        sections.extend(
+            self._format_opportunity_section_lines(results, max_len=max_len)
+        )
 
         if not sections:
             return ["\n".join(header).strip()]
@@ -303,7 +379,11 @@ class TelegramNotifier:
         if my_pools_report is None or not my_pools_report.has_any():
             return []
 
-        snapshots = [snap for snap in my_pools_report.snapshots if self._is_allowed_snapshot(snap)]
+        snapshots = [
+            snap
+            for snap in my_pools_report.snapshots
+            if self._is_allowed_snapshot(snap)
+        ]
         if not snapshots:
             return []
 
@@ -326,7 +406,11 @@ class TelegramNotifier:
             sections.append(health_lines)
 
         if bool(getattr(my_pools_report, "show_alerts", True)):
-            alerts = [snap for snap in snapshots if PoolHealthTag.HEALTHY not in snap.health_tags]
+            alerts = [
+                snap
+                for snap in snapshots
+                if PoolHealthTag.HEALTHY not in snap.health_tags
+            ]
             if alerts:
                 alert_lines: List[str] = ["*My Pools — Alerts*"]
                 for snap in alerts:
@@ -336,7 +420,56 @@ class TelegramNotifier:
 
         return sections
 
-    def _format_opportunity_section_lines(self, results: List[ScoutResult], *, max_len: int) -> List[List[str]]:
+    def _format_entry_recommendation_sections(
+        self,
+        entry_recommendations: List[EntryRecommendation] | None,
+    ) -> List[List[str]]:
+        if not entry_recommendations:
+            return []
+
+        actionable = [
+            r
+            for r in entry_recommendations
+            if r.actionability == EntryActionability.ACTIONABLE
+        ]
+        watchlist = [
+            r
+            for r in entry_recommendations
+            if r.actionability == EntryActionability.WATCHLIST
+        ]
+
+        lines: List[str] = ["*LP Entry Recommendations*"]
+        if actionable:
+            lines.append("- Actionable:")
+            for item in actionable:
+                lines.append(self._format_entry_recommendation_line(item))
+        if watchlist:
+            lines.append("- Watchlist:")
+            for item in watchlist:
+                lines.append(self._format_entry_recommendation_line(item))
+        lines.append("")
+        return [lines]
+
+    def _format_entry_recommendation_line(self, item: EntryRecommendation) -> str:
+        range_part = "Range: n/a"
+        if (
+            item.suggested_range_lower_tick is not None
+            and item.suggested_range_upper_tick is not None
+        ):
+            range_part = f"Range: [{item.suggested_range_lower_tick},{item.suggested_range_upper_tick}]"
+
+        fee_part = f"fee {item.fee_tier}bps" if item.fee_tier is not None else "fee n/a"
+        reason_part = (
+            f" | reason `{item.watchlist_reason}`" if item.watchlist_reason else ""
+        )
+        return (
+            f"  - `{item.chain}` `{item.pair}` | `{item.project}` | {fee_part} | "
+            f"{range_part} | Conf `{item.confidence.value}` | Rank {item.rank_v1:.4f}{reason_part}"
+        )
+
+    def _format_opportunity_section_lines(
+        self, results: List[ScoutResult], *, max_len: int
+    ) -> List[List[str]]:
         filtered = [item for item in results if self._is_allowed_candidate(item)]
         sections = [
             (PriorityTier.LOW_VOLATILITY, "1) Stable/Stable"),
@@ -384,8 +517,16 @@ class TelegramNotifier:
         sections: List[List[str]] = []
         mapping = [
             ("*Top-10 LP (High Turnover)*", directional_snapshot.lp_top, "Vol/TVL"),
-            ("*Top-10 Lending Supply*", directional_snapshot.lending_supply_top, "Supply APY"),
-            ("*Top-10 Lending Borrow (Cheapest)*", directional_snapshot.lending_borrow_top, "Borrow APR"),
+            (
+                "*Top-10 Lending Supply*",
+                directional_snapshot.lending_supply_top,
+                "Supply APY",
+            ),
+            (
+                "*Top-10 Lending Borrow (Cheapest)*",
+                directional_snapshot.lending_borrow_top,
+                "Borrow APR",
+            ),
             ("*Top-10 Staking*", directional_snapshot.staking_top, "Staking APY"),
         ]
         for title, items, metric_label in mapping:
@@ -406,12 +547,22 @@ class TelegramNotifier:
                 if not self._is_allowed_candidate(fake):
                     continue
                 vol_part = ""
-                if metric_label == "Vol/TVL" and isinstance(candidate.volume_24h_usd, (int, float)):
-                    vol_part = f" | Vol24h {self._format_tvl(float(candidate.volume_24h_usd))}"
+                if metric_label == "Vol/TVL" and isinstance(
+                    candidate.volume_24h_usd, (int, float)
+                ):
+                    vol_part = (
+                        f" | Vol24h {self._format_tvl(float(candidate.volume_24h_usd))}"
+                    )
                 conf_part = ""
                 if self.show_source_confidence:
-                    conf_val = candidate.source_confidence.value if hasattr(candidate.source_confidence, 'value') else str(candidate.source_confidence)
-                    conf_part = f" | {self._confidence_badge(conf_val)} Conf `{conf_val}`"
+                    conf_val = (
+                        candidate.source_confidence.value
+                        if hasattr(candidate.source_confidence, "value")
+                        else str(candidate.source_confidence)
+                    )
+                    conf_part = (
+                        f" | {self._confidence_badge(conf_val)} Conf `{conf_val}`"
+                    )
                 lines.append(
                     f"- `{candidate.chain}` `{candidate.symbol}` | `{candidate.project}` | "
                     f"{metric_label} {item.metric_value_pct:.2f}{'%' if metric_label != 'Vol/TVL' else ''} | "
@@ -439,17 +590,43 @@ class TelegramNotifier:
         for section in self._format_my_pools_sections(my_pools_report):
             lines.extend(section)
 
+    def _append_entry_recommendations(
+        self,
+        lines: List[str],
+        entry_recommendations: List[EntryRecommendation] | None,
+    ) -> None:
+        for section in self._format_entry_recommendation_sections(
+            entry_recommendations
+        ):
+            lines.extend(section)
+
     def _format_my_pool_health_line(self, snap: MonitoredPoolSnapshot) -> str:
-        tags = ",".join(tag.value for tag in snap.health_tags) if snap.health_tags else "HEALTHY"
+        tags = (
+            ",".join(tag.value for tag in snap.health_tags)
+            if snap.health_tags
+            else "HEALTHY"
+        )
         label = snap.label or snap.symbol or snap.pool_ref
         conf_part = ""
         if self.show_source_confidence:
-            conf_val = snap.source_confidence.value if hasattr(snap.source_confidence, "value") else str(snap.source_confidence)
+            conf_val = (
+                snap.source_confidence.value
+                if hasattr(snap.source_confidence, "value")
+                else str(snap.source_confidence)
+            )
             conf_part = f" | {self._confidence_badge(conf_val)} Conf `{conf_val}`"
         apy = f"{float(snap.apy):.2f}%" if isinstance(snap.apy, (int, float)) else "n/a"
         tvl = self._format_tvl(float(snap.tvl_usd or 0.0))
-        vol = self._format_tvl(float(snap.volume_24h_usd or 0.0)) if isinstance(snap.volume_24h_usd, (int, float)) else "n/a"
-        ratio = f"{float(snap.vol_to_tvl_24h):.2f}" if isinstance(snap.vol_to_tvl_24h, (int, float)) else "n/a"
+        vol = (
+            self._format_tvl(float(snap.volume_24h_usd or 0.0))
+            if isinstance(snap.volume_24h_usd, (int, float))
+            else "n/a"
+        )
+        ratio = (
+            f"{float(snap.vol_to_tvl_24h):.2f}"
+            if isinstance(snap.vol_to_tvl_24h, (int, float))
+            else "n/a"
+        )
         return (
             f"- {self._pool_health_badge(snap)} `{snap.chain or 'n/a'}` `{label}` | "
             f"`{snap.project or 'n/a'}` | APY {apy} | TVL {tvl} | Vol24h {vol} | Vol/TVL {ratio} | "
@@ -459,7 +636,11 @@ class TelegramNotifier:
     def _format_my_pool_alert_line(self, snap: MonitoredPoolSnapshot) -> str:
         label = snap.label or snap.symbol or snap.pool_ref
         reasons = ",".join(snap.alert_reasons) if snap.alert_reasons else "NO_REASON"
-        tags = ",".join(tag.value for tag in snap.health_tags) if snap.health_tags else "DATA_UNVERIFIED"
+        tags = (
+            ",".join(tag.value for tag in snap.health_tags)
+            if snap.health_tags
+            else "DATA_UNVERIFIED"
+        )
         return (
             f"- {self._pool_health_badge(snap)} `{snap.chain or 'n/a'}` `{label}` | "
             f"Alerts `{reasons}` | Tags `{tags}` | [Pool]({snap.pool_url or 'https://defillama.com/yields'})"
@@ -478,7 +659,9 @@ class TelegramNotifier:
             tvl_value = float(r.candidate.tvl_usd)
             ratio = (float(vol_24h) / tvl_value) if tvl_value > 0 else None
             ratio_str = f"{ratio:.2f}" if ratio is not None else "n/a"
-            vol_str = f" | Vol24h {self._format_tvl(float(vol_24h))} | Vol/TVL {ratio_str}"
+            vol_str = (
+                f" | Vol24h {self._format_tvl(float(vol_24h))} | Vol/TVL {ratio_str}"
+            )
         bucket = r.metadata.get("bucket", "N/A")
         sleeve = r.metadata.get("sleeve", "n/a")
         reason_codes = r.metadata.get("warn_reasons", "-") or "-"
@@ -542,9 +725,15 @@ class TelegramNotifier:
                 signal_str = " | " + " ".join(signals)
         return (
             f"- {badge} `{chain}` `{sym}` | `{project}` | APY {apy} | TVL {tvl} | "
-            f"Risk `{bucket}`" + (f" | Tags {tags_str}" if tags_str else "") + f" | Sleeve `{sleeve}` | Reasons `{reason_codes}` | "
+            f"Risk `{bucket}`"
+            + (f" | Tags {tags_str}" if tags_str else "")
+            + f" | Sleeve `{sleeve}` | Reasons `{reason_codes}` | "
             f"Fresh `{freshness}` ({age_m}m){conf_str} | ΔAPY {d_apy}% ΔTVL {d_tvl}% | "
-            f"Net@1k ${net_1k}/mo" + vol_str + signal_str + (f" | {sim_str}" if sim_str else "") + f" | [Pool]({pool_link})"
+            f"Net@1k ${net_1k}/mo"
+            + vol_str
+            + signal_str
+            + (f" | {sim_str}" if sim_str else "")
+            + f" | [Pool]({pool_link})"
         )
 
     def _append_lending_snapshot(
@@ -615,14 +804,26 @@ class TelegramNotifier:
         if lending_snapshot.best_gho_supply:
             borrow_candidates = [
                 item
-                for item in [lending_snapshot.lowest_eurc_borrow, lending_snapshot.lowest_usdc_borrow]
+                for item in [
+                    lending_snapshot.lowest_eurc_borrow,
+                    lending_snapshot.lowest_usdc_borrow,
+                ]
                 if item is not None
             ]
             if borrow_candidates:
-                best_borrow = min(borrow_candidates, key=lambda item: item.metric_value_pct)
-                spread = lending_snapshot.best_gho_supply.metric_value_pct - best_borrow.metric_value_pct
+                best_borrow = min(
+                    borrow_candidates, key=lambda item: item.metric_value_pct
+                )
+                spread = (
+                    lending_snapshot.best_gho_supply.metric_value_pct
+                    - best_borrow.metric_value_pct
+                )
                 coverage = (
-                    (lending_snapshot.best_gho_supply.metric_value_pct / best_borrow.metric_value_pct) * 100.0
+                    (
+                        lending_snapshot.best_gho_supply.metric_value_pct
+                        / best_borrow.metric_value_pct
+                    )
+                    * 100.0
                     if best_borrow.metric_value_pct > 0
                     else 0.0
                 )
@@ -700,12 +901,24 @@ class TelegramNotifier:
         return "🟠"
 
     def _confidence_badge(self, conf: str) -> str:
-        return {"VERIFIED": "✅", "AGGREGATOR_ONLY": "⚪", "DIVERGED": "⚠️", "STALE": "🔴"}.get(conf, "⚪")
+        return {
+            "VERIFIED": "✅",
+            "AGGREGATOR_ONLY": "⚪",
+            "DIVERGED": "⚠️",
+            "STALE": "🔴",
+        }.get(conf, "⚪")
 
     def _pool_health_badge(self, snap: MonitoredPoolSnapshot) -> str:
         if PoolHealthTag.DATA_UNVERIFIED in snap.health_tags:
             return "⚪"
-        if any(tag in snap.health_tags for tag in (PoolHealthTag.WATCH_VOLUME, PoolHealthTag.WATCH_APY_DRIFT, PoolHealthTag.WATCH_TVL_DRAIN)):
+        if any(
+            tag in snap.health_tags
+            for tag in (
+                PoolHealthTag.WATCH_VOLUME,
+                PoolHealthTag.WATCH_APY_DRIFT,
+                PoolHealthTag.WATCH_TVL_DRAIN,
+            )
+        ):
             return "🟡"
         return "🟢"
 

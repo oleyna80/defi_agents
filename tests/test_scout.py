@@ -35,7 +35,9 @@ class _MockAuditor:
         return self._status_map[address]
 
 
-def _candidate(pool, chain, symbol, apy, apy_mean_30d, tvl, age_days=None, volume_24h_usd=None):
+def _candidate(
+    pool, chain, symbol, apy, apy_mean_30d, tvl, age_days=None, volume_24h_usd=None
+):
     suffix = pool[-1] if pool and pool[-1].isdigit() else "1"
     candidate = ScoutCandidate.model_validate(
         {
@@ -58,7 +60,12 @@ def _candidate(pool, chain, symbol, apy, apy_mean_30d, tvl, age_days=None, volum
 
 
 def _scout(cfg, pools, status_map):
-    return YieldScout(cfg, _MockClient(pools), _MockAuditor(status_map), deduper=ScoutDeduper(ttl_seconds=0))
+    return YieldScout(
+        cfg,
+        _MockClient(pools),
+        _MockAuditor(status_map),
+        deduper=ScoutDeduper(ttl_seconds=0),
+    )
 
 
 def test_aggregator_dedup():
@@ -93,7 +100,9 @@ def test_security_block_excluded():
         _candidate("pool1", "Base", "USDC-USDT", 20, 18, 10_000_000),
     ]
     status_map = {
-        pools[0].address: SecurityResult(status=SecurityStatus.BLOCK, score=0, reasons=[], sources=[])
+        pools[0].address: SecurityResult(
+            status=SecurityStatus.BLOCK, score=0, reasons=[], sources=[]
+        )
     }
     scout = _scout(cfg, pools, status_map)
     results = _run(scout.analyze())
@@ -101,7 +110,9 @@ def test_security_block_excluded():
 
 
 def test_lindy_softens_missing_audit_block():
-    cfg = ScoutConfig(min_tvl_usd=100_000, lindy_min_tvl_usd=100_000_000, lindy_min_age_days=180)
+    cfg = ScoutConfig(
+        min_tvl_usd=100_000, lindy_min_tvl_usd=100_000_000, lindy_min_age_days=180
+    )
     pool = _candidate("pool1", "Base", "USDC-USDT", 20, 18, 150_000_000, age_days=365)
     status_map = {
         pool.address: SecurityResult(
@@ -126,7 +137,9 @@ def test_lindy_softens_missing_audit_block():
 
 
 def test_lindy_does_not_override_hidden_owner_block():
-    cfg = ScoutConfig(min_tvl_usd=100_000, lindy_min_tvl_usd=100_000_000, lindy_min_age_days=180)
+    cfg = ScoutConfig(
+        min_tvl_usd=100_000, lindy_min_tvl_usd=100_000_000, lindy_min_age_days=180
+    )
     pool = _candidate("pool1", "Base", "USDC-USDT", 20, 18, 150_000_000, age_days=365)
     status_map = {
         pool.address: SecurityResult(
@@ -216,7 +229,9 @@ def test_benchmark_tag_is_added_to_metadata():
 
     assert len(results) == 1
     assert results[0].metadata["above_benchmark"] == "true"
-    assert float(results[0].metadata["benchmark_delta_apy"]) == pytest.approx(3.0, rel=1e-2)
+    assert float(results[0].metadata["benchmark_delta_apy"]) == pytest.approx(
+        3.0, rel=1e-2
+    )
 
 
 def test_defillama_stability_fields_are_threaded_to_metadata():
@@ -307,8 +322,13 @@ def test_stability_scoring_applies_soft_penalty_without_hard_gate_changes():
     assert len(res_disabled) == 1
     assert len(res_enabled) == 1
     assert res_enabled[0].score < res_disabled[0].score
-    assert res_enabled[0].metadata["stability_signals"] == "OUTLIER,APY_VS_30D_HIGH,SIGMA_TO_MU_HIGH,IL_RISK"
-    assert float(res_enabled[0].metadata["stability_factor"]) == pytest.approx(0.288, rel=1e-3)
+    assert (
+        res_enabled[0].metadata["stability_signals"]
+        == "OUTLIER,APY_VS_30D_HIGH,SIGMA_TO_MU_HIGH,IL_RISK"
+    )
+    assert float(res_enabled[0].metadata["stability_factor"]) == pytest.approx(
+        0.288, rel=1e-3
+    )
 
 
 def test_tactical_sleeve_requires_explicit_enable():
@@ -371,8 +391,9 @@ def test_classify_token_tier_t1():
     pool = _candidate("pool1", "Base", "USDC-USDT", 12, 10, 10_000_000)
     status_map = {pool.address: SecurityResult.pass_as_tier1()}
     scout = _scout(cfg, [pool], status_map)
-    
+
     from defi_agents.scout.models import StableTier
+
     assert scout._classify_token_tier("USDC") == StableTier.T1
     assert scout._classify_token_tier("USDT") == StableTier.T1
     assert scout._classify_token_tier("DAI") == StableTier.T1
@@ -385,8 +406,9 @@ def test_classify_token_tier_t2():
     pool = _candidate("pool1", "Base", "GHO-USDC", 12, 10, 10_000_000)
     status_map = {pool.address: SecurityResult.pass_as_tier1()}
     scout = _scout(cfg, [pool], status_map)
-    
+
     from defi_agents.scout.models import StableTier
+
     assert scout._classify_token_tier("crvUSD") == StableTier.T2
     assert scout._classify_token_tier("GHO") == StableTier.T2
     assert scout._classify_token_tier("PYUSD") == StableTier.T2
@@ -398,8 +420,9 @@ def test_classify_token_tier_t3():
     pool = _candidate("pool1", "Base", "USDe-USDC", 12, 10, 10_000_000)
     status_map = {pool.address: SecurityResult.pass_as_tier1()}
     scout = _scout(cfg, [pool], status_map)
-    
+
     from defi_agents.scout.models import StableTier
+
     assert scout._classify_token_tier("USDe") == StableTier.T3
     assert scout._classify_token_tier("TUSD") == StableTier.T3
     assert scout._classify_token_tier("FDUSD") == StableTier.T3
@@ -411,8 +434,9 @@ def test_classify_pair_usd_stable_stable():
     pool = _candidate("pool1", "Base", "USDC-USDT", 12, 10, 10_000_000)
     status_map = {pool.address: SecurityResult.pass_as_tier1()}
     scout = _scout(cfg, [pool], status_map)
-    
+
     from defi_agents.scout.models import PairCurrencyClass
+
     pair_class, fx_exposure = scout._classify_pair(pool)
     assert pair_class == PairCurrencyClass.USD_STABLE_STABLE
     assert fx_exposure is False
@@ -424,8 +448,9 @@ def test_classify_pair_fx_stable():
     pool = _candidate("pool1", "Base", "EURC-USDC", 12, 10, 10_000_000)
     status_map = {pool.address: SecurityResult.pass_as_tier1()}
     scout = _scout(cfg, [pool], status_map)
-    
+
     from defi_agents.scout.models import PairCurrencyClass
+
     pair_class, fx_exposure = scout._classify_pair(pool)
     assert pair_class == PairCurrencyClass.FX_STABLE
     assert fx_exposure is True
@@ -441,7 +466,7 @@ def test_blacklist_blocks_by_symbol():
     pool = _candidate("pool1", "Base", "BADTOKEN-USDC", 12, 10, 10_000_000)
     status_map = {pool.address: SecurityResult.pass_as_tier1()}
     scout = _scout(cfg, [pool], status_map)
-    
+
     blocked, blacklist_by = scout._check_blacklist(pool)
     assert blocked is True
     assert blacklist_by == "symbol"
@@ -455,21 +480,23 @@ def test_blacklist_blocks_by_address():
         risk_policy={"enabled": True},
         token_buckets={"exclude_addresses": [bad_address]},
     )
-    pool = ScoutCandidate.model_validate({
-        "pool": "pool1",
-        "project": "dex",
-        "chain": "Base",
-        "symbol": "USDC-USDT",
-        "address": bad_address,
-        "chain_id": 8453,
-        "tvlUsd": 10_000_000,
-        "apy": 12,
-        "apyBase": 12,
-        "apyMean30d": 10,
-    })
+    pool = ScoutCandidate.model_validate(
+        {
+            "pool": "pool1",
+            "project": "dex",
+            "chain": "Base",
+            "symbol": "USDC-USDT",
+            "address": bad_address,
+            "chain_id": 8453,
+            "tvlUsd": 10_000_000,
+            "apy": 12,
+            "apyBase": 12,
+            "apyMean30d": 10,
+        }
+    )
     status_map = {pool.address: SecurityResult.pass_as_tier1()}
     scout = _scout(cfg, [pool], status_map)
-    
+
     blocked, blacklist_by = scout._check_blacklist(pool)
     assert blocked is True
     assert blacklist_by == "address"
@@ -481,7 +508,7 @@ def test_metadata_contains_tier_and_class():
     pool = _candidate("pool1", "Base", "USDC-USDT", 12, 10, 10_000_000)
     status_map = {pool.address: SecurityResult.pass_as_tier1()}
     results = _run(_scout(cfg, [pool], status_map).analyze())
-    
+
     assert len(results) == 1
     meta = results[0].metadata
     assert meta.get("stable_tier") == "T1"
@@ -495,7 +522,7 @@ def test_fx_pair_has_fx_exposure_in_metadata():
     pool = _candidate("pool1", "Base", "EURC-USDC", 12, 10, 10_000_000)
     status_map = {pool.address: SecurityResult.pass_as_tier1()}
     results = _run(_scout(cfg, [pool], status_map).analyze())
-    
+
     assert len(results) == 1
     meta = results[0].metadata
     assert meta.get("pair_currency_class") == "FX_STABLE"
@@ -581,7 +608,9 @@ def test_asset_universe_filter_defaults_to_all():
 
 
 def test_asset_universe_filter_target_only_drops_non_target_tokens():
-    cfg = ScoutConfig(min_tvl_usd=100_000, asset_universe={"intake_target_assets_only": True})
+    cfg = ScoutConfig(
+        min_tvl_usd=100_000, asset_universe={"intake_target_assets_only": True}
+    )
     pools = [
         _candidate("pool1", "Base", "WETH-USDC", 12, 10, 10_000_000),  # keep
         _candidate("pool2", "Base", "PAXG-USDC", 12, 10, 10_000_000),  # keep
@@ -601,11 +630,17 @@ def test_liquidity_gate_allows_high_volume_low_tvl_pool():
     cfg = ScoutConfig(
         min_tvl_usd=500_000,
         liquidity_gates={"min_volume_24h_usd": 1_000_000},
-        investor_profile={"initial_capital_usd": 1_000, "risk_profile": "micro", "horizon_days": 30},
+        investor_profile={
+            "initial_capital_usd": 1_000,
+            "risk_profile": "micro",
+            "horizon_days": 30,
+        },
         gas_efficiency={"estimated_roundtrip_gas_usd": 0.0, "holding_period_days": 60},
     )
     pools = [
-        _candidate("pool1", "Base", "USDC-USDT", 12, 10, 120_000, volume_24h_usd=2_000_000),
+        _candidate(
+            "pool1", "Base", "USDC-USDT", 12, 10, 120_000, volume_24h_usd=2_000_000
+        ),
     ]
     status_map = {pools[0].address: SecurityResult.pass_as_tier1()}
     results = _run(_scout(cfg, pools, status_map).analyze())
@@ -615,12 +650,21 @@ def test_liquidity_gate_allows_high_volume_low_tvl_pool():
 def test_liquidity_gate_rejects_below_absolute_min_tvl_even_with_volume():
     cfg = ScoutConfig(
         min_tvl_usd=500_000,
-        liquidity_gates={"absolute_min_tvl_usd": 100_000, "min_volume_24h_usd": 1_000_000},
-        investor_profile={"initial_capital_usd": 1_000, "risk_profile": "micro", "horizon_days": 30},
+        liquidity_gates={
+            "absolute_min_tvl_usd": 100_000,
+            "min_volume_24h_usd": 1_000_000,
+        },
+        investor_profile={
+            "initial_capital_usd": 1_000,
+            "risk_profile": "micro",
+            "horizon_days": 30,
+        },
         gas_efficiency={"estimated_roundtrip_gas_usd": 0.0, "holding_period_days": 60},
     )
     pools = [
-        _candidate("pool1", "Base", "USDC-USDT", 12, 10, 90_000, volume_24h_usd=2_000_000),
+        _candidate(
+            "pool1", "Base", "USDC-USDT", 12, 10, 90_000, volume_24h_usd=2_000_000
+        ),
     ]
     status_map = {pools[0].address: SecurityResult.pass_as_tier1()}
     results = _run(_scout(cfg, pools, status_map).analyze())
@@ -633,3 +677,44 @@ def test_non_evm_chain_hint_detection():
     assert scout._is_non_evm_chain_name("Solana") is True
     assert scout._is_non_evm_chain_name("Sui") is True
     assert scout._is_non_evm_chain_name("Ethereum") is False
+
+
+def test_lp_entry_calibration_defaults_are_safe() -> None:
+    cfg = ScoutConfig()
+    cal = cfg.lp_entry_calibration
+    assert cal.stability_enabled is True
+    assert cal.stability_history_path == "docs/memory-bank/history.csv"
+    assert cal.stability_min_observations == 3
+    assert cal.stability_observation_window_hours == 6
+    assert cal.source_confidence_factors["VERIFIED"] == 1.0
+    assert cal.source_confidence_factors["AGGREGATOR_ONLY"] == 0.85
+
+
+def test_lp_entry_calibration_accepts_partial_overrides() -> None:
+    cfg = ScoutConfig(
+        lp_entry_calibration={
+            "stability_min_observations": 4,
+            "stability_observation_window_hours": 12,
+            "rank_confidence_power": 1.2,
+            "confidence_high_min_factor": 0.9,
+            "confidence_medium_min_factor": 0.6,
+            "source_confidence_factors": {
+                "AGGREGATOR_ONLY": 0.88,
+            },
+        }
+    )
+    cal = cfg.lp_entry_calibration
+    assert cal.stability_min_observations == 4
+    assert cal.stability_observation_window_hours == 12
+    assert cal.rank_confidence_power == pytest.approx(1.2, rel=1e-9)
+    assert cal.source_confidence_factors["AGGREGATOR_ONLY"] == pytest.approx(0.88)
+
+
+def test_lp_entry_calibration_rejects_invalid_confidence_thresholds() -> None:
+    with pytest.raises(ValueError):
+        ScoutConfig(
+            lp_entry_calibration={
+                "confidence_high_min_factor": 0.6,
+                "confidence_medium_min_factor": 0.7,
+            }
+        )

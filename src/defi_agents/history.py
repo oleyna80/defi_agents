@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
@@ -11,6 +12,9 @@ def save_to_history(results: Iterable[ScoutResult], path: str | Path = "docs/mem
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     is_new = not path.exists()
+    # History rows represent cycle observations; use wall-clock cycle time,
+    # not upstream source timestamps that can be stale by design.
+    observed_at_ts = int(datetime.now(timezone.utc).timestamp())
     with path.open("a", newline="") as f:
         writer = csv.writer(f)
         if is_new:
@@ -42,7 +46,7 @@ def save_to_history(results: Iterable[ScoutResult], path: str | Path = "docs/mem
             metadata = getattr(l3, "metadata", None)
             writer.writerow(
                 [
-                    c.timestamp,
+                    observed_at_ts,
                     c.chain,
                     c.symbol,
                     c.project,

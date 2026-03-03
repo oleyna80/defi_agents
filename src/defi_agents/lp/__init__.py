@@ -8,29 +8,72 @@ from .band_depth import (
     tick_to_price,
     validate_tick_freshness,
 )
+from .entry_recommendation import (
+    build_ineligible_entry_recommendations,
+    build_entry_recommendations,
+    normalize_watchlist_reason,
+    split_lp_entry_eligibility,
+    summarize_watchlist_reason_counts,
+)
 from .models import (
     BandDepthResult,
     DataQuality,
     DegradationReason,
+    EntryActionability,
+    EntryConfidenceBand,
+    EntryRecommendation,
     PitType,
     PoolState,
     TickData,
 )
-from .pit_classifier import PitInfo, PriceBin, SuggestedRange, build_price_bins, find_liquidity_pits, suggest_range
+from .pit_classifier import (
+    PitInfo,
+    PriceBin,
+    SuggestedRange,
+    build_price_bins,
+    find_liquidity_pits,
+    suggest_range,
+)
 from .rpc_helper import CHAIN_RPC_ENV_MAP, fetch_slot0_tick
 from .runtime_metrics import (
     TickScanRuntimeMetrics,
     compute_scan_duration_p95_ms,
     summarize_tick_scan_runtime_metrics,
 )
+from .stability import (
+    EntryStabilityTelemetry,
+    compute_stability_observation_counts,
+    normalize_pool_ids,
+    summarize_entry_stability_telemetry,
+)
+from .shadow_calibration import (
+    EntryStabilityTelemetryPoint,
+    LpEntryShadowCalibrationSnapshot,
+    LpEntryShadowCalibrationThresholds,
+    evaluate_shadow_calibration_gates,
+    parse_entry_stability_telemetry_line,
+    summarize_entry_shadow_calibration,
+)
 from .tick_provider import TickDataProvider, TickProviderError, UniswapV3TickProvider
-from .volatility import VolEstimate, compute_historical_vol, estimate_vol, vol_adjusted_range_width
+from .volatility import (
+    VolEstimate,
+    compute_historical_vol,
+    estimate_vol,
+    vol_adjusted_range_width,
+)
 
 __all__ = [
     "BandDepthResult",
     "CHAIN_RPC_ENV_MAP",
     "DataQuality",
     "DegradationReason",
+    "EntryActionability",
+    "EntryConfidenceBand",
+    "EntryRecommendation",
+    "EntryStabilityTelemetry",
+    "EntryStabilityTelemetryPoint",
+    "LpEntryShadowCalibrationSnapshot",
+    "LpEntryShadowCalibrationThresholds",
     "PitInfo",
     "PitType",
     "PoolState",
@@ -46,16 +89,27 @@ __all__ = [
     "align_tick_down",
     "align_tick_up",
     "build_price_bins",
+    "build_ineligible_entry_recommendations",
+    "build_entry_recommendations",
     "calculate_band_depth_windows",
     "compute_scan_duration_p95_ms",
     "compute_historical_vol",
+    "compute_stability_observation_counts",
+    "evaluate_shadow_calibration_gates",
     "estimate_vol",
     "fetch_slot0_tick",
     "find_liquidity_pits",
+    "normalize_pool_ids",
+    "normalize_watchlist_reason",
+    "parse_entry_stability_telemetry_line",
     "price_to_tick",
     "scan_pool_band_depth",
+    "split_lp_entry_eligibility",
     "suggest_range",
     "summarize_tick_scan_runtime_metrics",
+    "summarize_watchlist_reason_counts",
+    "summarize_entry_stability_telemetry",
+    "summarize_entry_shadow_calibration",
     "tick_to_price",
     "validate_tick_freshness",
     "vol_adjusted_range_width",

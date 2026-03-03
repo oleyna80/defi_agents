@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from time import time
 
@@ -23,12 +24,27 @@ from defi_agents.security.goplus_client import GoPlusClient
 from defi_agents.security.whitelist import WhitelistProvider
 from defi_agents.notifier import TelegramNotifier
 from defi_agents.cache import CacheController
-from defi_agents.freshness import FreshnessManager, apply_confidence_factors, apply_freshness_policy
+from defi_agents.freshness import (
+    FreshnessManager,
+    apply_confidence_factors,
+    apply_freshness_policy,
+)
 from defi_agents.history import save_to_history
 from defi_agents.shadow_metrics import ShadowMetricsTracker
 from defi_agents.strategy_sim.engine import StrategySimEngine
 from defi_agents.strategy_sim.models import SimulationCounters
 from defi_agents.lp.band_depth import scan_pool_band_depth
+from defi_agents.lp.entry_recommendation import (
+    build_ineligible_entry_recommendations,
+    build_entry_recommendations,
+    split_lp_entry_eligibility,
+    summarize_watchlist_reason_counts,
+)
+from defi_agents.lp.stability import (
+    compute_stability_observation_counts,
+    normalize_pool_ids,
+    summarize_entry_stability_telemetry,
+)
 from defi_agents.lp.tick_provider import TickProviderError, UniswapV3TickProvider
 from defi_agents.lp.rpc_helper import fetch_slot0_tick
 from defi_agents.lp.models import DataQuality
@@ -56,6 +72,18 @@ logger = logging.getLogger("Sentinel")
 # Prevent accidental secret leaks in verbose HTTP request logs (e.g., Telegram bot token in URL path).
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+
+def _format_reason_counts_for_log(counts: Mapping[str, int] | None) -> str:
+    if not counts:
+        return "NONE"
+    parts: list[str] = []
+    for key in sorted(str(k).strip().upper() for k in counts.keys() if str(k).strip()):
+        value = int(counts.get(key, 0) or 0)
+        if value < 0:
+            continue
+        parts.append(f"{key}:{value}")
+    return ",".join(parts) if parts else "NONE"
 
 
 def _load_env_file(path: str = ".env") -> None:
@@ -99,6 +127,25 @@ def _to_float_or_none(value: object) -> float | None:
         return None
 
 
+def _parse_tick_range_from_metadata(metadata: Mapping[str, str]) -> tuple[int | None, int | None]:
+    lower_raw = metadata.get("suggested_range_lower_tick")
+    upper_raw = metadata.get("suggested_range_upper_tick")
+    try:
+        lower_tick = int(lower_raw) if lower_raw not in (None, "") else None
+        upper_tick = int(upper_raw) if upper_raw not in (None, "") else None
+    except (TypeError, ValueError):
+        return None, None
+    return lower_tick, upper_tick
+
+
+def _range_watchlist_reason(lower_tick: int | None, upper_tick: int | None) -> str | None:
+    if lower_tick is None and upper_tick is None:
+        return "RANGE_NOT_COMPUTED"
+    if lower_tick is None or upper_tick is None or lower_tick >= upper_tick:
+        return "INVALID_OR_MISSING_RANGE"
+    return None
+
+
 def _percentile(values: list[float], q: float) -> float | None:
     if not values:
         return None
@@ -107,10 +154,17 @@ def _percentile(values: list[float], q: float) -> float | None:
     return ordered[pos]
 
 
-def _freshness_divergence_stats(results) -> dict[str, tuple[int, float | None, float | None, float | None, float | None]]:  # noqa: ANN001
+def _freshness_divergence_stats(
+    results,
+) -> dict[
+    str, tuple[int, float | None, float | None, float | None, float | None]
+]:  # noqa: ANN001
     stats: dict[str, dict[str, list[float]]] = {}
     for r in results:
-        provider = str((r.metadata or {}).get("freshness_provider", "") or "").strip() or "none"
+        provider = (
+            str((r.metadata or {}).get("freshness_provider", "") or "").strip()
+            or "none"
+        )
         apy_div = _to_float_or_none((r.metadata or {}).get("apy_divergence_pct"))
         tvl_div = _to_float_or_none((r.metadata or {}).get("tvl_divergence_pct"))
         if provider not in stats:
@@ -120,7 +174,9 @@ def _freshness_divergence_stats(results) -> dict[str, tuple[int, float | None, f
         if tvl_div is not None:
             stats[provider]["tvl"].append(tvl_div)
 
-    out: dict[str, tuple[int, float | None, float | None, float | None, float | None]] = {}
+    out: dict[
+        str, tuple[int, float | None, float | None, float | None, float | None]
+    ] = {}
     for provider, values in stats.items():
         apy_vals = values["apy"]
         tvl_vals = values["tvl"]
@@ -136,7 +192,12 @@ def _freshness_divergence_stats(results) -> dict[str, tuple[int, float | None, f
 
 
 def _telegram_digest_due(config: ScoutConfig) -> tuple[bool, int, int]:
-    interval = int(getattr(getattr(config, "reporting", None), "telegram_digest_interval_seconds", 0) or 0)
+    interval = int(
+        getattr(
+            getattr(config, "reporting", None), "telegram_digest_interval_seconds", 0
+        )
+        or 0
+    )
     if interval <= 0:
         return True, 0, 0
     cache = CacheController(namespace="telegram_digest")
@@ -161,8 +222,13 @@ def _mark_telegram_digest_sent() -> None:
 
 def _telegram_no_opps_heartbeat_due(config: ScoutConfig) -> tuple[bool, int, int]:
     reporting = getattr(config, "reporting", None)
-    enabled = bool(getattr(reporting, "telegram_no_opportunities_heartbeat_enabled", False))
-    interval = int(getattr(reporting, "telegram_no_opportunities_heartbeat_interval_seconds", 0) or 0)
+    enabled = bool(
+        getattr(reporting, "telegram_no_opportunities_heartbeat_enabled", False)
+    )
+    interval = int(
+        getattr(reporting, "telegram_no_opportunities_heartbeat_interval_seconds", 0)
+        or 0
+    )
     if not enabled or interval <= 0:
         return False, interval, 0
     cache = CacheController(namespace="telegram_no_opps_heartbeat")
@@ -189,10 +255,14 @@ async def _load_execution_states(config: ScoutConfig) -> list[PositionState]:
     rpc_url = os.getenv("RPC_URL_ARBITRUM", "").strip()
 
     if not wallet_address:
-        logger.warning("Execution state source unavailable: reason=WALLET_ADDRESS_MISSING source=position_reader")
+        logger.warning(
+            "Execution state source unavailable: reason=WALLET_ADDRESS_MISSING source=position_reader"
+        )
         return []
     if not rpc_url:
-        logger.warning("Execution state source unavailable: reason=RPC_URL_ARBITRUM_MISSING source=position_reader")
+        logger.warning(
+            "Execution state source unavailable: reason=RPC_URL_ARBITRUM_MISSING source=position_reader"
+        )
         return []
 
     reader = ArbitrumUniswapV3PositionReader(rpc_url=rpc_url)
@@ -206,7 +276,9 @@ async def _load_execution_states(config: ScoutConfig) -> list[PositionState]:
         return []
 
     if not states:
-        logger.warning("Execution state source empty: reason=NO_ACTIVE_POSITIONS source=position_reader")
+        logger.warning(
+            "Execution state source empty: reason=NO_ACTIVE_POSITIONS source=position_reader"
+        )
         return []
 
     stale_count = sum(1 for state in states if state.stale)
@@ -324,7 +396,9 @@ def _build_execution_adapter(config: ScoutConfig):
             )
 
     if primary is None:
-        logger.warning("Execution adapter init failed for configured adapters; using native fallback.")
+        logger.warning(
+            "Execution adapter init failed for configured adapters; using native fallback."
+        )
         return NativeUniswapV3Adapter()
 
     if exec_cfg.fallback_adapter == exec_cfg.primary_adapter:
@@ -364,7 +438,9 @@ async def run_sentinel_cycle() -> None:
         logger.info("DeepSeek provider initialized.")
     except Exception as exc:  # noqa: BLE001
         if should_allow_mock_fallback():
-            logger.warning("AI init failed: %s. Falling back to MockAI (dev mode).", exc)
+            logger.warning(
+                "AI init failed: %s. Falling back to MockAI (dev mode).", exc
+            )
             provider = MockAIService()
         else:
             logger.critical("AI init failed and fallback disabled. Stopping startup.")
@@ -373,10 +449,18 @@ async def run_sentinel_cycle() -> None:
     notifier = TelegramNotifier(
         include_tags=config.risk_policy.include_tags_in_report,
         top_n_per_section=getattr(config.reporting, "telegram_top_n_per_section", 0),
-        show_source_confidence=getattr(config.reporting, "telegram_show_source_confidence", True),
-        show_market_signals=getattr(config.reporting, "telegram_show_market_signals", False),
+        show_source_confidence=getattr(
+            config.reporting, "telegram_show_source_confidence", True
+        ),
+        show_market_signals=getattr(
+            config.reporting, "telegram_show_market_signals", False
+        ),
         chat_id_env=(
-            getattr(config.reporting, "telegram_shadow_chat_id_env", "TELEGRAM_SHADOW_CHAT_ID")
+            getattr(
+                config.reporting,
+                "telegram_shadow_chat_id_env",
+                "TELEGRAM_SHADOW_CHAT_ID",
+            )
             if getattr(config.reporting, "telegram_shadow_mode_enabled", False)
             else None
         ),
@@ -389,15 +473,28 @@ async def run_sentinel_cycle() -> None:
     if getattr(config.reporting, "telegram_shadow_mode_enabled", False):
         logger.info(
             "Shadow mode enabled: chat_id_env=%s digest_interval=%ss",
-            getattr(config.reporting, "telegram_shadow_chat_id_env", "TELEGRAM_SHADOW_CHAT_ID"),
+            getattr(
+                config.reporting,
+                "telegram_shadow_chat_id_env",
+                "TELEGRAM_SHADOW_CHAT_ID",
+            ),
             int(getattr(config.reporting, "telegram_digest_interval_seconds", 0) or 0),
         )
     shadow_tracker = ShadowMetricsTracker(
-        horizon_seconds=int(getattr(config.reporting, "telegram_shadow_metrics_horizon_seconds", 86_400) or 86_400),
-        capture_interval_seconds=int(
-            getattr(config.reporting, "telegram_shadow_capture_interval_seconds", 21_600) or 21_600
+        horizon_seconds=int(
+            getattr(config.reporting, "telegram_shadow_metrics_horizon_seconds", 86_400)
+            or 86_400
         ),
-        retention_seconds=int(getattr(config.reporting, "telegram_shadow_retention_seconds", 1_209_600) or 1_209_600),
+        capture_interval_seconds=int(
+            getattr(
+                config.reporting, "telegram_shadow_capture_interval_seconds", 21_600
+            )
+            or 21_600
+        ),
+        retention_seconds=int(
+            getattr(config.reporting, "telegram_shadow_retention_seconds", 1_209_600)
+            or 1_209_600
+        ),
     )
 
     logger.info("Starting Global Scout Cycle (chains: ALL).")
@@ -407,13 +504,17 @@ async def run_sentinel_cycle() -> None:
             try:
                 directional_snapshot = await client.get_directional_snapshot()
             except Exception as exc:  # noqa: BLE001
-                logger.warning("Directional snapshot fetch failed: %s", exc.__class__.__name__)
+                logger.warning(
+                    "Directional snapshot fetch failed: %s", exc.__class__.__name__
+                )
                 directional_snapshot = None
         if getattr(config.reporting, "telegram_turnover_section_enabled", False):
             try:
                 turnover_snapshot = await client.get_turnover_snapshot()
             except Exception as exc:  # noqa: BLE001
-                logger.warning("Turnover snapshot fetch failed: %s", exc.__class__.__name__)
+                logger.warning(
+                    "Turnover snapshot fetch failed: %s", exc.__class__.__name__
+                )
                 turnover_snapshot = None
         opportunities = await scout.analyze()
         dex_stats = getattr(scout, "last_discovery_stats", None)
@@ -511,6 +612,24 @@ async def run_sentinel_cycle() -> None:
         td_scan_durations_ms: list[float] = []
         td_scan_results = []
         if td_cfg.enabled:
+            td_readiness_blockers: dict[str, int] = {}
+
+            def _inc_td_blocker(code: str) -> None:
+                normalized = str(code or "").strip().upper()
+                if not normalized:
+                    return
+                td_readiness_blockers[normalized] = (
+                    int(td_readiness_blockers.get(normalized, 0)) + 1
+                )
+
+            def _provider_init_blocker_code_from_exception(exc: Exception) -> str:
+                message = str(exc or "")
+                if "Missing env `GRAPH_API_KEY`" in message:
+                    return "GRAPH_API_KEY_MISSING"
+                if isinstance(exc, ValueError) and td_cfg.graph_api_key_env in message:
+                    return f"{td_cfg.graph_api_key_env.upper()}_MISSING"
+                return f"PROVIDER_INIT_{exc.__class__.__name__.upper()}"
+
             async def _build_chain_providers(
                 *,
                 venue: str,
@@ -539,6 +658,9 @@ async def run_sentinel_cycle() -> None:
                         except TickProviderError as exc:
                             # Fail-safe: treat as "disabled this cycle" (likely downtime/rate-limit),
                             # not as a hard init failure.
+                            _inc_td_blocker(
+                                f"PROVIDER_UNAVAILABLE_{getattr(exc.reason, 'value', str(exc.reason)).upper()}"
+                            )
                             logger.warning(
                                 "Tick density provider unavailable: venue=%s chain=%s reason=%s msg=%s",
                                 venue,
@@ -550,6 +672,7 @@ async def run_sentinel_cycle() -> None:
                         if not supports:
                             # Unsupported schema is expected on some subgraphs and is handled fail-safe.
                             # Keep this as INFO to avoid alert fatigue in routine shadow runs.
+                            _inc_td_blocker("SUBGRAPH_SCHEMA_UNSUPPORTED")
                             logger.info(
                                 "Tick density provider disabled (schema unsupported): venue=%s chain=%s",
                                 venue,
@@ -558,6 +681,9 @@ async def run_sentinel_cycle() -> None:
                             continue
                         providers[chain_name] = provider
                     except TickProviderError as exc:
+                        _inc_td_blocker(
+                            f"PROVIDER_INIT_{getattr(exc.reason, 'value', str(exc.reason)).upper()}"
+                        )
                         logger.warning(
                             "Tick density provider init failed: venue=%s chain=%s reason=%s msg=%s",
                             venue,
@@ -566,6 +692,7 @@ async def run_sentinel_cycle() -> None:
                             str(exc)[:220],
                         )
                     except Exception as exc:  # noqa: BLE001
+                        _inc_td_blocker(_provider_init_blocker_code_from_exception(exc))
                         logger.warning(
                             "Tick density provider init failed: venue=%s chain=%s err=%s msg=%s",
                             venue,
@@ -593,7 +720,9 @@ async def run_sentinel_cycle() -> None:
                 if rpc_url:
                     chain_rpc_urls[chain_name] = rpc_url
 
-            def _provider_for_candidate(candidate) -> UniswapV3TickProvider | None:  # noqa: ANN001
+            def _provider_for_candidate(
+                candidate,
+            ) -> UniswapV3TickProvider | None:  # noqa: ANN001
                 project_lower = (candidate.project or "").lower().replace(" ", "")
                 chain = candidate.chain or ""
                 if "aerodrome-slipstream" in project_lower:
@@ -614,7 +743,9 @@ async def run_sentinel_cycle() -> None:
 
             def _token_pair(candidate) -> tuple[str, str] | None:  # noqa: ANN001
                 normalized_tokens: list[str] = []
-                for raw_token in list(getattr(candidate, "underlying_tokens", []) or []):
+                for raw_token in list(
+                    getattr(candidate, "underlying_tokens", []) or []
+                ):
                     normalized = _normalize_evm_address(raw_token)
                     if normalized and normalized not in normalized_tokens:
                         normalized_tokens.append(normalized)
@@ -696,10 +827,13 @@ async def run_sentinel_cycle() -> None:
                 scan_candidates.append((opt, provider))
 
             # Limit shortlist scan scope by TVL priority.
-            scan_candidates.sort(key=lambda entry: float(entry[0].candidate.tvl_usd or 0), reverse=True)
-            scan_candidates = scan_candidates[:td_cfg.max_scan_candidates]
+            scan_candidates.sort(
+                key=lambda entry: float(entry[0].candidate.tvl_usd or 0), reverse=True
+            )
+            scan_candidates = scan_candidates[: td_cfg.max_scan_candidates]
             # Cache vol estimates per pool for this cycle to avoid duplicate historical lookups.
             vol_cache: dict[str, tuple[float, float, int, float] | None] = {}
+
             # Returns: ok | degraded | error | skip, plus resolved pool address if any.
             async def _scan_tick_candidate(
                 provider: UniswapV3TickProvider,
@@ -708,7 +842,9 @@ async def run_sentinel_cycle() -> None:
             ) -> tuple[str, str | None]:  # noqa: ANN001
                 nonlocal td_scanned, td_ok, td_degraded, td_scan_ms_total
 
-                pool_addr = await _resolve_scan_pool_address(provider, candidate, metadata)
+                pool_addr = await _resolve_scan_pool_address(
+                    provider, candidate, metadata
+                )
                 if not pool_addr:
                     return "skip", None
                 if pool_addr in scanned_pool_addrs:
@@ -721,7 +857,9 @@ async def run_sentinel_cycle() -> None:
                 if vol_key not in vol_cache:
                     vol_cache[vol_key] = None
                     try:
-                        ratio_prices = await client.get_pair_price_ratio_history(candidate, lookback_days=10)
+                        ratio_prices = await client.get_pair_price_ratio_history(
+                            candidate, lookback_days=10
+                        )
                         vol_est = estimate_vol(ratio_prices, holding_days=7.0)
                         if vol_est is not None:
                             vol_cache[vol_key] = (
@@ -733,12 +871,18 @@ async def run_sentinel_cycle() -> None:
                     except Exception:  # noqa: BLE001
                         pass
                 vol_info = vol_cache.get(vol_key)
+                daily_vol_for_scan: float | None = None
                 if metadata is not None and vol_info is not None:
                     daily_vol, annual_vol, sample_days, range_half_width = vol_info
+                    daily_vol_for_scan = float(daily_vol)
                     metadata["tick_daily_vol"] = f"{daily_vol:.6f}"
                     metadata["tick_annual_vol"] = f"{annual_vol:.6f}"
                     metadata["tick_vol_samples"] = str(sample_days)
-                    metadata["tick_range_half_width_pct"] = f"{range_half_width * 100.0:.2f}"
+                    metadata["tick_range_half_width_pct"] = (
+                        f"{range_half_width * 100.0:.2f}"
+                    )
+                elif vol_info is not None:
+                    daily_vol_for_scan = float(vol_info[0])
 
                 # RPC slot0 cross-check (optional, fail-safe)
                 rpc_tick = None
@@ -746,7 +890,9 @@ async def run_sentinel_cycle() -> None:
                 if rpc_url:
                     try:
                         rpc_tick = await fetch_slot0_tick(
-                            rpc_url, pool_addr, timeout_seconds=td_cfg.rpc_timeout_seconds,
+                            rpc_url,
+                            pool_addr,
+                            timeout_seconds=td_cfg.rpc_timeout_seconds,
                         )
                     except Exception:  # noqa: BLE001
                         pass  # slot0 failure is non-fatal
@@ -754,12 +900,18 @@ async def run_sentinel_cycle() -> None:
                 scan_start = time()
                 try:
                     band_result = await scan_pool_band_depth(
-                        provider, pool_addr,
+                        provider,
+                        pool_addr,
                         rpc_tick=rpc_tick,
                         enforce_rpc_check=rpc_tick is not None,
+                        daily_vol=daily_vol_for_scan,
                     )
                 except Exception as exc:  # noqa: BLE001
-                    logger.warning("Tick scan error pool=%s: %s", pool_addr[:10], exc.__class__.__name__)
+                    logger.warning(
+                        "Tick scan error pool=%s: %s",
+                        pool_addr[:10],
+                        exc.__class__.__name__,
+                    )
                     td_degraded += 1
                     if metadata is not None:
                         metadata["tick_data_quality"] = "ERROR"
@@ -773,13 +925,31 @@ async def run_sentinel_cycle() -> None:
 
                 if metadata is not None:
                     metadata["tick_data_quality"] = band_result.data_quality.value
-                    metadata["band_depth_1pct_usd"] = f"{band_result.band_depth_1pct_usd:.2f}"
-                    metadata["band_depth_2_5pct_usd"] = f"{band_result.band_depth_2_5pct_usd:.2f}"
-                    metadata["band_depth_5pct_usd"] = f"{band_result.band_depth_5pct_usd:.2f}"
+                    metadata["band_depth_1pct_usd"] = (
+                        f"{band_result.band_depth_1pct_usd:.2f}"
+                    )
+                    metadata["band_depth_2_5pct_usd"] = (
+                        f"{band_result.band_depth_2_5pct_usd:.2f}"
+                    )
+                    metadata["band_depth_5pct_usd"] = (
+                        f"{band_result.band_depth_5pct_usd:.2f}"
+                    )
+                    metadata["pit_type"] = band_result.pit_type.value
+                    metadata["pits_found"] = str(band_result.pits_found)
                     metadata["tick_pit_type"] = band_result.pit_type.value
                     metadata["tick_pits_found"] = str(band_result.pits_found)
+                    if band_result.suggested_range_lower_tick is not None:
+                        metadata["suggested_range_lower_tick"] = str(
+                            band_result.suggested_range_lower_tick
+                        )
+                    if band_result.suggested_range_upper_tick is not None:
+                        metadata["suggested_range_upper_tick"] = str(
+                            band_result.suggested_range_upper_tick
+                        )
                     if band_result.degradation_reason:
-                        metadata["tick_degradation_reason"] = band_result.degradation_reason.value
+                        metadata["tick_degradation_reason"] = (
+                            band_result.degradation_reason.value
+                        )
 
                 if band_result.data_quality == DataQuality.OK:
                     td_ok += 1
@@ -789,12 +959,16 @@ async def run_sentinel_cycle() -> None:
                 return "degraded", pool_addr
 
             for opt, provider in scan_candidates:
-                status, _pool_addr = await _scan_tick_candidate(provider, opt.candidate, opt.metadata)
+                status, _pool_addr = await _scan_tick_candidate(
+                    provider, opt.candidate, opt.metadata
+                )
                 if status == "skip":
                     td_skipped += 1
 
             # Secondary stream: scan discovered Uniswap pools even if they are not in shortlist.
-            discovery_candidates_raw = list(getattr(scout, "last_discovery_candidates", []) or [])
+            discovery_candidates_raw = list(
+                getattr(scout, "last_discovery_candidates", []) or []
+            )
             discovery_candidates: list[tuple[object, UniswapV3TickProvider]] = []
             discovery_seen_addrs: set[str] = set()
             for c in discovery_candidates_raw:
@@ -807,13 +981,18 @@ async def run_sentinel_cycle() -> None:
                     continue
                 pool_addr_direct = _normalize_evm_address(c.address)
                 if pool_addr_direct and (c.address_source or "").upper() == "POOL":
-                    if pool_addr_direct in scanned_pool_addrs or pool_addr_direct in discovery_seen_addrs:
+                    if (
+                        pool_addr_direct in scanned_pool_addrs
+                        or pool_addr_direct in discovery_seen_addrs
+                    ):
                         continue
                     discovery_seen_addrs.add(pool_addr_direct)
                 discovery_candidates.append((c, provider))
 
-            discovery_candidates.sort(key=lambda entry: float(entry[0].tvl_usd or 0), reverse=True)
-            discovery_candidates = discovery_candidates[:td_cfg.max_scan_candidates]
+            discovery_candidates.sort(
+                key=lambda entry: float(entry[0].tvl_usd or 0), reverse=True
+            )
+            discovery_candidates = discovery_candidates[: td_cfg.max_scan_candidates]
             for c, provider in discovery_candidates:
                 status, _pool_addr = await _scan_tick_candidate(provider, c, None)
                 if status == "ok":
@@ -838,11 +1017,24 @@ async def run_sentinel_cycle() -> None:
                 "discovery_scanned=%s discovery_ok=%s discovery_degraded=%s discovery_skipped=%s "
                 "pits_found_count=%s confident_pit_count=%s scan_ms_total=%.0f scan_duration_p95_ms=%.0f "
                 "enabled=%s shadow=%s",
-                td_scanned, td_ok, td_degraded, td_skipped,
-                td_discovery_scanned, td_discovery_ok, td_discovery_degraded, td_discovery_skipped,
-                td_runtime_metrics.pits_found_count, td_runtime_metrics.confident_pit_count,
-                td_scan_ms_total, td_runtime_metrics.scan_duration_p95_ms,
-                td_cfg.enabled, td_cfg.shadow_mode_enabled,
+                td_scanned,
+                td_ok,
+                td_degraded,
+                td_skipped,
+                td_discovery_scanned,
+                td_discovery_ok,
+                td_discovery_degraded,
+                td_discovery_skipped,
+                td_runtime_metrics.pits_found_count,
+                td_runtime_metrics.confident_pit_count,
+                td_scan_ms_total,
+                td_runtime_metrics.scan_duration_p95_ms,
+                td_cfg.enabled,
+                td_cfg.shadow_mode_enabled,
+            )
+            logger.info(
+                "Tick density readiness telemetry: blocker_counts=%s",
+                _format_reason_counts_for_log(td_readiness_blockers),
             )
         else:
             logger.info("Tick density scan disabled.")
@@ -866,15 +1058,26 @@ async def run_sentinel_cycle() -> None:
             return getattr(status, "value", str(status))
 
         safe_picks = [
-            opt for opt in eligible if (_sec_status_value(opt) in {"trusted", "pass"} and opt.score >= safe_min_score)
+            opt
+            for opt in eligible
+            if (
+                _sec_status_value(opt) in {"trusted", "pass"}
+                and opt.score >= safe_min_score
+            )
         ]
         warn_picks = [
-            opt for opt in eligible if (_sec_status_value(opt) == "warn" and opt.score >= warn_min_score)
+            opt
+            for opt in eligible
+            if (_sec_status_value(opt) == "warn" and opt.score >= warn_min_score)
         ]
         for opt in safe_picks:
             opt.metadata["bucket"] = "SAFE"
         for opt in warn_picks:
-            reasons = {r.strip() for r in opt.metadata.get("warn_reasons", "").split(",") if r.strip()}
+            reasons = {
+                r.strip()
+                for r in opt.metadata.get("warn_reasons", "").split(",")
+                if r.strip()
+            }
             if opt.metadata.get("lindy_softened") == "true":
                 opt.metadata["bucket"] = "LINDY/WARN"
             elif reasons and reasons.issubset({"REPUTATION_UNAVAILABLE"}):
@@ -887,13 +1090,24 @@ async def run_sentinel_cycle() -> None:
             opt.metadata["report_group"] = (
                 "ACTIONABLE" if opt.net_profit_usd >= min_profit else "WATCHLIST"
             )
+            if opt.metadata["report_group"] == "WATCHLIST":
+                opt.metadata["watchlist_reason"] = "NET_PROFIT_BELOW_THRESHOLD"
+            else:
+                opt.metadata.pop("watchlist_reason", None)
             # Tick density: downgrade to WATCHLIST if data quality is degraded
             if td_cfg.enabled and not td_cfg.shadow_mode_enabled:
                 tick_quality = opt.metadata.get("tick_data_quality", "")
                 if tick_quality and tick_quality not in {"OK", ""}:
                     opt.metadata["report_group"] = "WATCHLIST"
-                    opt.metadata.setdefault("watchlist_reason", tick_quality)
-            net_profit_1k = (1000.0 * (opt.net_apy / 100.0) / 12.0) - config.gas_efficiency.monthly_gas_cost_usd
+                    opt.metadata["watchlist_reason"] = "TICK_DATA_DEGRADED"
+            lower_tick, upper_tick = _parse_tick_range_from_metadata(opt.metadata)
+            range_watchlist_reason = _range_watchlist_reason(lower_tick, upper_tick)
+            if range_watchlist_reason is not None:
+                opt.metadata["report_group"] = "WATCHLIST"
+                opt.metadata["watchlist_reason"] = range_watchlist_reason
+            net_profit_1k = (
+                1000.0 * (opt.net_apy / 100.0) / 12.0
+            ) - config.gas_efficiency.monthly_gas_cost_usd
             opt.metadata["net_profit_1k_usd"] = f"{net_profit_1k:.2f}"
             # Phase A wiring: re-check metadata fields are present before adapters are integrated.
             opt.metadata.setdefault("freshness_status", "UNVERIFIED")
@@ -938,11 +1152,101 @@ async def run_sentinel_cycle() -> None:
         else:
             logger.info("StrategySim disabled or no candidates.")
 
+        recommendation_top_n = int(
+            getattr(config.reporting, "telegram_top_n_per_section", 0) or 5
+        )
+        lp_entry_cfg = config.lp_entry_calibration
+        stability_min_observations = (
+            int(lp_entry_cfg.stability_min_observations)
+            if lp_entry_cfg.stability_enabled
+            else 0
+        )
+        stability_observation_counts: dict[str, int] = {}
+        if lp_entry_cfg.stability_enabled and report_picks:
+            try:
+                stability_observation_counts = compute_stability_observation_counts(
+                    (pick.candidate.pool_id for pick in report_picks),
+                    history_path=lp_entry_cfg.stability_history_path,
+                    lookback_hours=lp_entry_cfg.stability_observation_window_hours,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "LP entry stability history read degraded: reason=HISTORY_READ_ERROR err=%s",
+                    exc.__class__.__name__,
+                )
+                stability_observation_counts = {}
+
+        entry_input_total = len(report_picks)
+        lp_entry_eligible_results, lp_entry_ineligible = split_lp_entry_eligibility(report_picks)
+        entry_lp_eligible_total = len(lp_entry_eligible_results)
+        entry_lp_ineligible_total = len(lp_entry_ineligible)
+
+        entry_range_ready_total = 0
+        entry_range_missing_total = 0
+        for opt in lp_entry_eligible_results:
+            lower_tick, upper_tick = _parse_tick_range_from_metadata(opt.metadata)
+            range_reason = _range_watchlist_reason(lower_tick, upper_tick)
+            if range_reason is None:
+                entry_range_ready_total += 1
+                continue
+            entry_range_missing_total += 1
+            opt.metadata["report_group"] = "WATCHLIST"
+            opt.metadata["watchlist_reason"] = range_reason
+
+        eligible_recommendations = build_entry_recommendations(
+            lp_entry_eligible_results,
+            top_n=max(1, recommendation_top_n),
+            stability_observation_counts=stability_observation_counts,
+            stability_min_observations=stability_min_observations,
+            calibration=lp_entry_cfg,
+        )
+        ineligible_recommendations = build_ineligible_entry_recommendations(
+            lp_entry_ineligible
+        )
+        entry_recommendations = eligible_recommendations + ineligible_recommendations
+        topn_cache = CacheController(namespace="lp_entry_topn_stability")
+        previous_topn_raw = topn_cache.get("topn_pool_ids")
+        previous_topn_pool_ids = (
+            previous_topn_raw
+            if isinstance(previous_topn_raw, (list, tuple, set))
+            else []
+        )
+        stability_telemetry = summarize_entry_stability_telemetry(
+            entry_recommendations,
+            top_n=max(1, recommendation_top_n),
+            previous_topn_pool_ids=normalize_pool_ids(previous_topn_pool_ids),
+        )
+        watchlist_reason_counts = summarize_watchlist_reason_counts(entry_recommendations)
+        topn_cache.set(
+            "topn_pool_ids",
+            stability_telemetry.topn_pool_ids,
+            ttl_seconds=365 * 24 * 3600,
+        )
+        logger.info(
+            "LP entry stability telemetry: entry_total=%s entry_actionable=%s entry_watchlist=%s "
+            "entry_watchlist_insufficient_history=%s entry_topn_churn=%.4f "
+            "entry_input_total=%s entry_lp_eligible_total=%s entry_lp_ineligible_total=%s "
+            "entry_range_ready_total=%s entry_range_missing_total=%s watchlist_reason_counts=%s",
+            stability_telemetry.entry_total,
+            stability_telemetry.entry_actionable,
+            stability_telemetry.entry_watchlist,
+            stability_telemetry.entry_watchlist_insufficient_history,
+            stability_telemetry.entry_topn_churn,
+            entry_input_total,
+            entry_lp_eligible_total,
+            entry_lp_ineligible_total,
+            entry_range_ready_total,
+            entry_range_missing_total,
+            _format_reason_counts_for_log(watchlist_reason_counts),
+        )
+
         # --- Execution loop (Spec 018, isolated and optional) ---
         if config.execution.enabled:
             states = await _load_execution_states(config)
             if not states:
-                logger.info("Execution enabled but no valid position states available; loop skipped.")
+                logger.info(
+                    "Execution enabled but no valid position states available; loop skipped."
+                )
             else:
                 execution_orchestrator = ExecutionOrchestrator(
                     mode=config.execution.mode,
@@ -983,8 +1287,16 @@ async def run_sentinel_cycle() -> None:
             min_profit,
         )
 
-        actionable_count = sum(1 for pick in report_picks if pick.metadata.get("report_group") == "ACTIONABLE")
-        watchlist_count = sum(1 for pick in report_picks if pick.metadata.get("report_group") == "WATCHLIST")
+        actionable_count = sum(
+            1
+            for pick in report_picks
+            if pick.metadata.get("report_group") == "ACTIONABLE"
+        )
+        watchlist_count = sum(
+            1
+            for pick in report_picks
+            if pick.metadata.get("report_group") == "WATCHLIST"
+        )
         if getattr(config.reporting, "telegram_shadow_mode_enabled", False):
             shadow_summary = shadow_tracker.process(report_picks)
             logger.info(shadow_summary.to_log_line())
@@ -995,15 +1307,22 @@ async def run_sentinel_cycle() -> None:
                 offset = int(offset_raw) if offset_raw is not None else None
             except (TypeError, ValueError):
                 offset = None
-            poll_limit = int(getattr(config.reporting, "telegram_recheck_poll_limit", 20) or 20)
-            command = str(getattr(config.reporting, "telegram_recheck_command", "/recheck") or "/recheck")
+            poll_limit = int(
+                getattr(config.reporting, "telegram_recheck_poll_limit", 20) or 20
+            )
+            command = str(
+                getattr(config.reporting, "telegram_recheck_command", "/recheck")
+                or "/recheck"
+            )
             requests, next_offset = await notifier.fetch_recheck_requests(
                 offset=offset,
                 limit=poll_limit,
                 command=command,
             )
             if next_offset is not None and next_offset != offset:
-                recheck_cache.set("offset", int(next_offset), ttl_seconds=365 * 24 * 3600)
+                recheck_cache.set(
+                    "offset", int(next_offset), ttl_seconds=365 * 24 * 3600
+                )
 
             # Bootstrap: first poll only advances offset and avoids replaying stale commands.
             if offset is None and requests:
@@ -1014,7 +1333,10 @@ async def run_sentinel_cycle() -> None:
                 )
                 requests = []
 
-            threshold_pct = float(getattr(config.reporting, "telegram_recheck_change_threshold_pct", 20.0) or 20.0)
+            threshold_pct = float(
+                getattr(config.reporting, "telegram_recheck_change_threshold_pct", 20.0)
+                or 20.0
+            )
             handled = 0
             for pool_id in requests[:5]:
                 handled += 1
@@ -1031,21 +1353,33 @@ async def run_sentinel_cycle() -> None:
                     )
                     continue
 
-                current_net_1k = (1000.0 * (float(candidate.apy or 0.0) / 100.0) / 12.0) - config.gas_efficiency.monthly_gas_cost_usd
+                current_net_1k = (
+                    1000.0 * (float(candidate.apy or 0.0) / 100.0) / 12.0
+                ) - config.gas_efficiency.monthly_gas_cost_usd
                 baseline = shadow_tracker.latest_prediction(pool_id)
                 baseline_value = None
                 if isinstance(baseline, dict):
                     baseline_value = baseline.get("predicted_net_profit_1k")
                 try:
-                    baseline_net_1k = float(baseline_value) if baseline_value is not None else None
+                    baseline_net_1k = (
+                        float(baseline_value) if baseline_value is not None else None
+                    )
                 except (TypeError, ValueError):
                     baseline_net_1k = None
 
-                decision_line = "⚪ NEED_BASELINE — no prior shadow snapshot for this pool."
+                decision_line = (
+                    "⚪ NEED_BASELINE — no prior shadow snapshot for this pool."
+                )
                 delta_line = "Δproxy: n/a"
                 if baseline_net_1k is not None and abs(baseline_net_1k) > 1e-9:
-                    delta_pct = abs(current_net_1k - baseline_net_1k) / abs(baseline_net_1k) * 100.0
-                    delta_line = f"Δproxy: {delta_pct:.1f}% (threshold {threshold_pct:.1f}%)"
+                    delta_pct = (
+                        abs(current_net_1k - baseline_net_1k)
+                        / abs(baseline_net_1k)
+                        * 100.0
+                    )
+                    delta_line = (
+                        f"Δproxy: {delta_pct:.1f}% (threshold {threshold_pct:.1f}%)"
+                    )
                     if delta_pct <= threshold_pct:
                         decision_line = "✅ CONFIRMED — proxy change within threshold."
                     else:
@@ -1059,7 +1393,11 @@ async def run_sentinel_cycle() -> None:
                             f"Pool ID: `{pool_id}`",
                             f"Current APY: {float(candidate.apy or 0.0):.2f}% | TVL: {float(candidate.tvl_usd or 0.0):,.0f} USD",
                             f"Current proxy Net@1k: {current_net_1k:.2f}/mo",
-                            f"Baseline proxy Net@1k: {baseline_net_1k:.2f}/mo" if baseline_net_1k is not None else "Baseline proxy Net@1k: n/a",
+                            (
+                                f"Baseline proxy Net@1k: {baseline_net_1k:.2f}/mo"
+                                if baseline_net_1k is not None
+                                else "Baseline proxy Net@1k: n/a"
+                            ),
                             delta_line,
                             decision_line,
                             f"[Pool](https://defillama.com/yields/pool/{pool_id})",
@@ -1097,7 +1435,9 @@ async def run_sentinel_cycle() -> None:
         )
         if report_picks:
             div_stats = _freshness_divergence_stats(report_picks)
-            for provider, (samples, apy_p50, apy_p90, tvl_p50, tvl_p90) in sorted(div_stats.items()):
+            for provider, (samples, apy_p50, apy_p90, tvl_p50, tvl_p90) in sorted(
+                div_stats.items()
+            ):
                 if samples <= 0:
                     continue
                 logger.info(
@@ -1119,6 +1459,7 @@ async def run_sentinel_cycle() -> None:
                     turnover_snapshot=turnover_snapshot,
                     directional_snapshot=directional_snapshot,
                     my_pools_report=my_pools_report,
+                    entry_recommendations=entry_recommendations,
                 )
                 _mark_telegram_digest_sent()
                 logger.info(
@@ -1128,7 +1469,9 @@ async def run_sentinel_cycle() -> None:
                     len(warn_picks),
                     actionable_count,
                     watchlist_count,
-                    bool(getattr(config.reporting, "telegram_shadow_mode_enabled", False)),
+                    bool(
+                        getattr(config.reporting, "telegram_shadow_mode_enabled", False)
+                    ),
                 )
             else:
                 logger.info(

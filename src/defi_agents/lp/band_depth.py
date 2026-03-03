@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation, getcontext
 from math import floor, log
 
-from .models import BandDepthResult, DataQuality, DegradationReason, PoolState, TickData
+from .models import BandDepthResult, DataQuality, DegradationReason, PitType, PoolState, TickData
 from .tick_provider import TickDataProvider, TickProviderError
 
 getcontext().prec = 48
@@ -84,6 +84,7 @@ async def scan_pool_band_depth(
     *,
     rpc_tick: int | None = None,
     enforce_rpc_check: bool = False,
+    daily_vol: float | None = None,
 ) -> BandDepthResult:
     try:
         pool_state = await provider.get_pool_state(pool_address)
@@ -121,11 +122,47 @@ async def scan_pool_band_depth(
             return _degraded_result(pool_address, freshness.reason or DegradationReason.RPC_UNAVAILABLE)
 
     band_depth = calculate_band_depth_windows(pool_state, ticks)
+
+    # Phase 2.7.5 P0 wiring: pit -> suggested range.
+    pit_type = PitType.NONE
+    pits_found = 0
+    suggested_range_lower_tick: int | None = None
+    suggested_range_upper_tick: int | None = None
+    try:
+        # Local import to avoid module-level circular dependency:
+        # pit_classifier imports helper functions from this module.
+        from .pit_classifier import PitInfo, build_price_bins, find_liquidity_pits, suggest_range
+
+        bins = build_price_bins(pool_state, ticks)
+        pits = find_liquidity_pits(bins)
+        pits_found = len(pits)
+
+        fallback_pit = PitInfo(
+            pit_type=PitType.NONE,
+            center_tick=0,
+            width_ticks=1,
+            distance_to_spot_pct=0.0,
+            depth_ratio=1.0,
+        )
+        selected_pit = next((pit for pit in pits if pit.pit_type == PitType.CONFIDENT_PIT), pits[0] if pits else fallback_pit)
+        pit_type = selected_pit.pit_type
+        suggested = suggest_range(selected_pit, pool_state, daily_vol=daily_vol)
+        if suggested.lower_tick < suggested.upper_tick:
+            suggested_range_lower_tick = int(suggested.lower_tick)
+            suggested_range_upper_tick = int(suggested.upper_tick)
+    except Exception:
+        # Fail-safe: keep scan result OK with depth data even if pit/range analysis fails.
+        pass
+
     return BandDepthResult(
         pool_address=pool_state.pool_address,
         band_depth_1pct_usd=float(band_depth.get(0.01, 0.0)),
         band_depth_2_5pct_usd=float(band_depth.get(0.025, 0.0)),
         band_depth_5pct_usd=float(band_depth.get(0.05, 0.0)),
+        pit_type=pit_type,
+        pits_found=pits_found,
+        suggested_range_lower_tick=suggested_range_lower_tick,
+        suggested_range_upper_tick=suggested_range_upper_tick,
         data_quality=DataQuality.OK,
     )
 

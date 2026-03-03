@@ -175,6 +175,51 @@
 
 ---
 
+## 🟥 Phase 2.7.5: LP Entry Recommendation Engine (Новый приоритет: Critical, NEXT)
+*Цель: из текущего Scout/Tick-Density пайплайна получать детерминированную рекомендацию для входа в позицию: `сеть + протокол + пара + диапазон`.*
+
+- **Spec baseline:** `docs/specs/lp-decision-engine-v1.md` (APPROVED)
+- **Execution plans:** `docs/plans/024-lp-entry-recommendation-v1-plan.md`, `docs/plans/025-lp-entry-research-roo-task.md`, `docs/plans/026-lp-entry-implementation-roo-task.md`, `docs/plans/027-lp-entry-stability-calibration-roo-task.md`, `docs/plans/028-lp-entry-shadow-evidence-calibration-roo-task.md`
+- [x] **Task definition locked (до кодинга):**
+  - Вход: shortlist кандидатов + метаданные `band_depth_*`, `tick_data_quality`, `freshness`, `strategy_sim`.
+  - Выход: `EntryRecommendation` (top-N), где для каждой рекомендации есть:
+    - `chain`, `project`, `pair`, `fee_tier`,
+    - `suggested_range_lower_tick`, `suggested_range_upper_tick` (+ price view),
+    - `confidence`, `reason_codes`, `watchlist_reason` (если не actionable).
+  - Fail-safe контракт: деградированные/неполные tick данные никогда не поднимаются в actionable.
+- [x] **Research gate (обязательный, до разработки):**
+  - Матрица покрытия по сетям/DEX для v1 (`Base/Arbitrum`, `Uniswap v3/Aerodrome`).
+  - Сравнение подходов range selection: pit-based vs volatility-adjusted vs hybrid.
+  - Калибровка порогов ранжирования (`competition_ratio`, `min_net_monthly_usd`, confidence cutoffs).
+  - Формализация метрик качества (precision actionable, доля watchlist по degraded данным, стабильность top-N).
+- [x] **Development gate (после research sign-off):**
+  - Wiring pit detection + range suggestion в runtime output path.
+  - Ранжирование `EntryRecommendation` и отдельный блок в отчёте оператора.
+  - Регрессионные тесты + fail-safe тесты.
+- [x] **DoD фазы 2.7.5:**
+  - В отчёте есть отдельный блок `LP Entry Recommendations` с полями `network/pair/range`.
+  - Для degraded tick/freshness данных рекомендации помечаются как WATCHLIST (без false-actionable).
+  - Тесты на ранжирование/диапазон/fail-safe проходят стабильно.
+
+- [x] **Phase 2.7.6 (P1): Stability + Shadow Calibration**
+  - [x] Ввести history/stability gate для actionable (`>=3 observations / 6h`).
+  - [x] Добавить telemetry метрики churn/stability для Top-N.
+  - [x] Выполнить controlled calibration `rank_v1`/confidence thresholds на SHADOW evidence.
+    - 2026-03-03 window-24 evidence (`docs/reports/lp-entry-shadow-calibration-2026-03-03.md`): `all_pass=true` (`cycles_with_entry_telemetry=24`, `errors_zero_pass=true`), решение `KEEP` (без retune) как evidence-backed no-op.
+  - [x] Закрыть через `docs/plans/028-lp-entry-shadow-evidence-calibration-roo-task.md` (evidence gate + controlled retune).
+
+- [ ] **Phase 2.7.7 (P1, IN PROGRESS): Actionable Enablement**
+  - [x] Добавлен детерминированный reason-level telemetry контракт для `WATCHLIST` (`watchlist_reason_counts`) в cycle-level LP entry telemetry.
+  - [x] Формализованы и выведены в evidence data-readiness блокеры tick-density (`GRAPH_API_KEY_MISSING`, provider/subgraph init/schema blockers).
+  - [x] Расширен calibration tooling: gate `actionable_ratio_positive_pass` + top-3 watchlist reasons при `actionable_ratio == 0`.
+  - [x] Выпущен отчёт `docs/reports/lp-entry-actionable-enablement-2026-03-03.md` с before/after snapshot и blocker section.
+  - [x] Реализован root-cause slice Plan 030 в runtime/tests: LP-only eligibility pre-filter перед `build_entry_recommendations(...)`, machine-code taxonomy для ineligible/range-path (`NON_LP_YIELD_TYPE`, `UNSUPPORTED_ENTRY_VENUE`, `MISSING_POOL_REFERENCE`, `RANGE_NOT_COMPUTED`, `INVALID_OR_MISSING_RANGE`), coverage counters `entry_input_total/entry_lp_eligible_total/entry_lp_ineligible_total/entry_range_ready_total/entry_range_missing_total`.
+    - Реализация: `main.py`, `src/defi_agents/lp/entry_recommendation.py`, `src/defi_agents/lp/shadow_calibration.py`, тесты/репорт синхронизированы.
+  - [ ] Закрыть фазу после устойчивого SHADOW-окна с ненулевым `actionable_ratio` или после evidence-backed reversible tune итерации (макс 1-2 параметра за итерацию).
+  - Трек ведётся через `docs/plans/029-lp-entry-actionable-enablement-roo-task.md` и `docs/plans/030-lp-entry-lp-scope-range-coverage-roo-task.md`.
+
+---
+
 ## 🛡️ Phase 2.8: Protocol Inspector (Новый приоритет: High, IN PROGRESS)
 *Цель: автоматизировать due diligence протоколов (anti-scam / onchain verifiability) как отдельный service-bot, не ломая Scout pipeline.*
 

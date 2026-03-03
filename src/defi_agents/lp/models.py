@@ -18,6 +18,17 @@ class PitType(str, Enum):
     NONE = "NONE"
 
 
+class EntryActionability(str, Enum):
+    ACTIONABLE = "ACTIONABLE"
+    WATCHLIST = "WATCHLIST"
+
+
+class EntryConfidenceBand(str, Enum):
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+
+
 class DegradationReason(str, Enum):
     PAGINATION_LIMIT_REACHED = "PAGINATION_LIMIT_REACHED"
     SUBGRAPH_TIMEOUT = "SUBGRAPH_TIMEOUT"
@@ -60,7 +71,24 @@ class BandDepthResult(BaseModel):
     @model_validator(mode="after")
     def _validate_reason(self) -> "BandDepthResult":
         if self.data_quality != DataQuality.OK and self.degradation_reason is None:
-            raise ValueError("degradation_reason is required when data_quality is not OK")
+            raise ValueError(
+                "degradation_reason is required when data_quality is not OK"
+            )
         if self.data_quality == DataQuality.OK:
             self.degradation_reason = None
         return self
+
+
+class EntryRecommendation(BaseModel):
+    chain: str
+    project: str
+    pair: str
+    fee_tier: int | None = None
+    suggested_range_lower_tick: int | None = None
+    suggested_range_upper_tick: int | None = None
+    confidence: EntryConfidenceBand = EntryConfidenceBand.LOW
+    reasons: list[str] = Field(default_factory=list)
+    watchlist_reason: str | None = None
+    actionability: EntryActionability = EntryActionability.WATCHLIST
+    rank_v1: float = 0.0
+    source_pool_id: str = ""

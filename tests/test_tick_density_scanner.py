@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -8,8 +9,18 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from defi_agents.lp.band_depth import scan_pool_band_depth, tick_to_price, validate_tick_freshness
-from defi_agents.lp.models import DataQuality, DegradationReason, PoolState, TickData
+from defi_agents.lp.band_depth import (
+    scan_pool_band_depth,
+    tick_to_price,
+    validate_tick_freshness,
+)
+from defi_agents.lp.models import (
+    DataQuality,
+    DegradationReason,
+    PitType,
+    PoolState,
+    TickData,
+)
 from defi_agents.lp.tick_provider import TickProviderError, UniswapV3TickProvider
 from defi_agents.scout.config import ScoutConfig
 
@@ -22,7 +33,9 @@ class _DummyProvider:
     async def get_pool_state(self, pool_address: str) -> PoolState:
         return self._state
 
-    async def get_pool_ticks(self, pool_address: str, lower: int, upper: int) -> list[TickData]:
+    async def get_pool_ticks(
+        self, pool_address: str, lower: int, upper: int
+    ) -> list[TickData]:
         return self._ticks
 
     def protocol_fee_pct(self) -> float:
@@ -86,10 +99,55 @@ async def test_scan_pool_band_depth_returns_ok_with_monotonic_windows() -> None:
         TickData(tick_index=500, liquidity_net=0, liquidity_gross=1000),
     ]
     provider = _DummyProvider(state=state, ticks=ticks)
-    result = await scan_pool_band_depth(provider, "0xpool", rpc_tick=0, enforce_rpc_check=True)
+    result = await scan_pool_band_depth(
+        provider, "0xpool", rpc_tick=0, enforce_rpc_check=True
+    )
     assert result.data_quality == DataQuality.OK
     assert result.degradation_reason is None
-    assert result.band_depth_5pct_usd > result.band_depth_2_5pct_usd > result.band_depth_1pct_usd > 0
+    assert (
+        result.band_depth_5pct_usd
+        > result.band_depth_2_5pct_usd
+        > result.band_depth_1pct_usd
+        > 0
+    )
+    assert result.pit_type in {PitType.NONE, PitType.NOISE_PIT, PitType.CONFIDENT_PIT}
+    assert result.pits_found >= 0
+    assert result.suggested_range_lower_tick is not None
+    assert result.suggested_range_upper_tick is not None
+    assert result.suggested_range_lower_tick < result.suggested_range_upper_tick
+
+
+@pytest.mark.asyncio
+async def test_scan_pool_band_depth_passes_daily_vol_to_suggest_range(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state = PoolState(
+        pool_address="0xpool",
+        tick=0,
+        liquidity=1_000_000,
+        sqrt_price_x96=0,
+        fee_tier=500,
+        tick_spacing=10,
+        token0_decimals=18,
+        token1_decimals=18,
+    )
+    ticks = [
+        TickData(tick_index=-500, liquidity_net=0, liquidity_gross=1000),
+        TickData(tick_index=500, liquidity_net=0, liquidity_gross=1000),
+    ]
+    provider = _DummyProvider(state=state, ticks=ticks)
+    observed: dict[str, float | None] = {"daily_vol": None}
+
+    def _fake_suggest_range(*args, **kwargs):  # noqa: ANN002, ANN003
+        observed["daily_vol"] = kwargs.get("daily_vol")
+        return SimpleNamespace(lower_tick=-120, upper_tick=120)
+
+    monkeypatch.setattr("defi_agents.lp.pit_classifier.suggest_range", _fake_suggest_range)
+    result = await scan_pool_band_depth(provider, "0xpool", daily_vol=0.031)
+    assert result.data_quality == DataQuality.OK
+    assert observed["daily_vol"] == pytest.approx(0.031)
+    assert result.suggested_range_lower_tick == -120
+    assert result.suggested_range_upper_tick == 120
 
 
 @pytest.mark.asyncio
@@ -129,13 +187,17 @@ async def test_uniswap_provider_pagination_limit_raises() -> None:
     provider._query = _fake_query  # type: ignore[method-assign]
 
     with pytest.raises(TickProviderError) as exc_info:
-        await provider.get_pool_ticks("0x1111111111111111111111111111111111111111", -100, 100)
+        await provider.get_pool_ticks(
+            "0x1111111111111111111111111111111111111111", -100, 100
+        )
     assert exc_info.value.reason == DegradationReason.PAGINATION_LIMIT_REACHED
 
 
 @pytest.mark.asyncio
 async def test_uniswap_provider_pool_state_parses_and_maps_tick_spacing() -> None:
-    provider = UniswapV3TickProvider(endpoint="https://example.com/graphql", retry_attempts=0)
+    provider = UniswapV3TickProvider(
+        endpoint="https://example.com/graphql", retry_attempts=0
+    )
 
     async def _fake_query(payload: dict) -> dict:
         return {
@@ -162,7 +224,9 @@ async def test_uniswap_provider_pool_state_parses_and_maps_tick_spacing() -> Non
 
 @pytest.mark.asyncio
 async def test_uniswap_provider_supports_tick_schema_cached() -> None:
-    provider = UniswapV3TickProvider(endpoint="https://example.com/graphql", retry_attempts=0)
+    provider = UniswapV3TickProvider(
+        endpoint="https://example.com/graphql", retry_attempts=0
+    )
     call_count = 0
 
     async def _fake_query(payload: dict) -> dict:
@@ -187,7 +251,9 @@ async def test_uniswap_provider_supports_tick_schema_cached() -> None:
 
 @pytest.mark.asyncio
 async def test_uniswap_provider_rejects_schema_without_ticks_field() -> None:
-    provider = UniswapV3TickProvider(endpoint="https://example.com/graphql", retry_attempts=0)
+    provider = UniswapV3TickProvider(
+        endpoint="https://example.com/graphql", retry_attempts=0
+    )
 
     async def _fake_query(payload: dict) -> dict:
         return {
@@ -198,20 +264,28 @@ async def test_uniswap_provider_rejects_schema_without_ticks_field() -> None:
     provider._query = _fake_query  # type: ignore[method-assign]
 
     with pytest.raises(TickProviderError) as exc_info:
-        await provider.get_pool_ticks("0x1111111111111111111111111111111111111111", -10, 10)
+        await provider.get_pool_ticks(
+            "0x1111111111111111111111111111111111111111", -10, 10
+        )
     assert exc_info.value.reason == DegradationReason.SUBGRAPH_ERROR
 
 
 @pytest.mark.asyncio
 async def test_uniswap_provider_find_pool_address_prefers_fee_tier() -> None:
-    provider = UniswapV3TickProvider(endpoint="https://example.com/graphql", retry_attempts=0)
+    provider = UniswapV3TickProvider(
+        endpoint="https://example.com/graphql", retry_attempts=0
+    )
 
     async def _fake_query(payload: dict) -> dict:
         query = str(payload.get("query", ""))
         variables = dict(payload.get("variables", {}) or {})
         if "PoolsByPairAndFee" in query:
             # Only one orientation matches + fee filter applied.
-            if variables.get("token0") == "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" and variables.get("token1") == "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb":
+            if (
+                variables.get("token0") == "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                and variables.get("token1")
+                == "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            ):
                 return {
                     "pools": [
                         {
@@ -236,7 +310,9 @@ async def test_uniswap_provider_find_pool_address_prefers_fee_tier() -> None:
 
 @pytest.mark.asyncio
 async def test_uniswap_provider_find_pool_address_falls_back_without_fee() -> None:
-    provider = UniswapV3TickProvider(endpoint="https://example.com/graphql", retry_attempts=0)
+    provider = UniswapV3TickProvider(
+        endpoint="https://example.com/graphql", retry_attempts=0
+    )
 
     async def _fake_query(payload: dict) -> dict:
         query = str(payload.get("query", ""))
