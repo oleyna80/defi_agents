@@ -37,8 +37,21 @@ from defi_agents.lp.band_depth import scan_pool_band_depth
 from defi_agents.lp.entry_recommendation import (
     build_ineligible_entry_recommendations,
     build_entry_recommendations,
+    filter_lp_entry_target_scope,
+    is_lp_entry_target_scope_match,
+    normalize_pair_for_target_matching,
     split_lp_entry_eligibility,
+    summarize_watchlist_blocker_reason_counts,
     summarize_watchlist_reason_counts,
+)
+from defi_agents.lp.readiness import (
+    READINESS_BLOCKER_GRAPH_API_KEY_MISSING,
+    READINESS_BLOCKER_RPC_TICK_UNAVAILABLE,
+    READINESS_BLOCKER_SUBGRAPH_SCHEMA_UNSUPPORTED,
+    READINESS_BLOCKER_TICK_PROVIDER_INIT_ERROR,
+    READINESS_BLOCKER_TICK_PROVIDER_RUNTIME_ERROR,
+    normalize_readiness_blocker_code,
+    readiness_blocker_from_tick_degradation_reason,
 )
 from defi_agents.lp.stability import (
     compute_stability_observation_counts,
@@ -86,6 +99,27 @@ def _format_reason_counts_for_log(counts: Mapping[str, int] | None) -> str:
     return ",".join(parts) if parts else "NONE"
 
 
+def _select_primary_readiness_blocker(counts: Mapping[str, int] | None) -> str | None:
+    if not counts:
+        return None
+    ranked: list[tuple[str, int]] = []
+    for raw_code, raw_count in counts.items():
+        code = normalize_readiness_blocker_code(raw_code)
+        if not code:
+            continue
+        try:
+            count = int(str(raw_count).strip())
+        except (TypeError, ValueError):
+            continue
+        if count <= 0:
+            continue
+        ranked.append((code, count))
+    if not ranked:
+        return None
+    ranked.sort(key=lambda item: (-item[1], item[0]))
+    return ranked[0][0]
+
+
 def _load_env_file(path: str = ".env") -> None:
     env_path = ROOT / path
     if not env_path.exists():
@@ -127,7 +161,9 @@ def _to_float_or_none(value: object) -> float | None:
         return None
 
 
-def _parse_tick_range_from_metadata(metadata: Mapping[str, str]) -> tuple[int | None, int | None]:
+def _parse_tick_range_from_metadata(
+    metadata: Mapping[str, str],
+) -> tuple[int | None, int | None]:
     lower_raw = metadata.get("suggested_range_lower_tick")
     upper_raw = metadata.get("suggested_range_upper_tick")
     try:
@@ -138,7 +174,9 @@ def _parse_tick_range_from_metadata(metadata: Mapping[str, str]) -> tuple[int | 
     return lower_tick, upper_tick
 
 
-def _range_watchlist_reason(lower_tick: int | None, upper_tick: int | None) -> str | None:
+def _range_watchlist_reason(
+    lower_tick: int | None, upper_tick: int | None
+) -> str | None:
     if lower_tick is None and upper_tick is None:
         return "RANGE_NOT_COMPUTED"
     if lower_tick is None or upper_tick is None or lower_tick >= upper_tick:
@@ -267,6 +305,7 @@ async def _load_execution_states(config: ScoutConfig) -> list[PositionState]:
         return []
 
     states: list[PositionState] = []
+    failed_chains: list[str] = []
     stale_count = 0
     for chain_name in sorted(chains.keys(), key=lambda item: str(item).lower()):
         chain_cfg = chains[chain_name]
@@ -282,6 +321,7 @@ async def _load_execution_states(config: ScoutConfig) -> list[PositionState]:
                 chain_name,
                 exc.__class__.__name__,
             )
+            failed_chains.append(str(chain_name))
             continue
 
         chain_stale_count = sum(1 for state in chain_states if state.stale)
@@ -292,6 +332,14 @@ async def _load_execution_states(config: ScoutConfig) -> list[PositionState]:
             len(chain_states),
         )
         states.extend(chain_states)
+
+    if len(failed_chains) == len(chains):
+        failed_chains_csv = ",".join(sorted(failed_chains, key=lambda item: item.lower()))
+        logger.error(
+            "Execution state source failed: reason=POSITION_READER_ALL_CHAINS_FAILED failed_chains=%s source=position_reader",
+            failed_chains_csv,
+        )
+        raise RuntimeError("POSITION_READER_ALL_CHAINS_FAILED")
 
     if not states:
         logger.warning(
@@ -498,6 +546,9 @@ async def run_sentinel_cycle() -> None:
     notifier = TelegramNotifier(
         include_tags=config.risk_policy.include_tags_in_report,
         top_n_per_section=getattr(config.reporting, "telegram_top_n_per_section", 0),
+        show_opportunity_sections=getattr(
+            config.reporting, "telegram_opportunity_sections_enabled", True
+        ),
         show_source_confidence=getattr(
             config.reporting, "telegram_show_source_confidence", True
         ),
@@ -660,11 +711,10 @@ async def run_sentinel_cycle() -> None:
         td_scan_ms_total = 0.0
         td_scan_durations_ms: list[float] = []
         td_scan_results = []
+        td_readiness_blockers: dict[str, int] = {}
         if td_cfg.enabled:
-            td_readiness_blockers: dict[str, int] = {}
-
             def _inc_td_blocker(code: str) -> None:
-                normalized = str(code or "").strip().upper()
+                normalized = normalize_readiness_blocker_code(code)
                 if not normalized:
                     return
                 td_readiness_blockers[normalized] = (
@@ -674,10 +724,10 @@ async def run_sentinel_cycle() -> None:
             def _provider_init_blocker_code_from_exception(exc: Exception) -> str:
                 message = str(exc or "")
                 if "Missing env `GRAPH_API_KEY`" in message:
-                    return "GRAPH_API_KEY_MISSING"
+                    return READINESS_BLOCKER_GRAPH_API_KEY_MISSING
                 if isinstance(exc, ValueError) and td_cfg.graph_api_key_env in message:
-                    return f"{td_cfg.graph_api_key_env.upper()}_MISSING"
-                return f"PROVIDER_INIT_{exc.__class__.__name__.upper()}"
+                    return READINESS_BLOCKER_GRAPH_API_KEY_MISSING
+                return READINESS_BLOCKER_TICK_PROVIDER_INIT_ERROR
 
             async def _build_chain_providers(
                 *,
@@ -707,9 +757,7 @@ async def run_sentinel_cycle() -> None:
                         except TickProviderError as exc:
                             # Fail-safe: treat as "disabled this cycle" (likely downtime/rate-limit),
                             # not as a hard init failure.
-                            _inc_td_blocker(
-                                f"PROVIDER_UNAVAILABLE_{getattr(exc.reason, 'value', str(exc.reason)).upper()}"
-                            )
+                            _inc_td_blocker(READINESS_BLOCKER_TICK_PROVIDER_RUNTIME_ERROR)
                             logger.warning(
                                 "Tick density provider unavailable: venue=%s chain=%s reason=%s msg=%s",
                                 venue,
@@ -721,7 +769,9 @@ async def run_sentinel_cycle() -> None:
                         if not supports:
                             # Unsupported schema is expected on some subgraphs and is handled fail-safe.
                             # Keep this as INFO to avoid alert fatigue in routine shadow runs.
-                            _inc_td_blocker("SUBGRAPH_SCHEMA_UNSUPPORTED")
+                            _inc_td_blocker(
+                                READINESS_BLOCKER_SUBGRAPH_SCHEMA_UNSUPPORTED
+                            )
                             logger.info(
                                 "Tick density provider disabled (schema unsupported): venue=%s chain=%s",
                                 venue,
@@ -730,9 +780,7 @@ async def run_sentinel_cycle() -> None:
                             continue
                         providers[chain_name] = provider
                     except TickProviderError as exc:
-                        _inc_td_blocker(
-                            f"PROVIDER_INIT_{getattr(exc.reason, 'value', str(exc.reason)).upper()}"
-                        )
+                        _inc_td_blocker(READINESS_BLOCKER_TICK_PROVIDER_INIT_ERROR)
                         logger.warning(
                             "Tick density provider init failed: venue=%s chain=%s reason=%s msg=%s",
                             venue,
@@ -944,7 +992,9 @@ async def run_sentinel_cycle() -> None:
                             timeout_seconds=td_cfg.rpc_timeout_seconds,
                         )
                     except Exception:  # noqa: BLE001
-                        pass  # slot0 failure is non-fatal
+                        rpc_tick = None
+                    if rpc_tick is None:
+                        _inc_td_blocker(READINESS_BLOCKER_RPC_TICK_UNAVAILABLE)
 
                 scan_start = time()
                 try:
@@ -964,6 +1014,9 @@ async def run_sentinel_cycle() -> None:
                     td_degraded += 1
                     if metadata is not None:
                         metadata["tick_data_quality"] = "ERROR"
+                        metadata["readiness_blocker"] = (
+                            READINESS_BLOCKER_TICK_PROVIDER_RUNTIME_ERROR
+                        )
                     return "error", pool_addr
 
                 scan_elapsed_ms = (time() - scan_start) * 1000.0
@@ -999,6 +1052,11 @@ async def run_sentinel_cycle() -> None:
                         metadata["tick_degradation_reason"] = (
                             band_result.degradation_reason.value
                         )
+                        blocker_reason = readiness_blocker_from_tick_degradation_reason(
+                            band_result.degradation_reason.value
+                        )
+                        if blocker_reason:
+                            metadata["readiness_blocker"] = blocker_reason
 
                 if band_result.data_quality == DataQuality.OK:
                     td_ok += 1
@@ -1149,11 +1207,27 @@ async def run_sentinel_cycle() -> None:
                 if tick_quality and tick_quality not in {"OK", ""}:
                     opt.metadata["report_group"] = "WATCHLIST"
                     opt.metadata["watchlist_reason"] = "TICK_DATA_DEGRADED"
+                    blocker_reason = normalize_readiness_blocker_code(
+                        opt.metadata.get("readiness_blocker")
+                    ) or readiness_blocker_from_tick_degradation_reason(
+                        opt.metadata.get("tick_degradation_reason")
+                    )
+                    if blocker_reason:
+                        opt.metadata["readiness_blocker"] = blocker_reason
             lower_tick, upper_tick = _parse_tick_range_from_metadata(opt.metadata)
             range_watchlist_reason = _range_watchlist_reason(lower_tick, upper_tick)
             if range_watchlist_reason is not None:
                 opt.metadata["report_group"] = "WATCHLIST"
                 opt.metadata["watchlist_reason"] = range_watchlist_reason
+                blocker_reason = normalize_readiness_blocker_code(
+                    opt.metadata.get("readiness_blocker")
+                )
+                if blocker_reason is None and td_cfg.enabled:
+                    blocker_reason = _select_primary_readiness_blocker(
+                        td_readiness_blockers
+                    )
+                if blocker_reason:
+                    opt.metadata["readiness_blocker"] = blocker_reason
             net_profit_1k = (
                 1000.0 * (opt.net_apy / 100.0) / 12.0
             ) - config.gas_efficiency.monthly_gas_cost_usd
@@ -1173,6 +1247,17 @@ async def run_sentinel_cycle() -> None:
 
         freshness_counts = apply_freshness_policy(report_picks, config.freshness)
         apply_confidence_factors(report_picks, config.confidence_factors)
+
+        # Seed LP-entry eligibility state before StrategySim policy.
+        # This keeps LP actionable decisions decoupled from generic
+        # StrategySim downgrade reasons (PARTIAL/UNSUPPORTED/risk-profile).
+        for pick in report_picks:
+            pick.metadata["lp_entry_seed_report_group"] = str(
+                pick.metadata.get("report_group") or "WATCHLIST"
+            ).upper()
+            pick.metadata["lp_entry_seed_watchlist_reason"] = str(
+                pick.metadata.get("watchlist_reason") or ""
+            ).upper()
 
         # --- Strategy Simulation (v1) ---
         sim_counters = SimulationCounters()
@@ -1201,8 +1286,14 @@ async def run_sentinel_cycle() -> None:
         else:
             logger.info("StrategySim disabled or no candidates.")
 
-        recommendation_top_n = int(
+        default_recommendation_top_n = int(
             getattr(config.reporting, "telegram_top_n_per_section", 0) or 5
+        )
+        lp_entry_target_cfg = config.lp_entry_targeting
+        recommendation_top_n = int(
+            lp_entry_target_cfg.top_n
+            if lp_entry_target_cfg.enabled and lp_entry_target_cfg.top_n is not None
+            else default_recommendation_top_n
         )
         lp_entry_cfg = config.lp_entry_calibration
         stability_min_observations = (
@@ -1226,9 +1317,68 @@ async def run_sentinel_cycle() -> None:
                 stability_observation_counts = {}
 
         entry_input_total = len(report_picks)
-        lp_entry_eligible_results, lp_entry_ineligible = split_lp_entry_eligibility(report_picks)
+        lp_entry_eligible_results, lp_entry_ineligible = split_lp_entry_eligibility(
+            report_picks
+        )
         entry_lp_eligible_total = len(lp_entry_eligible_results)
         entry_lp_ineligible_total = len(lp_entry_ineligible)
+
+        entry_target_scope_enabled = int(lp_entry_target_cfg.enabled)
+        entry_target_input_total = entry_lp_eligible_total + entry_lp_ineligible_total
+        entry_target_matched_total = entry_target_input_total
+        entry_target_excluded_total = 0
+        entry_target_reason = "NONE"
+
+        if lp_entry_target_cfg.enabled and (
+            lp_entry_eligible_results or lp_entry_ineligible
+        ):
+            normalized_target_pair = normalize_pair_for_target_matching(
+                lp_entry_target_cfg.target_pair
+            )
+            normalized_target_chains = {
+                str(chain).strip().lower()
+                for chain in (lp_entry_target_cfg.allowed_chains or [])
+                if str(chain).strip()
+            }
+            normalized_target_projects = {
+                re.sub(r"[\s_-]+", "", str(project).strip().lower())
+                for project in (lp_entry_target_cfg.allowed_projects or [])
+                if str(project).strip()
+            }
+            lp_entry_eligible_results = filter_lp_entry_target_scope(
+                lp_entry_eligible_results,
+                target_pair=lp_entry_target_cfg.target_pair,
+                allowed_chains=lp_entry_target_cfg.allowed_chains,
+                allowed_projects=lp_entry_target_cfg.allowed_projects,
+            )
+            lp_entry_ineligible = [
+                (item, reason)
+                for item, reason in lp_entry_ineligible
+                if is_lp_entry_target_scope_match(
+                    item,
+                    normalized_target_pair=normalized_target_pair,
+                    normalized_chains=normalized_target_chains,
+                    normalized_projects=normalized_target_projects,
+                )
+            ]
+            entry_target_matched_total = len(lp_entry_eligible_results) + len(
+                lp_entry_ineligible
+            )
+            if entry_target_matched_total > entry_target_input_total:
+                logger.warning(
+                    "LP entry target telemetry mismatch: matched_total=%s exceeds input_total=%s; clamping.",
+                    entry_target_matched_total,
+                    entry_target_input_total,
+                )
+                entry_target_matched_total = entry_target_input_total
+            entry_target_excluded_total = (
+                entry_target_input_total - entry_target_matched_total
+            )
+            if entry_target_matched_total == 0:
+                entry_target_reason = "TARGET_SCOPE_EMPTY"
+
+        if lp_entry_target_cfg.enabled and entry_target_input_total == 0:
+            entry_target_reason = "TARGET_SCOPE_EMPTY"
 
         entry_range_ready_total = 0
         entry_range_missing_total = 0
@@ -1265,7 +1415,12 @@ async def run_sentinel_cycle() -> None:
             top_n=max(1, recommendation_top_n),
             previous_topn_pool_ids=normalize_pool_ids(previous_topn_pool_ids),
         )
-        watchlist_reason_counts = summarize_watchlist_reason_counts(entry_recommendations)
+        watchlist_reason_counts = summarize_watchlist_reason_counts(
+            entry_recommendations
+        )
+        watchlist_blocker_reason_counts = summarize_watchlist_blocker_reason_counts(
+            entry_recommendations
+        )
         topn_cache.set(
             "topn_pool_ids",
             stability_telemetry.topn_pool_ids,
@@ -1275,7 +1430,11 @@ async def run_sentinel_cycle() -> None:
             "LP entry stability telemetry: entry_total=%s entry_actionable=%s entry_watchlist=%s "
             "entry_watchlist_insufficient_history=%s entry_topn_churn=%.4f "
             "entry_input_total=%s entry_lp_eligible_total=%s entry_lp_ineligible_total=%s "
-            "entry_range_ready_total=%s entry_range_missing_total=%s watchlist_reason_counts=%s",
+            "entry_range_ready_total=%s entry_range_missing_total=%s "
+            "entry_target_scope_enabled=%s entry_target_input_total=%s "
+            "entry_target_matched_total=%s entry_target_excluded_total=%s "
+            "entry_target_reason=%s watchlist_reason_counts=%s "
+            "watchlist_blocker_reason_counts=%s",
             stability_telemetry.entry_total,
             stability_telemetry.entry_actionable,
             stability_telemetry.entry_watchlist,
@@ -1286,7 +1445,13 @@ async def run_sentinel_cycle() -> None:
             entry_lp_ineligible_total,
             entry_range_ready_total,
             entry_range_missing_total,
+            entry_target_scope_enabled,
+            entry_target_input_total,
+            entry_target_matched_total,
+            entry_target_excluded_total,
+            entry_target_reason,
             _format_reason_counts_for_log(watchlist_reason_counts),
+            _format_reason_counts_for_log(watchlist_blocker_reason_counts),
         )
 
         # --- Execution loop (Spec 018, isolated and optional) ---

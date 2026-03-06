@@ -18,8 +18,12 @@ from defi_agents.lp.stability import (
 )
 from defi_agents.lp.entry_recommendation import (
     build_ineligible_entry_recommendations,
+    filter_lp_entry_target_scope,
+    is_lp_entry_target_scope_match,
+    normalize_pair_for_target_matching,
     normalize_watchlist_reason,
     split_lp_entry_eligibility,
+    summarize_watchlist_blocker_reason_counts,
     summarize_watchlist_reason_counts,
 )
 from defi_agents.scout.models import (
@@ -359,7 +363,9 @@ def test_lp_entry_eligibility_split_and_ineligible_reason_taxonomy() -> None:
     }
 
 
-def test_lp_entry_eligibility_accepts_token_pair_reference_without_pool_address() -> None:
+def test_lp_entry_eligibility_accepts_token_pair_reference_without_pool_address() -> (
+    None
+):
     token_pair_ref = _result(
         chain="Base",
         project="uniswap-v3",
@@ -674,6 +680,72 @@ def test_watchlist_reason_is_normalized_to_deterministic_code() -> None:
     assert rec.watchlist_reason == "REPORT_GROUP_WATCHLIST"
 
 
+def test_degraded_path_preserves_normalized_readiness_blocker_root_cause() -> None:
+    result = _result(
+        chain="Base",
+        project="uniswap-v3",
+        symbol="WETH-USDC",
+        pool_id="pool-degraded-root-cause",
+        score=6.0,
+        metadata={
+            "report_group": "ACTIONABLE",
+            "freshness_status": "FRESH",
+            "source_confidence": "VERIFIED",
+            "tick_data_quality": "DEGRADED",
+            "tick_degradation_reason": "SUBGRAPH_TIMEOUT",
+            # legacy/free-form-ish runtime bucket from old telemetry path:
+            "readiness_blocker": "PROVIDER_UNAVAILABLE_SUBGRAPH_TIMEOUT",
+            "suggested_range_lower_tick": "-120",
+            "suggested_range_upper_tick": "120",
+            "score_raw": "6.0",
+            "net_profit_1k_usd": "12.0",
+        },
+    )
+
+    out = build_entry_recommendations([result], top_n=5)
+    assert len(out) == 1
+    rec = out[0]
+    assert rec.actionability == EntryActionability.WATCHLIST
+    assert rec.watchlist_reason == "TICK_DATA_DEGRADED"
+    assert rec.watchlist_blocker_reason == "TICK_PROVIDER_RUNTIME_ERROR"
+    assert result.metadata["watchlist_blocker_reason"] == "TICK_PROVIDER_RUNTIME_ERROR"
+
+    blocker_counts = summarize_watchlist_blocker_reason_counts(out)
+    assert blocker_counts == {"TICK_PROVIDER_RUNTIME_ERROR": 1}
+
+
+def test_lp_entry_decouples_from_generic_strategysim_watchlist_downgrade() -> None:
+    result = _result(
+        chain="Base",
+        project="uniswap-v3",
+        symbol="WETH-USDC",
+        pool_id="pool-sim-decouple",
+        score=6.0,
+        metadata={
+            # Generic StrategySim policy already downgraded report_group to WATCHLIST,
+            # but LP seed says this candidate was ACTIONABLE before sim policy.
+            "report_group": "WATCHLIST",
+            "watchlist_reason": "SIM_STATUS_PARTIAL",
+            "lp_entry_seed_report_group": "ACTIONABLE",
+            "lp_entry_seed_watchlist_reason": "",
+            "freshness_status": "FRESH",
+            "source_confidence": "VERIFIED",
+            "tick_data_quality": "OK",
+            "suggested_range_lower_tick": "-120",
+            "suggested_range_upper_tick": "120",
+            "score_raw": "6.0",
+            "net_profit_1k_usd": "12.0",
+        },
+    )
+
+    out = build_entry_recommendations([result], top_n=5)
+    assert len(out) == 1
+    rec = out[0]
+    assert rec.actionability == EntryActionability.ACTIONABLE
+    assert rec.watchlist_reason is None
+    assert rec.rank_v1 > 0.0
+
+
 def test_summarize_watchlist_reason_counts_sorted_and_deterministic() -> None:
     actionable = _result(
         chain="Base",
@@ -744,4 +816,130 @@ def test_normalize_watchlist_reason_accepts_machine_code_and_rejects_free_text()
     assert (
         normalize_watchlist_reason("not deterministic free text")
         == "REPORT_GROUP_WATCHLIST"
+    )
+
+
+def test_target_pair_normalization_matches_eth_usdt_and_weth_usdt() -> None:
+    assert normalize_pair_for_target_matching("ETH/USDT") == "ETH/USDT"
+    assert normalize_pair_for_target_matching("WETH-USDT") == "ETH/USDT"
+    assert normalize_pair_for_target_matching("usdt_weth") == "ETH/USDT"
+    assert normalize_pair_for_target_matching("ETH-USDT-USDC") == ""
+    assert normalize_pair_for_target_matching("ETH") == ""
+
+
+def test_filter_lp_entry_target_scope_applies_pair_chain_and_project_allowlists() -> None:
+    base_meta = {
+        "report_group": "ACTIONABLE",
+        "freshness_status": "FRESH",
+        "source_confidence": "VERIFIED",
+        "tick_data_quality": "OK",
+        "suggested_range_lower_tick": "-100",
+        "suggested_range_upper_tick": "100",
+    }
+    target_ok = _result(
+        chain="Base",
+        project="Uniswap V3",
+        symbol="WETH-USDT",
+        pool_id="pool-target-ok",
+        score=6.0,
+        metadata=base_meta,
+    )
+    wrong_chain = _result(
+        chain="Arbitrum",
+        project="Uniswap V3",
+        symbol="ETH/USDT",
+        pool_id="pool-target-wrong-chain",
+        score=5.0,
+        metadata=base_meta,
+    )
+    wrong_project = _result(
+        chain="Base",
+        project="Aerodrome Slipstream",
+        symbol="ETH-USDT",
+        pool_id="pool-target-wrong-project",
+        score=5.0,
+        metadata=base_meta,
+    )
+    wrong_pair = _result(
+        chain="Base",
+        project="Uniswap V3",
+        symbol="WETH-USDC",
+        pool_id="pool-target-wrong-pair",
+        score=5.0,
+        metadata=base_meta,
+    )
+
+    matched = filter_lp_entry_target_scope(
+        [target_ok, wrong_chain, wrong_project, wrong_pair],
+        target_pair="ETH/USDT",
+        allowed_chains=["base"],
+        allowed_projects=["uniswap-v3"],
+    )
+    assert [item.candidate.pool_id for item in matched] == ["pool-target-ok"]
+
+
+def test_filter_lp_entry_target_scope_with_empty_constraints_is_pair_only() -> None:
+    target_1 = _result(
+        chain="Base",
+        project="uniswap-v3",
+        symbol="ETH/USDT",
+        pool_id="pool-target-1",
+        score=6.0,
+        metadata={"report_group": "ACTIONABLE"},
+    )
+    target_2 = _result(
+        chain="Arbitrum",
+        project="aerodrome-slipstream",
+        symbol="WETH-USDT",
+        pool_id="pool-target-2",
+        score=6.0,
+        metadata={"report_group": "ACTIONABLE"},
+    )
+    non_target = _result(
+        chain="Base",
+        project="uniswap-v3",
+        symbol="ETH-USDC",
+        pool_id="pool-non-target",
+        score=6.0,
+        metadata={"report_group": "ACTIONABLE"},
+    )
+
+    matched = filter_lp_entry_target_scope(
+        [target_1, target_2, non_target],
+        target_pair="eth-usdt",
+        allowed_chains=[],
+        allowed_projects=[],
+    )
+    assert [item.candidate.pool_id for item in matched] == [
+        "pool-target-1",
+        "pool-target-2",
+    ]
+
+
+def test_is_lp_entry_target_scope_match_checks_pair_chain_project() -> None:
+    result = _result(
+        chain="Base",
+        project="Uniswap V3",
+        symbol="WETH-USDT",
+        pool_id="pool-match",
+        score=5.0,
+        metadata={"report_group": "ACTIONABLE"},
+    )
+    assert (
+        is_lp_entry_target_scope_match(
+            result,
+            normalized_target_pair="ETH/USDT",
+            normalized_chains={"base"},
+            normalized_projects={"uniswapv3"},
+        )
+        is True
+    )
+    assert (
+        is_lp_entry_target_scope_match(
+            result,
+            normalized_target_pair="ETH/USDT",
+            normalized_chains={"arbitrum"},
+            normalized_projects={"uniswapv3"},
+        )
+        is False
     )

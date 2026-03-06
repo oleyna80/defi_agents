@@ -13,7 +13,7 @@ git pull
 Confirm execution block:
 
 ```bash
-rg -n '"execution"|\"mode\"|\"enabled\"|\"allow_live_mode\"|\"kill_switch\"' docs/memory-bank/scout_config.json
+rg -n '"execution"|"chains"|"rpc_url"|"coingecko_platform_id"|"factory_proxy"|"position_manager_proxy"|"mode"|"enabled"|"allow_live_mode"|"kill_switch"' docs/memory-bank/scout_config.json
 ```
 
 Required safe defaults before SHADOW:
@@ -21,7 +21,13 @@ Required safe defaults before SHADOW:
 - `execution.mode="SHADOW"`
 - `execution.allow_live_mode=false`
 - `execution.policy.kill_switch=false`
-- `execution.mock_positions` retained only for backward-compatible config shape; current runtime state source is reader-only (`WALLET_ADDRESS` + `RPC_URL_ARBITRUM` via position reader).
+- `execution.chains` must contain at least one complete chain entry; per-chain required fields are:
+  - `rpc_url`
+  - `coingecko_platform_id`
+  - `uniswap_v3.factory_proxy`
+  - `uniswap_v3.position_manager_proxy`
+- incomplete chain entries are excluded from active set at config-parse time (`reason=EXECUTION_CHAIN_CONFIG_INCOMPLETE`).
+- `execution.mock_positions` retained only for backward-compatible config shape; current runtime state source is multi-chain reader-only (`WALLET_ADDRESS` + `execution.chains`).
 
 ## 2) Reload and start scheduler
 
@@ -50,6 +56,10 @@ Expected:
 - `Execution summary: mode=SHADOW ...`
 - `exec_ok=0` (by design in SHADOW)
 - reason maps present: `policy_blocks={...}`, `sim_fail_reasons={...}`, `exec_fail_reasons={...}`
+- expected position-state log signatures:
+  - `Execution states loaded: source=position_reader chain=<ChainName> active_states=<N>`
+  - partial degradation (one chain fails, cycle continues): `Execution state source degraded: chain=<ChainName> reason=POSITION_READER_ERROR ... source=position_reader`
+  - all chains fail (controlled hard failure): `Execution state source failed: reason=POSITION_READER_ALL_CHAINS_FAILED failed_chains=<csv> source=position_reader`
 - no `Traceback|CRITICAL`
 
 ## 3.1) v3utils SHADOW smoke (optional)
@@ -101,6 +111,7 @@ Gate criteria:
 - `errors=0`
 - `execution_summaries >= 1` and aligns with `runs`
 - `exec_fail=0` in SHADOW
+- `POSITION_READER_ALL_CHAINS_FAILED` does not appear in the observation window
 - no crash loops; cycle duration stays within expected operational window
 
 ## 5) Rollback

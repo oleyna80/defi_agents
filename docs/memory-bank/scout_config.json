@@ -8,6 +8,7 @@
       "telegram_digest_interval_seconds": 21600,
       "telegram_report_mode": "snapshot",
       "telegram_top_n_per_section": 10,
+      "telegram_opportunity_sections_enabled": false,
       "telegram_turnover_section_enabled": false,
       "telegram_turnover_top_n": 10,
       "telegram_turnover_min_tvl_usd": 100000,
@@ -319,6 +320,40 @@
       "native_live_timeout_seconds": 12.0,
       "native_live_receipt_timeout_seconds": 45.0,
       "native_live_receipt_poll_seconds": 1.5,
+      "chains": {
+        "Arbitrum": {
+          "rpc_url": "https://arb1.example.invalid",
+          "coingecko_platform_id": "arbitrum-one",
+          "uniswap_v3": {
+            "factory_proxy": "0x1111111111111111111111111111111111111111",
+            "position_manager_proxy": "0x2222222222222222222222222222222222222222"
+          }
+        },
+        "Base": {
+          "rpc_url": "https://base.example.invalid",
+          "coingecko_platform_id": "base",
+          "uniswap_v3": {
+            "factory_proxy": "0x3333333333333333333333333333333333333333",
+            "position_manager_proxy": "0x4444444444444444444444444444444444444444"
+          }
+        },
+        "Optimism": {
+          "rpc_url": "https://optimism.example.invalid",
+          "coingecko_platform_id": "optimistic-ethereum",
+          "uniswap_v3": {
+            "factory_proxy": "0x5555555555555555555555555555555555555555",
+            "position_manager_proxy": "0x6666666666666666666666666666666666666666"
+          }
+        },
+        "HypeEVM": {
+          "rpc_url": "https://hype-evm.example.invalid",
+          "coingecko_platform_id": "hyperevm",
+          "uniswap_v3": {
+            "factory_proxy": "0x7777777777777777777777777777777777777777",
+            "position_manager_proxy": "0x8888888888888888888888888888888888888888"
+          }
+        }
+      },
       "policy": {
         "max_gas_usd_per_tx": 15.0,
         "max_slippage_bps": 100,
@@ -435,6 +470,13 @@
         "whale": 70
       },
       "min_data_completeness_pct": 80.0
+    },
+    "lp_entry_targeting": {
+      "enabled": false,
+      "target_pair": "",
+      "allowed_chains": [],
+      "allowed_projects": [],
+      "top_n": null
     },
     "min_warn_score": 0.0,
     "confidence_factors": {

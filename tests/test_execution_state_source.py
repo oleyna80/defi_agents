@@ -70,7 +70,9 @@ def test_execution_state_source_no_wallet_does_not_fallback_to_mock(monkeypatch:
     assert states == []
 
 
-def test_execution_state_source_reader_error_does_not_fallback_to_mock(monkeypatch: pytest.MonkeyPatch):
+def test_execution_state_source_all_chains_fail_raises_controlled_error(
+    monkeypatch: pytest.MonkeyPatch,
+):
     cfg = _config_with_chains()
     monkeypatch.setenv("WALLET_ADDRESS", "0x1111111111111111111111111111111111111111")
 
@@ -83,9 +85,8 @@ def test_execution_state_source_reader_error_does_not_fallback_to_mock(monkeypat
 
     monkeypatch.setattr(sentinel_main, "_build_execution_position_reader", _build_reader)
 
-    states = _run(sentinel_main._load_execution_states(cfg))
-
-    assert states == []
+    with pytest.raises(RuntimeError, match="POSITION_READER_ALL_CHAINS_FAILED"):
+        _run(sentinel_main._load_execution_states(cfg))
 
 
 def test_execution_state_source_aggregates_multichain_states_in_deterministic_order(

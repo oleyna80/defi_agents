@@ -89,6 +89,7 @@ class EntryRecommendation(BaseModel):
     confidence: EntryConfidenceBand = EntryConfidenceBand.LOW
     reasons: list[str] = Field(default_factory=list)
     watchlist_reason: str | None = None
+    watchlist_blocker_reason: str | None = None
     actionability: EntryActionability = EntryActionability.WATCHLIST
     rank_v1: float = 0.0
     source_pool_id: str = ""

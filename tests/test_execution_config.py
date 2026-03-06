@@ -134,3 +134,66 @@ def test_sample_scout_config_includes_execution_block():
     assert cfg.execution.rebalance_edge_decay_bps == 250
     assert cfg.execution.mock_positions == []
     assert cfg.execution.krystal_timeout_seconds == 8.0
+
+
+def test_execution_chains_incomplete_chain_excluded_from_active_set():
+    cfg = ScoutConfig(
+        execution={
+            "chains": {
+                "Arbitrum": {
+                    "rpc_url": "https://arb.example.invalid",
+                    "coingecko_platform_id": "arbitrum-one",
+                    "uniswap_v3": {
+                        "factory_proxy": "0x1111111111111111111111111111111111111111",
+                        "position_manager_proxy": "",
+                    },
+                }
+            }
+        }
+    )
+    assert cfg.execution.chains == {}
+
+
+def test_execution_chains_complete_chain_remains_active():
+    cfg = ScoutConfig(
+        execution={
+            "chains": {
+                "Base": {
+                    "rpc_url": "https://base.example.invalid",
+                    "coingecko_platform_id": "base",
+                    "uniswap_v3": {
+                        "factory_proxy": "0x3333333333333333333333333333333333333333",
+                        "position_manager_proxy": "0x4444444444444444444444444444444444444444",
+                    },
+                }
+            }
+        }
+    )
+    assert "Base" in cfg.execution.chains
+    assert cfg.execution.chains["Base"].rpc_url == "https://base.example.invalid"
+
+
+def test_execution_chains_all_incomplete_results_in_empty_configured_chains():
+    cfg = ScoutConfig(
+        execution={
+            "chains": {
+                "Arbitrum": {
+                    "rpc_url": "",
+                    "coingecko_platform_id": "arbitrum-one",
+                    "uniswap_v3": {
+                        "factory_proxy": "0x1111111111111111111111111111111111111111",
+                        "position_manager_proxy": "0x2222222222222222222222222222222222222222",
+                    },
+                },
+                "Optimism": {
+                    "rpc_url": "https://optimism.example.invalid",
+                    "coingecko_platform_id": "",
+                    "uniswap_v3": {
+                        "factory_proxy": "0x5555555555555555555555555555555555555555",
+                        "position_manager_proxy": "",
+                    },
+                },
+            }
+        }
+    )
+    assert cfg.execution.chains == {}

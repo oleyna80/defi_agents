@@ -79,6 +79,7 @@ class TelegramNotifier:
         self,
         include_tags: bool = False,
         top_n_per_section: int = 0,
+        show_opportunity_sections: bool = True,
         show_source_confidence: bool = True,
         show_market_signals: bool = False,
         chat_id_env: str | None = None,
@@ -93,6 +94,7 @@ class TelegramNotifier:
         self.top_n_per_section = (
             int(top_n_per_section) if isinstance(top_n_per_section, int) else 0
         )
+        self.show_opportunity_sections = bool(show_opportunity_sections)
         self.show_source_confidence = show_source_confidence
         self.show_market_signals = show_market_signals
         self.message_prefix = (message_prefix or "").strip()
@@ -288,27 +290,28 @@ class TelegramNotifier:
         if not (directional_snapshot and directional_snapshot.has_any()):
             self._append_lending_snapshot(lines, lending_snapshot)
             self._append_turnover_snapshot(lines, turnover_snapshot)
-        results = [item for item in results if self._is_allowed_candidate(item)]
-        sections = [
-            (PriorityTier.LOW_VOLATILITY, "1) Stable/Stable"),
-            (PriorityTier.COIN_STABLE, "2) Token/Stable"),
-            (PriorityTier.COIN_COIN, "3) Token/Token"),
-        ]
-        for priority, title in sections:
-            section_results = [r for r in results if r.priority == priority]
-            if not section_results:
-                continue
-            section_results = sorted(
-                section_results,
-                key=lambda r: (r.candidate.apy or 0.0, r.candidate.tvl_usd or 0.0),
-                reverse=True,
-            )
-            if isinstance(self.top_n_per_section, int) and self.top_n_per_section > 0:
-                section_results = section_results[: self.top_n_per_section]
-            lines.append(f"*{title}*")
-            for r in section_results:
-                lines.append(self._format_opportunity_line(r))
-            lines.append("")
+        if self.show_opportunity_sections:
+            results = [item for item in results if self._is_allowed_candidate(item)]
+            sections = [
+                (PriorityTier.LOW_VOLATILITY, "1) Stable/Stable"),
+                (PriorityTier.COIN_STABLE, "2) Token/Stable"),
+                (PriorityTier.COIN_COIN, "3) Token/Token"),
+            ]
+            for priority, title in sections:
+                section_results = [r for r in results if r.priority == priority]
+                if not section_results:
+                    continue
+                section_results = sorted(
+                    section_results,
+                    key=lambda r: (r.candidate.apy or 0.0, r.candidate.tvl_usd or 0.0),
+                    reverse=True,
+                )
+                if isinstance(self.top_n_per_section, int) and self.top_n_per_section > 0:
+                    section_results = section_results[: self.top_n_per_section]
+                lines.append(f"*{title}*")
+                for r in section_results:
+                    lines.append(self._format_opportunity_line(r))
+                lines.append("")
         return "\n".join(lines)
 
     def _format_report_blocks(
@@ -359,11 +362,14 @@ class TelegramNotifier:
             if turnover_lines:
                 sections.append(turnover_lines)
 
-        sections.extend(
-            self._format_opportunity_section_lines(results, max_len=max_len)
-        )
+        if self.show_opportunity_sections:
+            sections.extend(
+                self._format_opportunity_section_lines(results, max_len=max_len)
+            )
 
         if not sections:
+            if not self.show_opportunity_sections:
+                return []
             return ["\n".join(header).strip()]
 
         blocks: List[str] = []

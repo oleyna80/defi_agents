@@ -1,0 +1,22 @@
+{
+  "positions": [
+    {
+      "position_id": "uni-v3:5346935",
+      "position_pnl_usd": 338.00523218380226,
+      "hodl_pnl_usd": 0.0,
+      "pnl_vs_hodl_usd": 338.00523218380226
+    },
+    {
+      "position_id": "uni-v3:5340024",
+      "position_pnl_usd": -10.334100000000000,
+      "hodl_pnl_usd": -9.283000000000001,
+      "pnl_vs_hodl_usd": -1.0510999999999997
+    },
+    {
+      "position_id": "uni-v3:6000001",
+      "position_pnl_usd": 42.75,
+      "hodl_pnl_usd": 41.5,
+      "pnl_vs_hodl_usd": 1.25
+    }
+  ]
+}

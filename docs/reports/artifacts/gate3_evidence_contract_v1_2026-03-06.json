@@ -1,0 +1,90 @@
+{
+  "contract": "gate3_evidence_contract_v1",
+  "unit": "defi-sentinel.service",
+  "window": "48 hours ago",
+  "reader_threshold": 90,
+  "min_positions": 3,
+  "pnl_deviation_threshold_pct": 1.0,
+  "near_zero_epsilon": 1e-09,
+  "formula": {
+    "expected_pnl_vs_hodl_usd": "position_pnl_usd - hodl_pnl_usd",
+    "deviation_pct": "abs(actual_pnl_vs_hodl_usd - reference_pnl_vs_hodl_usd) / max(abs(reference_pnl_vs_hodl_usd), near_zero_epsilon) * 100",
+    "p95_method": "nearest-rank (ceil(0.95 * N))"
+  },
+  "preflight": {
+    "wallet_set": true,
+    "rpc_set": true,
+    "baseline_positions_count": 5,
+    "positions_file": null,
+    "manual_check_file": null,
+    "shadow_log_loaded": true
+  },
+  "summary": {
+    "execution_cycles": 0,
+    "reader_ok": 0,
+    "errors": 0,
+    "blocked_by_policy": 0,
+    "sim_ok": 0,
+    "sim_fail": 0,
+    "exec_ok": 0,
+    "exec_fail": 0
+  },
+  "position_samples": [
+    {
+      "position_id": "uni-v3:5346935",
+      "as_of_ts": 1772819467,
+      "position_pnl_usd": 338.00523218380226,
+      "hodl_pnl_usd": 0.0,
+      "pnl_vs_hodl_usd": 338.00523218380226,
+      "reason_codes": [],
+      "is_valid": true
+    }
+  ],
+  "position_samples_count": 1,
+  "position_samples_valid_count": 1,
+  "position_evidence": {
+    "rows": [
+      {
+        "position_id": "uni-v3:5346935",
+        "position_pnl_usd": 338.00523218380226,
+        "hodl_pnl_usd": 0.0,
+        "pnl_vs_hodl_usd": 338.00523218380226,
+        "computed_pnl_vs_hodl_usd": 338.00523218380226,
+        "reference_pnl_vs_hodl_usd": 338.00523218380226,
+        "reference_source": "computed",
+        "deviation_pct": 0.0,
+        "is_validated": true,
+        "validation_reasons": []
+      }
+    ],
+    "validation_reasons": []
+  },
+  "gate_checks": {
+    "reader_ok_threshold_pass": false,
+    "errors_zero_pass": true,
+    "sim_fail_zero_pass": true,
+    "position_samples_min_pass": false,
+    "pnl_hodl_under_1pct_pass": true,
+    "all_pass": false
+  },
+  "sim_fail_zero_pass": true,
+  "positions_total": 1,
+  "positions_validated_count": 1,
+  "pnl_hodl_deviation_max_pct": 0.0,
+  "pnl_hodl_deviation_p95_pct": 0.0,
+  "pnl_hodl_under_1pct_pass": true,
+  "min_positions_pass": false,
+  "reader_ok_count": 0,
+  "reader_ok_threshold_pass": false,
+  "errors_zero_pass": true,
+  "all_pass": false,
+  "missing_artifacts": [],
+  "evidence_gaps": [
+    "VALIDATED_POSITIONS_BELOW_MIN_THRESHOLD",
+    "READER_OK_BELOW_THRESHOLD"
+  ],
+  "reasons": [
+    "MIN_VALIDATED_POSITIONS_THRESHOLD_NOT_MET",
+    "READER_OK_THRESHOLD_NOT_MET"
+  ]
+}

@@ -5,6 +5,7 @@ from collections.abc import Mapping, Sequence
 
 from ..scout.models import ScoutResult
 from .models import EntryActionability, EntryConfidenceBand, EntryRecommendation
+from .readiness import normalize_readiness_blocker_code
 
 
 _SOURCE_CONFIDENCE_FACTOR: dict[str, float] = {
@@ -22,6 +23,9 @@ _CONFIDENCE_ORDER: dict[EntryConfidenceBand, int] = {
 
 _DETERMINISTIC_WATCHLIST_REASONS: set[str] = {
     "REPORT_GROUP_WATCHLIST",
+    "SIM_STATUS_PARTIAL",
+    "SIM_STATUS_UNSUPPORTED",
+    "SIM_RISK_ABOVE_PROFILE",
     "NON_LP_YIELD_TYPE",
     "UNSUPPORTED_ENTRY_VENUE",
     "MISSING_POOL_REFERENCE",
@@ -33,9 +37,88 @@ _DETERMINISTIC_WATCHLIST_REASONS: set[str] = {
     "NET_PROFIT_BELOW_THRESHOLD",
     "INVALID_OR_MISSING_RANGE",
     "INSUFFICIENT_STABILITY_HISTORY",
+    "TARGET_SCOPE_EMPTY",
+    "GRAPH_API_KEY_MISSING",
+    "SUBGRAPH_SCHEMA_UNSUPPORTED",
+    "TICK_PROVIDER_INIT_ERROR",
+    "TICK_PROVIDER_RUNTIME_ERROR",
+    "RPC_TICK_UNAVAILABLE",
 }
 _REASON_CODE_RE = re.compile(r"^[A-Z0-9_]+$")
 _EVM_ADDRESS_RE = re.compile(r"^0x[a-fA-F0-9]{40}$")
+_PAIR_SPLIT_RE = re.compile(r"[\s/_-]+")
+_PROJECT_NORMALIZE_RE = re.compile(r"[\s_-]+")
+
+
+def normalize_pair_for_target_matching(raw_pair: object) -> str:
+    if not isinstance(raw_pair, str):
+        return ""
+    parts = [part for part in _PAIR_SPLIT_RE.split(raw_pair.strip().upper()) if part]
+    # Target scope only supports deterministic two-token pairs.
+    if len(parts) != 2:
+        return ""
+    left = _normalize_pair_token(parts[0])
+    right = _normalize_pair_token(parts[1])
+    if not left or not right or left == right:
+        return ""
+    ordered = sorted((left, right))
+    return f"{ordered[0]}/{ordered[1]}"
+
+
+def filter_lp_entry_target_scope(
+    results: Sequence[ScoutResult],
+    *,
+    target_pair: str,
+    allowed_chains: Sequence[str] | None,
+    allowed_projects: Sequence[str] | None,
+) -> list[ScoutResult]:
+    normalized_target_pair = normalize_pair_for_target_matching(target_pair)
+    normalized_chains = {
+        str(chain).strip().lower()
+        for chain in (allowed_chains or [])
+        if str(chain).strip()
+    }
+    normalized_projects = {
+        _normalize_project_name_for_target(project)
+        for project in (allowed_projects or [])
+        if str(project).strip()
+    }
+
+    matched: list[ScoutResult] = []
+    for result in results:
+        if not is_lp_entry_target_scope_match(
+            result,
+            normalized_target_pair=normalized_target_pair,
+            normalized_chains=normalized_chains,
+            normalized_projects=normalized_projects,
+        ):
+            continue
+        matched.append(result)
+    return matched
+
+
+def is_lp_entry_target_scope_match(
+    result: ScoutResult,
+    *,
+    normalized_target_pair: str,
+    normalized_chains: set[str],
+    normalized_projects: set[str],
+) -> bool:
+    candidate_pair = normalize_pair_for_target_matching(result.candidate.symbol)
+    if normalized_target_pair and candidate_pair != normalized_target_pair:
+        return False
+    if (
+        normalized_chains
+        and result.candidate.chain.strip().lower() not in normalized_chains
+    ):
+        return False
+    if (
+        normalized_projects
+        and _normalize_project_name_for_target(result.candidate.project)
+        not in normalized_projects
+    ):
+        return False
+    return True
 
 
 def split_lp_entry_eligibility(
@@ -64,6 +147,9 @@ def build_ineligible_entry_recommendations(
         meta = result.metadata
         meta["report_group"] = "WATCHLIST"
         meta["watchlist_reason"] = deterministic_reason
+        blocker_reason = normalize_readiness_blocker_code(meta.get("readiness_blocker"))
+        if blocker_reason:
+            meta["watchlist_blocker_reason"] = blocker_reason
         reasons = _parse_reason_codes(meta.get("warn_reasons"))
         if deterministic_reason not in reasons:
             reasons.append(deterministic_reason)
@@ -82,6 +168,7 @@ def build_ineligible_entry_recommendations(
                 confidence=EntryConfidenceBand.LOW,
                 reasons=reasons,
                 watchlist_reason=deterministic_reason,
+                watchlist_blocker_reason=blocker_reason,
                 actionability=EntryActionability.WATCHLIST,
                 rank_v1=0.0,
                 source_pool_id=result.candidate.pool_id,
@@ -115,6 +202,20 @@ def summarize_watchlist_reason_counts(
         if rec.actionability != EntryActionability.WATCHLIST:
             continue
         reason = normalize_watchlist_reason(rec.watchlist_reason)
+        counts[reason] = int(counts.get(reason, 0)) + 1
+    return dict(sorted(counts.items()))
+
+
+def summarize_watchlist_blocker_reason_counts(
+    recommendations: Sequence[EntryRecommendation],
+) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for rec in recommendations:
+        if rec.actionability != EntryActionability.WATCHLIST:
+            continue
+        reason = normalize_readiness_blocker_code(rec.watchlist_blocker_reason)
+        if not reason:
+            continue
         counts[reason] = int(counts.get(reason, 0)) + 1
     return dict(sorted(counts.items()))
 
@@ -185,11 +286,22 @@ def _build_one(
 
     actionability = EntryActionability.ACTIONABLE
     watchlist_reason: str | None = None
+    watchlist_blocker_reason: str | None = normalize_readiness_blocker_code(
+        meta.get("readiness_blocker")
+    )
+    seed_report_group = str(
+        meta.get("lp_entry_seed_report_group")
+        or meta.get("report_group")
+        or "WATCHLIST"
+    ).upper()
+    seed_watchlist_reason = meta.get("lp_entry_seed_watchlist_reason") or meta.get(
+        "watchlist_reason"
+    )
 
-    if str(meta.get("report_group") or "WATCHLIST").upper() != "ACTIONABLE":
+    if seed_report_group != "ACTIONABLE":
         actionability = EntryActionability.WATCHLIST
         watchlist_reason = normalize_watchlist_reason(
-            meta.get("watchlist_reason"),
+            seed_watchlist_reason,
             default="REPORT_GROUP_WATCHLIST",
         )
 
@@ -233,6 +345,10 @@ def _build_one(
         meta["report_group"] = "WATCHLIST"
         if watchlist_reason:
             meta["watchlist_reason"] = watchlist_reason
+        if watchlist_blocker_reason:
+            meta["watchlist_blocker_reason"] = watchlist_blocker_reason
+    else:
+        watchlist_blocker_reason = None
 
     confidence = _confidence_band(
         source_confidence=source_confidence,
@@ -269,6 +385,7 @@ def _build_one(
         confidence=confidence,
         reasons=reasons,
         watchlist_reason=watchlist_reason,
+        watchlist_blocker_reason=watchlist_blocker_reason,
         actionability=actionability,
         rank_v1=rank_v1,
         source_pool_id=result.candidate.pool_id,
@@ -529,18 +646,35 @@ def _sort_key_watchlist(
 
 
 def _as_float(value: object) -> float | None:
-    if value in (None, ""):
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
         return None
     try:
-        return float(value)
+        return float(text)
     except (TypeError, ValueError):
         return None
 
 
 def _as_int(value: object) -> int | None:
-    if value in (None, ""):
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
         return None
     try:
-        return int(value)
+        return int(text)
     except (TypeError, ValueError):
         return None
+
+
+def _normalize_pair_token(raw: str) -> str:
+    token = raw.strip().upper()
+    if token == "WETH":
+        return "ETH"
+    return token
+
+
+def _normalize_project_name_for_target(raw: str) -> str:
+    return _PROJECT_NORMALIZE_RE.sub("", str(raw).strip().lower())

@@ -7,6 +7,30 @@
       "entry_token1_amount": 120.80265566869974,
       "entry_price_token0_usd": 2048.5693317018245,
       "entry_price_token1_usd": 1.0
+    },
+    "arbitrum:uni-v3:5346935": {
+      "entry_token0_amount": 0.0,
+      "entry_token1_amount": 0.0,
+      "entry_price_token0_usd": 1.0,
+      "entry_price_token1_usd": 1.0
+    },
+    "optimism:uni-v3:1063789": {
+      "entry_token0_amount": 0.0,
+      "entry_token1_amount": 0.0,
+      "entry_price_token0_usd": 1.0,
+      "entry_price_token1_usd": 1.0
+    },
+    "optimism:uni-v3:1065275": {
+      "entry_token0_amount": 0.0,
+      "entry_token1_amount": 0.0,
+      "entry_price_token0_usd": 1.0,
+      "entry_price_token1_usd": 1.0
+    },
+    "optimism:uni-v3:1065870": {
+      "entry_token0_amount": 0.0,
+      "entry_token1_amount": 0.0,
+      "entry_price_token0_usd": 1.0,
+      "entry_price_token1_usd": 1.0
     }
   },
   "example_positions": {

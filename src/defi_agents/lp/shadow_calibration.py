@@ -5,6 +5,11 @@ import re
 from dataclasses import dataclass, field
 from typing import Iterable, Sequence
 
+from .readiness import (
+    normalize_readiness_blocker_code,
+    normalize_readiness_blocker_counts,
+)
+
 _TELEMETRY_PREFIX = "LP entry stability telemetry:"
 _READINESS_PREFIX = "Tick density readiness telemetry:"
 _TELEMETRY_RE = re.compile(
@@ -19,7 +24,13 @@ _TELEMETRY_RE = re.compile(
     r"(?:\s+entry_lp_ineligible_total=(?P<entry_lp_ineligible_total>\d+))?"
     r"(?:\s+entry_range_ready_total=(?P<entry_range_ready_total>\d+))?"
     r"(?:\s+entry_range_missing_total=(?P<entry_range_missing_total>\d+))?"
+    r"(?:\s+entry_target_scope_enabled=(?P<entry_target_scope_enabled>\d+))?"
+    r"(?:\s+entry_target_input_total=(?P<entry_target_input_total>\d+))?"
+    r"(?:\s+entry_target_matched_total=(?P<entry_target_matched_total>\d+))?"
+    r"(?:\s+entry_target_excluded_total=(?P<entry_target_excluded_total>\d+))?"
+    r"(?:\s+entry_target_reason=(?P<entry_target_reason>[A-Z0-9_]+))?"
     r"(?:\s+watchlist_reason_counts=(?P<watchlist_reason_counts>\S+))?"
+    r"(?:\s+watchlist_blocker_reason_counts=(?P<watchlist_blocker_reason_counts>\S+))?"
 )
 _READINESS_RE = re.compile(
     r"Tick density readiness telemetry:\s+" r"blocker_counts=(?P<blocker_counts>\S+)"
@@ -39,7 +50,13 @@ class EntryStabilityTelemetryPoint:
     entry_lp_ineligible_total: int | None = None
     entry_range_ready_total: int | None = None
     entry_range_missing_total: int | None = None
+    entry_target_scope_enabled: int | None = None
+    entry_target_input_total: int | None = None
+    entry_target_matched_total: int | None = None
+    entry_target_excluded_total: int | None = None
+    entry_target_reason: str | None = None
     watchlist_reason_counts: dict[str, int] = field(default_factory=dict)
+    watchlist_blocker_reason_counts: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -56,7 +73,13 @@ class LpEntryShadowCalibrationSnapshot:
     entry_lp_ineligible_total_sum: int
     entry_range_ready_total_sum: int
     entry_range_missing_total_sum: int
+    entry_target_scope_enabled_cycles: int
+    entry_target_input_total_sum: int
+    entry_target_matched_total_sum: int
+    entry_target_excluded_total_sum: int
+    entry_target_reason_counts: dict[str, int]
     watchlist_reason_counts: dict[str, int]
+    watchlist_blocker_reason_counts: dict[str, int]
     tick_density_readiness_blocker_counts: dict[str, int]
     telemetry_parse_errors: int
     runtime_error_lines: int
@@ -79,7 +102,15 @@ class LpEntryShadowCalibrationSnapshot:
             "entry_lp_ineligible_total_sum": self.entry_lp_ineligible_total_sum,
             "entry_range_ready_total_sum": self.entry_range_ready_total_sum,
             "entry_range_missing_total_sum": self.entry_range_missing_total_sum,
+            "entry_target_scope_enabled_cycles": self.entry_target_scope_enabled_cycles,
+            "entry_target_input_total_sum": self.entry_target_input_total_sum,
+            "entry_target_matched_total_sum": self.entry_target_matched_total_sum,
+            "entry_target_excluded_total_sum": self.entry_target_excluded_total_sum,
+            "entry_target_reason_counts": dict(self.entry_target_reason_counts),
             "watchlist_reason_counts": dict(self.watchlist_reason_counts),
+            "watchlist_blocker_reason_counts": dict(
+                self.watchlist_blocker_reason_counts
+            ),
             "tick_density_readiness_blocker_counts": dict(
                 self.tick_density_readiness_blocker_counts
             ),
@@ -149,8 +180,27 @@ def parse_entry_stability_telemetry_line(
             entry_range_missing_total=_parse_optional_non_negative_int(
                 values.get("entry_range_missing_total")
             ),
+            entry_target_scope_enabled=_parse_optional_non_negative_int(
+                values.get("entry_target_scope_enabled")
+            ),
+            entry_target_input_total=_parse_optional_non_negative_int(
+                values.get("entry_target_input_total")
+            ),
+            entry_target_matched_total=_parse_optional_non_negative_int(
+                values.get("entry_target_matched_total")
+            ),
+            entry_target_excluded_total=_parse_optional_non_negative_int(
+                values.get("entry_target_excluded_total")
+            ),
+            entry_target_reason=_parse_optional_reason_code(
+                values.get("entry_target_reason")
+            ),
             watchlist_reason_counts=_parse_reason_counts_blob(
                 values.get("watchlist_reason_counts")
+            ),
+            watchlist_blocker_reason_counts=_parse_reason_counts_blob(
+                values.get("watchlist_blocker_reason_counts"),
+                normalize_readiness=True,
             ),
         )
     except (TypeError, ValueError):
@@ -171,7 +221,9 @@ def parse_tick_density_readiness_telemetry_line(line: str) -> dict[str, int] | N
     match = _READINESS_RE.search(line)
     if match is None:
         return None
-    return _parse_reason_counts_blob(match.group("blocker_counts"))
+    return _parse_reason_counts_blob(
+        match.group("blocker_counts"), normalize_readiness=True
+    )
 
 
 def summarize_entry_shadow_calibration(
@@ -179,6 +231,8 @@ def summarize_entry_shadow_calibration(
 ) -> LpEntryShadowCalibrationSnapshot:
     points: list[EntryStabilityTelemetryPoint] = []
     watchlist_reason_counts_total: dict[str, int] = {}
+    watchlist_blocker_reason_counts_total: dict[str, int] = {}
+    target_reason_counts_total: dict[str, int] = {}
     readiness_blockers_total: dict[str, int] = {}
     telemetry_parse_errors = 0
     runtime_error_lines = 0
@@ -194,6 +248,10 @@ def summarize_entry_shadow_calibration(
             _merge_reason_counts(
                 target=watchlist_reason_counts_total,
                 source=point.watchlist_reason_counts,
+            )
+            _merge_reason_counts(
+                target=watchlist_blocker_reason_counts_total,
+                source=point.watchlist_blocker_reason_counts,
             )
             continue
 
@@ -230,6 +288,25 @@ def summarize_entry_shadow_calibration(
     entry_range_missing_total_sum = _sum_optional_int(
         point.entry_range_missing_total for point in points
     )
+    entry_target_scope_enabled_cycles = sum(
+        1 for point in points if int(point.entry_target_scope_enabled or 0) > 0
+    )
+    entry_target_input_total_sum = _sum_optional_int(
+        point.entry_target_input_total for point in points
+    )
+    entry_target_matched_total_sum = _sum_optional_int(
+        point.entry_target_matched_total for point in points
+    )
+    entry_target_excluded_total_sum = _sum_optional_int(
+        point.entry_target_excluded_total for point in points
+    )
+    for point in points:
+        reason = str(point.entry_target_reason or "").strip().upper()
+        if not reason:
+            continue
+        target_reason_counts_total[reason] = (
+            int(target_reason_counts_total.get(reason, 0)) + 1
+        )
 
     return LpEntryShadowCalibrationSnapshot(
         cycles_with_entry_telemetry=len(points),
@@ -246,7 +323,15 @@ def summarize_entry_shadow_calibration(
         entry_lp_ineligible_total_sum=entry_lp_ineligible_total_sum,
         entry_range_ready_total_sum=entry_range_ready_total_sum,
         entry_range_missing_total_sum=entry_range_missing_total_sum,
+        entry_target_scope_enabled_cycles=entry_target_scope_enabled_cycles,
+        entry_target_input_total_sum=entry_target_input_total_sum,
+        entry_target_matched_total_sum=entry_target_matched_total_sum,
+        entry_target_excluded_total_sum=entry_target_excluded_total_sum,
+        entry_target_reason_counts=dict(sorted(target_reason_counts_total.items())),
         watchlist_reason_counts=dict(sorted(watchlist_reason_counts_total.items())),
+        watchlist_blocker_reason_counts=dict(
+            sorted(watchlist_blocker_reason_counts_total.items())
+        ),
         tick_density_readiness_blocker_counts=dict(
             sorted(readiness_blockers_total.items())
         ),
@@ -307,11 +392,16 @@ def _validate_unit_interval(name: str, value: float) -> None:
         raise ValueError(f"{name} must be within [0.0, 1.0]")
 
 
-def _parse_reason_counts_blob(raw: object) -> dict[str, int]:
+def _parse_reason_counts_blob(
+    raw: object,
+    *,
+    normalize_readiness: bool = False,
+) -> dict[str, int]:
     text = str(raw or "").strip()
     if not text or text.upper() == "NONE":
         return {}
     out: dict[str, int] = {}
+    parsed_raw: dict[str, int] = {}
     for token in text.split(","):
         item = token.strip()
         if not item or ":" not in item:
@@ -326,7 +416,10 @@ def _parse_reason_counts_blob(raw: object) -> dict[str, int]:
             continue
         if count <= 0:
             continue
-        out[reason_code] = int(out.get(reason_code, 0)) + count
+        parsed_raw[reason_code] = int(parsed_raw.get(reason_code, 0)) + count
+    if normalize_readiness:
+        return normalize_readiness_blocker_counts(parsed_raw)
+    out = dict(parsed_raw)
     return dict(sorted(out.items()))
 
 
@@ -348,6 +441,15 @@ def _parse_optional_non_negative_int(value: object) -> int | None:
     if parsed < 0:
         raise ValueError("optional telemetry counters must be non-negative")
     return parsed
+
+
+def _parse_optional_reason_code(value: object) -> str | None:
+    text = str(value or "").strip().upper()
+    if not text:
+        return None
+    if re.fullmatch(r"[A-Z0-9_]+", text) is None:
+        raise ValueError("entry_target_reason must be machine-readable code")
+    return text
 
 
 def _sum_optional_int(values: Iterable[int | None]) -> int:

@@ -175,7 +175,7 @@
 
 ---
 
-## 🟥 Phase 2.7.5: LP Entry Recommendation Engine (Новый приоритет: Critical, NEXT)
+## 🟥 Phase 2.7.5: LP Entry Recommendation Engine (Новый приоритет: Critical, CLOSED)
 *Цель: из текущего Scout/Tick-Density пайплайна получать детерминированную рекомендацию для входа в позицию: `сеть + протокол + пара + диапазон`.*
 
 - **Spec baseline:** `docs/specs/lp-decision-engine-v1.md` (APPROVED)
@@ -201,22 +201,45 @@
   - Для degraded tick/freshness данных рекомендации помечаются как WATCHLIST (без false-actionable).
   - Тесты на ранжирование/диапазон/fail-safe проходят стабильно.
 
-- [x] **Phase 2.7.6 (P1): Stability + Shadow Calibration**
+- [x] **Phase 2.7.6 (P1, CLOSED): Stability + Shadow Calibration**
   - [x] Ввести history/stability gate для actionable (`>=3 observations / 6h`).
   - [x] Добавить telemetry метрики churn/stability для Top-N.
   - [x] Выполнить controlled calibration `rank_v1`/confidence thresholds на SHADOW evidence.
     - 2026-03-03 window-24 evidence (`docs/reports/lp-entry-shadow-calibration-2026-03-03.md`): `all_pass=true` (`cycles_with_entry_telemetry=24`, `errors_zero_pass=true`), решение `KEEP` (без retune) как evidence-backed no-op.
   - [x] Закрыть через `docs/plans/028-lp-entry-shadow-evidence-calibration-roo-task.md` (evidence gate + controlled retune).
 
-- [ ] **Phase 2.7.7 (P1, IN PROGRESS): Actionable Enablement**
+- [x] **Phase 2.7.7 (P1, CLOSED): Actionable Enablement**
   - [x] Добавлен детерминированный reason-level telemetry контракт для `WATCHLIST` (`watchlist_reason_counts`) в cycle-level LP entry telemetry.
   - [x] Формализованы и выведены в evidence data-readiness блокеры tick-density (`GRAPH_API_KEY_MISSING`, provider/subgraph init/schema blockers).
   - [x] Расширен calibration tooling: gate `actionable_ratio_positive_pass` + top-3 watchlist reasons при `actionable_ratio == 0`.
   - [x] Выпущен отчёт `docs/reports/lp-entry-actionable-enablement-2026-03-03.md` с before/after snapshot и blocker section.
   - [x] Реализован root-cause slice Plan 030 в runtime/tests: LP-only eligibility pre-filter перед `build_entry_recommendations(...)`, machine-code taxonomy для ineligible/range-path (`NON_LP_YIELD_TYPE`, `UNSUPPORTED_ENTRY_VENUE`, `MISSING_POOL_REFERENCE`, `RANGE_NOT_COMPUTED`, `INVALID_OR_MISSING_RANGE`), coverage counters `entry_input_total/entry_lp_eligible_total/entry_lp_ineligible_total/entry_range_ready_total/entry_range_missing_total`.
     - Реализация: `main.py`, `src/defi_agents/lp/entry_recommendation.py`, `src/defi_agents/lp/shadow_calibration.py`, тесты/репорт синхронизированы.
-  - [ ] Закрыть фазу после устойчивого SHADOW-окна с ненулевым `actionable_ratio` или после evidence-backed reversible tune итерации (макс 1-2 параметра за итерацию).
-  - Трек ведётся через `docs/plans/029-lp-entry-actionable-enablement-roo-task.md` и `docs/plans/030-lp-entry-lp-scope-range-coverage-roo-task.md`.
+  - [x] Проведён post-Plan030 diagnostic SHADOW evidence (2026-03-04): при валидном runtime окне (`cycles_with_entry_telemetry=4`) зафиксировано `actionable_ratio=0.0` при `entry_lp_eligible_total_sum=26`, `entry_range_ready_total_sum=23` и доминации `REPORT_GROUP_WATCHLIST` в LP-eligible subset; зафиксирован следующий root-cause track через Plan 031.
+  - [x] Реализован Plan 031 (StrategySim decoupling + deterministic sim policy reasons):
+    - LP entry builder теперь использует seed-поля `lp_entry_seed_report_group`/`lp_entry_seed_watchlist_reason` (pre-StrategySim snapshot), поэтому generic StrategySim downgrade (`PARTIAL/UNSUPPORTED/risk`) больше не подавляет LP-eligible/range-ready actionable path структурно.
+    - В `strategy_sim.apply_policy(...)` добавлены machine-readable причины downgrade без free-text: `SIM_STATUS_PARTIAL`, `SIM_STATUS_UNSUPPORTED`, `SIM_RISK_ABOVE_PROFILE` (в `watchlist_reason` + `sim_policy_reason`).
+    - LP fail-safe контракт сохранён без ослабления (`degraded/stale/diverged/invalid-range/insufficient-history` -> `WATCHLIST`).
+    - Post-fix SHADOW evidence: `docs/reports/artifacts/lp_entry_shadow_calibration_post_plan031_mockai_2026-03-04.json` => `actionable_ratio_positive_pass=true`, `errors_zero_pass=true`.
+  - [x] Выполнить long-window closeout после Plan 031 через `docs/plans/032-lp-entry-phase277-shadow-closeout-roo-task.md`:
+    - sustained SHADOW window (`>=24` cycles) + повторная проверка gate-метрик,
+    - optional reversible tune только при необходимости (max 1-2 knobs),
+    - финальное решение `KEEP/ADJUST/ROLLBACK` и формальное закрытие Phase 2.7.7.
+    - 2026-03-04 closeout evidence (`docs/reports/artifacts/lp_entry_shadow_calibration_phase277_closeout_mockai_2026-03-04.json`): `cycles_with_entry_telemetry=24`, `errors_zero_pass=true`, `actionable_ratio_positive_pass=true`, churn gates pass (`topn_churn_avg=0.0605`, `topn_churn_p95=0.375`), decision `KEEP` (no tune required).
+  - [x] Закрыть фазу после устойчивого SHADOW-окна с ненулевым `actionable_ratio` или после evidence-backed reversible tune итерации (макс 1-2 параметра за итерацию).
+  - Трек ведётся через `docs/plans/029-lp-entry-actionable-enablement-roo-task.md`, `docs/plans/030-lp-entry-lp-scope-range-coverage-roo-task.md`, `docs/plans/031-lp-entry-strategysim-decoupling-roo-task.md`, `docs/plans/032-lp-entry-phase277-shadow-closeout-roo-task.md`.
+
+- [x] **Phase 2.7.8 (P1, CLOSED): ETH/USDT Targeted Cross-Network Selector (SHADOW)**
+  - Цель: дать оператору целевой режим поиска `network + protocol + range` для пары `ETH/USDT` (с нормализацией `WETH-USDT`) в рамках поддерживаемых venue.
+  - План исполнения: `docs/plans/033-lp-entry-eth-usdt-target-scope-roo-task.md`.
+  - Scope:
+    - Config-driven target scope (`pair/chains/projects/top_n`) без ломки текущего LP Entry report path.
+    - Сравнение внутри target scope по нескольким сетям и поддерживаемым протоколам (`uniswap-v3`, `aerodrome-slipstream`).
+    - Deterministic telemetry counters для target filtering и empty-target случаев.
+  - 2026-03-04 (Plan 033): реализованы `lp_entry_targeting` schema/config validation, pair-normalization для target matching (`ETH/USDT` ↔ `WETH-USDT`) без изменения display symbols, pre-build target filtering перед `build_entry_recommendations(...)`, target-scope telemetry counters (`entry_target_scope_enabled`, `entry_target_input_total`, `entry_target_matched_total`, `entry_target_excluded_total`) и marker `entry_target_reason=TARGET_SCOPE_EMPTY`; regression coverage и обязательные проверки пройдены.
+  - Инварианты:
+    - Fail-safe contract сохраняется (`degraded/stale/diverged/invalid-range` не становятся actionable).
+    - Нет LIVE/infra/secrets изменений, только WSL/repo scope.
 
 ---
 

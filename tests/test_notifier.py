@@ -870,6 +870,7 @@ def test_report_blocks_include_lp_entry_recommendations_section():
             confidence=EntryConfidenceBand.LOW,
             reasons=["INVALID_OR_MISSING_RANGE"],
             watchlist_reason="INVALID_OR_MISSING_RANGE",
+            watchlist_blocker_reason="TICK_PROVIDER_RUNTIME_ERROR",
             actionability=EntryActionability.WATCHLIST,
             rank_v1=0.0,
             source_pool_id="pool-2",
@@ -882,3 +883,53 @@ def test_report_blocks_include_lp_entry_recommendations_section():
     assert "- Watchlist:" in joined
     assert "Range: [-120,120]" in joined
     assert "reason `INVALID_OR_MISSING_RANGE`" in joined
+
+
+def test_report_blocks_can_hide_opportunity_sections_but_keep_lp_entry() -> None:
+    notifier = TelegramNotifier(show_opportunity_sections=False)
+    recs = [
+        EntryRecommendation(
+            chain="Base",
+            project="aerodrome-slipstream",
+            pair="ETH-USDT",
+            fee_tier=500,
+            suggested_range_lower_tick=-120,
+            suggested_range_upper_tick=120,
+            confidence=EntryConfidenceBand.HIGH,
+            reasons=["OK"],
+            watchlist_reason=None,
+            actionability=EntryActionability.ACTIONABLE,
+            rank_v1=6.125,
+            source_pool_id="pool-1",
+        ),
+    ]
+    blocks = notifier._format_report_blocks(
+        [
+            _result(
+                priority=PriorityTier.COIN_STABLE,
+                bucket="WARN/REPUTATION",
+                symbol="WETH-USDC",
+            )
+        ],
+        entry_recommendations=recs,
+    )
+    joined = "\n".join(blocks)
+    assert "LP Entry Recommendations" in joined
+    assert "1) Stable/Stable" not in joined
+    assert "`WETH-USDC`" not in joined
+
+
+def test_report_blocks_returns_empty_when_opportunity_hidden_and_no_other_sections() -> (
+    None
+):
+    notifier = TelegramNotifier(show_opportunity_sections=False)
+    blocks = notifier._format_report_blocks(
+        [
+            _result(
+                priority=PriorityTier.COIN_STABLE,
+                bucket="WARN/REPUTATION",
+                symbol="WETH-USDC",
+            )
+        ]
+    )
+    assert blocks == []

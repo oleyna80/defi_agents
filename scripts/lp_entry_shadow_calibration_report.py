@@ -14,6 +14,18 @@ from defi_agents.lp.shadow_calibration import (
 )
 
 
+def _top_n_reason_counts(
+    counts: dict[str, int],
+    *,
+    top_n: int = 3,
+) -> list[dict[str, int | str]]:
+    ranked = sorted(
+        ((str(k), int(v)) for k, v in (counts or {}).items()),
+        key=lambda item: (-item[1], item[0]),
+    )[: max(1, int(top_n))]
+    return [{"reason": reason, "count": count} for reason, count in ranked]
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Build LP Entry SHADOW calibration snapshot from telemetry logs."
@@ -114,25 +126,44 @@ def main() -> int:
     gate_checks = payload["gate_checks"]
     snapshot_dict = payload["snapshot"]
     actionable_ratio = float(snapshot_dict.get("actionable_ratio", 0.0) or 0.0)
+    all_pass = bool(gate_checks.get("all_pass", False))
+    top_watchlist_reasons = _top_n_reason_counts(
+        dict(snapshot_dict.get("watchlist_reason_counts", {}) or {}),
+        top_n=3,
+    )
+    top_watchlist_blocker_reasons = _top_n_reason_counts(
+        dict(snapshot_dict.get("watchlist_blocker_reason_counts", {}) or {}),
+        top_n=3,
+    )
+    top_tick_density_readiness_blockers = _top_n_reason_counts(
+        dict(snapshot_dict.get("tick_density_readiness_blocker_counts", {}) or {}),
+        top_n=3,
+    )
+
     if not bool(gate_checks.get("actionable_ratio_positive_pass", False)):
-        reason_counts = dict(snapshot_dict.get("watchlist_reason_counts", {}) or {})
-        top3 = sorted(
-            ((str(k), int(v)) for k, v in reason_counts.items()),
-            key=lambda item: (-item[1], item[0]),
-        )[:3]
         payload["actionable_enablement"] = {
             "actionable_ratio": actionable_ratio,
             "actionable_ratio_positive_pass": False,
-            "top_watchlist_reasons": [
-                {"reason": reason, "count": count} for reason, count in top3
-            ],
+            "top_watchlist_reasons": top_watchlist_reasons,
+            "top_watchlist_blocker_reasons": top_watchlist_blocker_reasons,
+            "top_tick_density_readiness_blockers": top_tick_density_readiness_blockers,
         }
     else:
         payload["actionable_enablement"] = {
             "actionable_ratio": actionable_ratio,
             "actionable_ratio_positive_pass": True,
             "top_watchlist_reasons": [],
+            "top_watchlist_blocker_reasons": [],
+            "top_tick_density_readiness_blockers": [],
         }
+
+    if not all_pass:
+        payload["calibration_fail_context"] = {
+            "top_watchlist_reasons": top_watchlist_reasons,
+            "top_watchlist_blocker_reasons": top_watchlist_blocker_reasons,
+            "top_tick_density_readiness_blockers": top_tick_density_readiness_blockers,
+        }
+
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 

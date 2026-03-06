@@ -1,0 +1,90 @@
+=== cycle 1 ===
+2026-03-04 10:36:27,977 - WARNING - Sentinel - AI init failed: DEEPSEEK_API_KEY is not set. Falling back to MockAI (dev mode).
+2026-03-04 10:36:27,978 - INFO - Sentinel - Shadow mode enabled: chat_id_env=TELEGRAM_SHADOW_CHAT_ID digest_interval=21600s
+2026-03-04 10:36:27,978 - INFO - Sentinel - Starting Global Scout Cycle (chains: ALL).
+2026-03-04 10:37:03,065 - INFO - defi_agents.scout.scout - Funnel metrics: raw=317 heuristics=124 addressable_selected=40 missing_address=35 missing_chain_id=51 addressable_total=73 security_counts={'trusted': 0, 'pass': 0, 'warn': 40, 'block': 0, 'unknown': 0} top_reasons=[('REPUTATION_UNAVAILABLE', 40), ('PROXY_CONTRACT', 7), ('HIDDEN_OWNER', 6), ('TACTICAL_DISABLED', 5), ('COST_DOMINATED', 3)] lindy_softened=0 exploration_slots=15 tactical_filtered=5 capacity_filtered=0 cost_filtered=3 blacklist_filtered=0 liquidity_filtered=2 universe_filtered=0 unsupported_non_evm=29 missing_chain_top=[('Sui', 9), ('Monad', 7), ('Aptos', 6), ('Cardano', 5), ('Solana', 4)] results=32 deduped=28
+2026-03-04 10:37:03,066 - INFO - defi_agents.scout.scout - Stablecoin risk policy: tier_counts={'T1': 8, 'UNKNOWN': 30, 'T2': 2} pair_class_counts={'TOKEN_STABLE': 7, 'TOKEN_TOKEN': 30, 'USD_STABLE_STABLE': 1, 'FX_STABLE': 2}
+2026-03-04 10:37:03,066 - INFO - Sentinel - DEX discovery: llama=314 uniswap_new=3 filtered=997 errors=0 timeouts=0 total=317 enabled=True
+2026-03-04 10:37:03,066 - INFO - Sentinel - DeFiLlama provider: pools requests=1 success=1 timeouts=0 errors=0 parse_errors=0 cache_hits=0
+2026-03-04 10:37:03,066 - INFO - Sentinel - Lending snapshot: best_eth_supply=8.48% best_btc_supply=0.23% best_gho_supply=n/a lowest_stable_borrow=n/a lowest_eurc_borrow=n/a lowest_usdc_borrow=n/a
+2026-03-04 10:37:04,576 - INFO - Sentinel - Tick density provider disabled (schema unsupported): venue=uniswap chain=Arbitrum
+2026-03-04 10:37:34,393 - INFO - Sentinel - Tick density scan: scanned=8 ok=8 degraded_count=0 skipped=23 discovery_scanned=0 discovery_ok=0 discovery_degraded=0 discovery_skipped=3 pits_found_count=16 confident_pit_count=8 scan_ms_total=3473 scan_duration_p95_ms=501 enabled=True shadow=True
+2026-03-04 10:37:34,393 - INFO - Sentinel - Tick density readiness telemetry: blocker_counts=SUBGRAPH_SCHEMA_UNSUPPORTED:1
+2026-03-04 10:37:36,248 - INFO - Sentinel - StrategySim summary: simulated=28 ok=0 partial=13 unsupported=15 watchlist_missing=13 downgraded=7 best_strategy_dist=stable_stable_fee_capture:2,clmm_range_harvest:6,yield_bearing_stable_core:4,single_sided_lending:1
+2026-03-04 10:37:36,264 - INFO - Sentinel - LP entry stability telemetry: entry_total=28 entry_actionable=4 entry_watchlist=24 entry_watchlist_insufficient_history=3 entry_topn_churn=1.0000 entry_input_total=28 entry_lp_eligible_total=8 entry_lp_ineligible_total=20 entry_range_ready_total=8 entry_range_missing_total=0 watchlist_reason_counts=INSUFFICIENT_STABILITY_HISTORY:3,NET_PROFIT_BELOW_THRESHOLD:1,NON_LP_YIELD_TYPE:16,UNSUPPORTED_ENTRY_VENUE:4
+2026-03-04 10:37:42,574 - INFO - Sentinel - Execution states loaded: source=position_reader chain=Arbitrum active_states=1
+2026-03-04 10:37:42,575 - INFO - Sentinel - Execution summary: mode=SHADOW states=1 tx_plans=0 intents=1 blocked_by_policy=0 sim_ok=0 sim_fail=0 exec_ok=0 exec_fail=0 policy_blocks={} sim_fail_reasons={} exec_fail_reasons={}
+2026-03-04 10:37:42,575 - INFO - Sentinel - Final filters: eligible=28 profit_ok=10 safe=0 warn=28 safe_min_score=10.00 warn_min_score=0.00 min_monthly_profit_usd=5.00
+2026-03-04 10:37:42,578 - INFO - Sentinel - Shadow metrics: captured=5 evaluated=0 pending=72 median_ape_proxy=0.00 p75_ape_proxy=0.00 directional_accuracy_proxy=0.00 rmse_normalized_proxy=0.00
+2026-03-04 10:37:42,784 - INFO - Sentinel - Freshness summary: rechecked=1 fresh=1 stale=0 unverified=27 diverged=1 downgraded=0 aave_checked=0 aave_ok=0 aave_timeout=0 aave_error=0 aave_schema_mismatch=0 aave_addr_mismatch=0 morpho_checked=1 morpho_ok=1 morpho_timeout=0 morpho_error=0 morpho_schema_mismatch=0 morpho_addr_mismatch=0 recheck_enabled=True strict=False
+2026-03-04 10:37:42,784 - INFO - Sentinel - Freshness divergence: provider=morpho_direct samples=1 apy_p50=193.05 apy_p90=193.05 tvl_p50=98.31 tvl_p90=98.31
+2026-03-04 10:37:42,784 - INFO - Sentinel - Report suppressed by digest schedule: interval=21600s next_in=17093s picks=28 (actionable=0 watchlist=28).
+=== end cycle 1 ===
+=== cycle 2 ===
+2026-03-04 10:37:44,642 - WARNING - Sentinel - AI init failed: DEEPSEEK_API_KEY is not set. Falling back to MockAI (dev mode).
+2026-03-04 10:37:44,643 - INFO - Sentinel - Shadow mode enabled: chat_id_env=TELEGRAM_SHADOW_CHAT_ID digest_interval=21600s
+2026-03-04 10:37:44,643 - INFO - Sentinel - Starting Global Scout Cycle (chains: ALL).
+2026-03-04 10:38:18,020 - INFO - defi_agents.scout.scout - Funnel metrics: raw=317 heuristics=124 addressable_selected=40 missing_address=35 missing_chain_id=51 addressable_total=73 security_counts={'trusted': 0, 'pass': 0, 'warn': 40, 'block': 0, 'unknown': 0} top_reasons=[('REPUTATION_UNAVAILABLE', 40), ('PROXY_CONTRACT', 6), ('HIDDEN_OWNER', 6), ('TACTICAL_DISABLED', 5), ('COST_DOMINATED', 3)] lindy_softened=0 exploration_slots=15 tactical_filtered=5 capacity_filtered=0 cost_filtered=3 blacklist_filtered=0 liquidity_filtered=2 universe_filtered=0 unsupported_non_evm=29 missing_chain_top=[('Sui', 9), ('Monad', 7), ('Aptos', 6), ('Cardano', 5), ('Solana', 4)] results=32 deduped=28
+2026-03-04 10:38:18,020 - INFO - defi_agents.scout.scout - Stablecoin risk policy: tier_counts={'T1': 8, 'UNKNOWN': 30, 'T2': 2} pair_class_counts={'TOKEN_STABLE': 7, 'TOKEN_TOKEN': 30, 'USD_STABLE_STABLE': 1, 'FX_STABLE': 2}
+2026-03-04 10:38:18,021 - INFO - Sentinel - DEX discovery: llama=314 uniswap_new=3 filtered=997 errors=0 timeouts=0 total=317 enabled=True
+2026-03-04 10:38:18,021 - INFO - Sentinel - DeFiLlama provider: pools requests=1 success=1 timeouts=0 errors=0 parse_errors=0 cache_hits=0
+2026-03-04 10:38:18,021 - INFO - Sentinel - Lending snapshot: best_eth_supply=8.48% best_btc_supply=0.23% best_gho_supply=n/a lowest_stable_borrow=n/a lowest_eurc_borrow=n/a lowest_usdc_borrow=n/a
+2026-03-04 10:38:19,469 - INFO - Sentinel - Tick density provider disabled (schema unsupported): venue=uniswap chain=Arbitrum
+2026-03-04 10:38:54,398 - INFO - Sentinel - Tick density scan: scanned=8 ok=8 degraded_count=0 skipped=23 discovery_scanned=0 discovery_ok=0 discovery_degraded=0 discovery_skipped=3 pits_found_count=16 confident_pit_count=8 scan_ms_total=8062 scan_duration_p95_ms=2690 enabled=True shadow=True
+2026-03-04 10:38:54,399 - INFO - Sentinel - Tick density readiness telemetry: blocker_counts=SUBGRAPH_SCHEMA_UNSUPPORTED:1
+2026-03-04 10:38:58,415 - INFO - Sentinel - StrategySim summary: simulated=28 ok=0 partial=13 unsupported=15 watchlist_missing=13 downgraded=7 best_strategy_dist=stable_stable_fee_capture:2,clmm_range_harvest:6,yield_bearing_stable_core:4,single_sided_lending:1
+2026-03-04 10:38:58,422 - INFO - Sentinel - LP entry stability telemetry: entry_total=28 entry_actionable=4 entry_watchlist=24 entry_watchlist_insufficient_history=3 entry_topn_churn=0.0000 entry_input_total=28 entry_lp_eligible_total=8 entry_lp_ineligible_total=20 entry_range_ready_total=8 entry_range_missing_total=0 watchlist_reason_counts=INSUFFICIENT_STABILITY_HISTORY:3,NET_PROFIT_BELOW_THRESHOLD:1,NON_LP_YIELD_TYPE:16,UNSUPPORTED_ENTRY_VENUE:4
+2026-03-04 10:39:01,250 - INFO - Sentinel - Execution states loaded: source=position_reader chain=Arbitrum active_states=1
+2026-03-04 10:39:01,251 - INFO - Sentinel - Execution summary: mode=SHADOW states=1 tx_plans=0 intents=1 blocked_by_policy=0 sim_ok=0 sim_fail=0 exec_ok=0 exec_fail=0 policy_blocks={} sim_fail_reasons={} exec_fail_reasons={}
+2026-03-04 10:39:01,251 - INFO - Sentinel - Final filters: eligible=28 profit_ok=10 safe=0 warn=28 safe_min_score=10.00 warn_min_score=0.00 min_monthly_profit_usd=5.00
+2026-03-04 10:39:01,266 - INFO - Sentinel - Shadow metrics: captured=0 evaluated=0 pending=72 median_ape_proxy=0.00 p75_ape_proxy=0.00 directional_accuracy_proxy=0.00 rmse_normalized_proxy=0.00
+2026-03-04 10:39:01,429 - INFO - Sentinel - Freshness summary: rechecked=1 fresh=1 stale=0 unverified=27 diverged=1 downgraded=0 aave_checked=0 aave_ok=0 aave_timeout=0 aave_error=0 aave_schema_mismatch=0 aave_addr_mismatch=0 morpho_checked=1 morpho_ok=1 morpho_timeout=0 morpho_error=0 morpho_schema_mismatch=0 morpho_addr_mismatch=0 recheck_enabled=True strict=False
+2026-03-04 10:39:01,429 - INFO - Sentinel - Freshness divergence: provider=morpho_direct samples=1 apy_p50=193.05 apy_p90=193.05 tvl_p50=98.31 tvl_p90=98.31
+2026-03-04 10:39:01,430 - INFO - Sentinel - Report suppressed by digest schedule: interval=21600s next_in=17014s picks=28 (actionable=0 watchlist=28).
+=== end cycle 2 ===
+=== cycle 3 ===
+2026-03-04 10:39:02,893 - WARNING - Sentinel - AI init failed: DEEPSEEK_API_KEY is not set. Falling back to MockAI (dev mode).
+2026-03-04 10:39:02,893 - INFO - Sentinel - Shadow mode enabled: chat_id_env=TELEGRAM_SHADOW_CHAT_ID digest_interval=21600s
+2026-03-04 10:39:02,893 - INFO - Sentinel - Starting Global Scout Cycle (chains: ALL).
+2026-03-04 10:39:34,674 - INFO - defi_agents.scout.scout - Funnel metrics: raw=317 heuristics=124 addressable_selected=40 missing_address=35 missing_chain_id=51 addressable_total=73 security_counts={'trusted': 0, 'pass': 0, 'warn': 40, 'block': 0, 'unknown': 0} top_reasons=[('REPUTATION_UNAVAILABLE', 40), ('PROXY_CONTRACT', 6), ('HIDDEN_OWNER', 6), ('TACTICAL_DISABLED', 5), ('COST_DOMINATED', 3)] lindy_softened=0 exploration_slots=15 tactical_filtered=5 capacity_filtered=0 cost_filtered=3 blacklist_filtered=0 liquidity_filtered=2 universe_filtered=0 unsupported_non_evm=29 missing_chain_top=[('Sui', 9), ('Monad', 7), ('Aptos', 6), ('Cardano', 5), ('Solana', 4)] results=32 deduped=28
+2026-03-04 10:39:34,674 - INFO - defi_agents.scout.scout - Stablecoin risk policy: tier_counts={'T1': 8, 'UNKNOWN': 30, 'T2': 2} pair_class_counts={'TOKEN_STABLE': 7, 'TOKEN_TOKEN': 30, 'USD_STABLE_STABLE': 1, 'FX_STABLE': 2}
+2026-03-04 10:39:34,674 - INFO - Sentinel - DEX discovery: llama=314 uniswap_new=3 filtered=997 errors=0 timeouts=0 total=317 enabled=True
+2026-03-04 10:39:34,675 - INFO - Sentinel - DeFiLlama provider: pools requests=1 success=1 timeouts=0 errors=0 parse_errors=0 cache_hits=0
+2026-03-04 10:39:34,675 - INFO - Sentinel - Lending snapshot: best_eth_supply=8.48% best_btc_supply=0.23% best_gho_supply=n/a lowest_stable_borrow=n/a lowest_eurc_borrow=n/a lowest_usdc_borrow=n/a
+2026-03-04 10:39:35,764 - INFO - Sentinel - Tick density provider disabled (schema unsupported): venue=uniswap chain=Arbitrum
+2026-03-04 10:40:09,163 - INFO - Sentinel - Tick density scan: scanned=8 ok=8 degraded_count=0 skipped=23 discovery_scanned=0 discovery_ok=0 discovery_degraded=0 discovery_skipped=3 pits_found_count=16 confident_pit_count=8 scan_ms_total=4792 scan_duration_p95_ms=889 enabled=True shadow=True
+2026-03-04 10:40:09,163 - INFO - Sentinel - Tick density readiness telemetry: blocker_counts=SUBGRAPH_SCHEMA_UNSUPPORTED:1
+2026-03-04 10:40:18,270 - INFO - Sentinel - StrategySim summary: simulated=28 ok=0 partial=13 unsupported=15 watchlist_missing=13 downgraded=7 best_strategy_dist=stable_stable_fee_capture:2,clmm_range_harvest:6,yield_bearing_stable_core:4,single_sided_lending:1
+2026-03-04 10:40:18,288 - INFO - Sentinel - LP entry stability telemetry: entry_total=28 entry_actionable=7 entry_watchlist=21 entry_watchlist_insufficient_history=0 entry_topn_churn=0.4286 entry_input_total=28 entry_lp_eligible_total=8 entry_lp_ineligible_total=20 entry_range_ready_total=8 entry_range_missing_total=0 watchlist_reason_counts=NET_PROFIT_BELOW_THRESHOLD:1,NON_LP_YIELD_TYPE:16,UNSUPPORTED_ENTRY_VENUE:4
+2026-03-04 10:40:24,049 - INFO - Sentinel - Execution states loaded: source=position_reader chain=Arbitrum active_states=1
+2026-03-04 10:40:24,050 - INFO - Sentinel - Execution summary: mode=SHADOW states=1 tx_plans=0 intents=1 blocked_by_policy=0 sim_ok=0 sim_fail=0 exec_ok=0 exec_fail=0 policy_blocks={} sim_fail_reasons={} exec_fail_reasons={}
+2026-03-04 10:40:24,050 - INFO - Sentinel - Final filters: eligible=28 profit_ok=10 safe=0 warn=28 safe_min_score=10.00 warn_min_score=0.00 min_monthly_profit_usd=5.00
+2026-03-04 10:40:24,052 - INFO - Sentinel - Shadow metrics: captured=0 evaluated=0 pending=72 median_ape_proxy=0.00 p75_ape_proxy=0.00 directional_accuracy_proxy=0.00 rmse_normalized_proxy=0.00
+2026-03-04 10:40:24,222 - INFO - Sentinel - Freshness summary: rechecked=1 fresh=1 stale=0 unverified=27 diverged=1 downgraded=0 aave_checked=0 aave_ok=0 aave_timeout=0 aave_error=0 aave_schema_mismatch=0 aave_addr_mismatch=0 morpho_checked=1 morpho_ok=1 morpho_timeout=0 morpho_error=0 morpho_schema_mismatch=0 morpho_addr_mismatch=0 recheck_enabled=True strict=False
+2026-03-04 10:40:24,223 - INFO - Sentinel - Freshness divergence: provider=morpho_direct samples=1 apy_p50=192.99 apy_p90=192.99 tvl_p50=98.31 tvl_p90=98.31
+2026-03-04 10:40:24,223 - INFO - Sentinel - Report suppressed by digest schedule: interval=21600s next_in=16931s picks=28 (actionable=0 watchlist=28).
+=== end cycle 3 ===
+=== cycle 4 ===
+2026-03-04 10:40:25,683 - WARNING - Sentinel - AI init failed: DEEPSEEK_API_KEY is not set. Falling back to MockAI (dev mode).
+2026-03-04 10:40:25,683 - INFO - Sentinel - Shadow mode enabled: chat_id_env=TELEGRAM_SHADOW_CHAT_ID digest_interval=21600s
+2026-03-04 10:40:25,684 - INFO - Sentinel - Starting Global Scout Cycle (chains: ALL).
+2026-03-04 10:40:36,594 - WARNING - defi_agents.scout.uniswap_v3_new_pools - Request error for https://gateway.thegraph.com/api/***/subgraphs/id/HyW7A86UEdYVt5b9Lrw8W2F98yKecerHKutZTRbSCX27: ReadTimeout
+2026-03-04 10:40:36,594 - WARNING - defi_agents.scout.uniswap_v3_new_pools - Uniswap new-pools adapter error: chain=Arbitrum err=RuntimeError
+2026-03-04 10:40:59,243 - INFO - defi_agents.scout.scout - Funnel metrics: raw=314 heuristics=123 addressable_selected=40 missing_address=35 missing_chain_id=51 addressable_total=72 security_counts={'trusted': 0, 'pass': 0, 'warn': 40, 'block': 0, 'unknown': 0} top_reasons=[('REPUTATION_UNAVAILABLE', 40), ('PROXY_CONTRACT', 6), ('HIDDEN_OWNER', 6), ('TACTICAL_DISABLED', 5), ('COST_DOMINATED', 3)] lindy_softened=0 exploration_slots=15 tactical_filtered=5 capacity_filtered=0 cost_filtered=3 blacklist_filtered=0 liquidity_filtered=0 universe_filtered=0 unsupported_non_evm=29 missing_chain_top=[('Sui', 9), ('Monad', 7), ('Aptos', 6), ('Cardano', 5), ('Solana', 4)] results=32 deduped=28
+2026-03-04 10:40:59,243 - INFO - defi_agents.scout.scout - Stablecoin risk policy: tier_counts={'T1': 8, 'UNKNOWN': 30, 'T2': 2} pair_class_counts={'TOKEN_STABLE': 7, 'TOKEN_TOKEN': 30, 'USD_STABLE_STABLE': 1, 'FX_STABLE': 2}
+2026-03-04 10:40:59,243 - INFO - Sentinel - DEX discovery: llama=314 uniswap_new=0 filtered=800 errors=1 timeouts=0 total=314 enabled=True
+2026-03-04 10:40:59,244 - INFO - Sentinel - DeFiLlama provider: pools requests=1 success=1 timeouts=0 errors=0 parse_errors=0 cache_hits=0
+2026-03-04 10:40:59,244 - INFO - Sentinel - Lending snapshot: best_eth_supply=8.48% best_btc_supply=0.23% best_gho_supply=n/a lowest_stable_borrow=n/a lowest_eurc_borrow=n/a lowest_usdc_borrow=n/a
+2026-03-04 10:40:59,804 - INFO - Sentinel - Tick density provider disabled (schema unsupported): venue=uniswap chain=Arbitrum
+2026-03-04 10:41:33,782 - INFO - Sentinel - Tick density scan: scanned=8 ok=8 degraded_count=0 skipped=20 discovery_scanned=0 discovery_ok=0 discovery_degraded=0 discovery_skipped=0 pits_found_count=16 confident_pit_count=8 scan_ms_total=6801 scan_duration_p95_ms=1326 enabled=True shadow=True
+2026-03-04 10:41:33,782 - INFO - Sentinel - Tick density readiness telemetry: blocker_counts=SUBGRAPH_SCHEMA_UNSUPPORTED:1
+2026-03-04 10:41:38,904 - INFO - Sentinel - StrategySim summary: simulated=28 ok=0 partial=13 unsupported=15 watchlist_missing=13 downgraded=7 best_strategy_dist=stable_stable_fee_capture:2,clmm_range_harvest:6,yield_bearing_stable_core:4,single_sided_lending:1
+2026-03-04 10:41:38,911 - INFO - Sentinel - LP entry stability telemetry: entry_total=28 entry_actionable=7 entry_watchlist=21 entry_watchlist_insufficient_history=0 entry_topn_churn=0.0000 entry_input_total=28 entry_lp_eligible_total=8 entry_lp_ineligible_total=20 entry_range_ready_total=8 entry_range_missing_total=0 watchlist_reason_counts=NET_PROFIT_BELOW_THRESHOLD:1,NON_LP_YIELD_TYPE:16,UNSUPPORTED_ENTRY_VENUE:4
+2026-03-04 10:41:44,929 - INFO - Sentinel - Execution states loaded: source=position_reader chain=Arbitrum active_states=1
+2026-03-04 10:41:44,930 - INFO - Sentinel - Execution summary: mode=SHADOW states=1 tx_plans=0 intents=1 blocked_by_policy=0 sim_ok=0 sim_fail=0 exec_ok=0 exec_fail=0 policy_blocks={} sim_fail_reasons={} exec_fail_reasons={}
+2026-03-04 10:41:44,930 - INFO - Sentinel - Final filters: eligible=28 profit_ok=10 safe=0 warn=28 safe_min_score=10.00 warn_min_score=0.00 min_monthly_profit_usd=5.00
+2026-03-04 10:41:44,932 - INFO - Sentinel - Shadow metrics: captured=0 evaluated=0 pending=72 median_ape_proxy=0.00 p75_ape_proxy=0.00 directional_accuracy_proxy=0.00 rmse_normalized_proxy=0.00
+2026-03-04 10:41:45,099 - INFO - Sentinel - Freshness summary: rechecked=1 fresh=1 stale=0 unverified=27 diverged=1 downgraded=0 aave_checked=0 aave_ok=0 aave_timeout=0 aave_error=0 aave_schema_mismatch=0 aave_addr_mismatch=0 morpho_checked=1 morpho_ok=1 morpho_timeout=0 morpho_error=0 morpho_schema_mismatch=0 morpho_addr_mismatch=0 recheck_enabled=True strict=False
+2026-03-04 10:41:45,099 - INFO - Sentinel - Freshness divergence: provider=morpho_direct samples=1 apy_p50=193.00 apy_p90=193.00 tvl_p50=98.31 tvl_p90=98.31
+2026-03-04 10:41:45,100 - INFO - Sentinel - Report suppressed by digest schedule: interval=21600s next_in=16850s picks=28 (actionable=0 watchlist=28).
+=== end cycle 4 ===

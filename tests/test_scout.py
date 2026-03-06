@@ -718,3 +718,58 @@ def test_lp_entry_calibration_rejects_invalid_confidence_thresholds() -> None:
                 "confidence_medium_min_factor": 0.7,
             }
         )
+
+
+def test_lp_entry_targeting_defaults_are_safe() -> None:
+    cfg = ScoutConfig()
+    targeting = cfg.lp_entry_targeting
+    assert targeting.enabled is False
+    assert targeting.target_pair == ""
+    assert targeting.allowed_chains == []
+    assert targeting.allowed_projects == []
+    assert targeting.top_n is None
+
+
+def test_lp_entry_targeting_accepts_valid_eth_usdt_target_scope() -> None:
+    cfg = ScoutConfig(
+        lp_entry_targeting={
+            "enabled": True,
+            "target_pair": "WETH-USDT",
+            "allowed_chains": ["Base", "Arbitrum"],
+            "allowed_projects": ["uniswap-v3", "aerodrome-slipstream"],
+            "top_n": 3,
+        }
+    )
+    targeting = cfg.lp_entry_targeting
+    assert targeting.enabled is True
+    assert targeting.target_pair == "WETH-USDT"
+    assert targeting.allowed_chains == ["Base", "Arbitrum"]
+    assert targeting.allowed_projects == ["uniswap-v3", "aerodrome-slipstream"]
+    assert targeting.top_n == 3
+
+
+def test_lp_entry_targeting_rejects_enabled_without_valid_pair() -> None:
+    with pytest.raises(ValueError):
+        ScoutConfig(lp_entry_targeting={"enabled": True, "target_pair": ""})
+
+
+def test_lp_entry_targeting_rejects_invalid_pair_format() -> None:
+    with pytest.raises(ValueError):
+        ScoutConfig(lp_entry_targeting={"enabled": False, "target_pair": "ETH"})
+
+
+def test_lp_entry_targeting_rejects_three_token_pair_format() -> None:
+    with pytest.raises(ValueError):
+        ScoutConfig(lp_entry_targeting={"enabled": True, "target_pair": "ETH-USDT-USDC"})
+
+
+def test_reporting_opportunity_sections_flag_defaults_and_override() -> None:
+    cfg = ScoutConfig()
+    assert cfg.reporting.telegram_opportunity_sections_enabled is True
+
+    cfg = ScoutConfig(
+        reporting={
+            "telegram_opportunity_sections_enabled": False,
+        }
+    )
+    assert cfg.reporting.telegram_opportunity_sections_enabled is False

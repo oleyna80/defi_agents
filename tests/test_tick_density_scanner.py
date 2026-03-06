@@ -22,6 +22,7 @@ from defi_agents.lp.models import (
     TickData,
 )
 from defi_agents.lp.tick_provider import TickProviderError, UniswapV3TickProvider
+from defi_agents.lp.readiness import normalize_readiness_blocker_code
 from defi_agents.scout.config import ScoutConfig
 
 
@@ -142,7 +143,9 @@ async def test_scan_pool_band_depth_passes_daily_vol_to_suggest_range(
         observed["daily_vol"] = kwargs.get("daily_vol")
         return SimpleNamespace(lower_tick=-120, upper_tick=120)
 
-    monkeypatch.setattr("defi_agents.lp.pit_classifier.suggest_range", _fake_suggest_range)
+    monkeypatch.setattr(
+        "defi_agents.lp.pit_classifier.suggest_range", _fake_suggest_range
+    )
     result = await scan_pool_band_depth(provider, "0xpool", daily_vol=0.031)
     assert result.data_quality == DataQuality.OK
     assert observed["daily_vol"] == pytest.approx(0.031)
@@ -359,3 +362,22 @@ def test_scout_config_includes_tick_density_block() -> None:
     assert cfg.tick_density.enabled is True
     assert cfg.tick_density.max_pages_per_pool == 10
     assert cfg.tick_density.max_ticks_per_pool == 1000
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("GRAPH_API_KEY_MISSING", "GRAPH_API_KEY_MISSING"),
+        ("SUBGRAPH_SCHEMA_UNSUPPORTED", "SUBGRAPH_SCHEMA_UNSUPPORTED"),
+        ("PROVIDER_INIT_VALUEERROR", "TICK_PROVIDER_INIT_ERROR"),
+        (
+            "PROVIDER_UNAVAILABLE_SUBGRAPH_TIMEOUT",
+            "TICK_PROVIDER_RUNTIME_ERROR",
+        ),
+        ("RPC_UNAVAILABLE", "RPC_TICK_UNAVAILABLE"),
+    ],
+)
+def test_normalize_readiness_blocker_code_maps_legacy_tokens(
+    raw: str, expected: str
+) -> None:
+    assert normalize_readiness_blocker_code(raw) == expected
