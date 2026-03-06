@@ -12,7 +12,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from defi_agents.scout.config import ScoutConfig
+from defi_agents.scout.config import ExecutionChainConfig, ScoutConfig
 from defi_agents.scout.defillama_client import DeFiLlamaClient
 from defi_agents.scout.scout import YieldScout
 from defi_agents.ai.provider import DeepSeekProvider, MockAIService
@@ -50,7 +50,7 @@ from defi_agents.lp.rpc_helper import fetch_slot0_tick
 from defi_agents.lp.models import DataQuality
 from defi_agents.lp.volatility import estimate_vol
 from defi_agents.lp.runtime_metrics import summarize_tick_scan_runtime_metrics
-from defi_agents.tracker import ArbitrumUniswapV3PositionReader
+from defi_agents.tracker.position_reader import BaseUniswapV3PositionReader
 from defi_agents.execution import (
     ExecutionOrchestrator,
     FailoverExecutionAdapter,
@@ -252,28 +252,46 @@ def _mark_telegram_no_opps_heartbeat_sent() -> None:
 
 async def _load_execution_states(config: ScoutConfig) -> list[PositionState]:
     wallet_address = os.getenv("WALLET_ADDRESS", "").strip()
-    rpc_url = os.getenv("RPC_URL_ARBITRUM", "").strip()
 
     if not wallet_address:
         logger.warning(
             "Execution state source unavailable: reason=WALLET_ADDRESS_MISSING source=position_reader"
         )
         return []
-    if not rpc_url:
+
+    chains = dict(config.execution.chains)
+    if not chains:
         logger.warning(
-            "Execution state source unavailable: reason=RPC_URL_ARBITRUM_MISSING source=position_reader"
+            "Execution state source unavailable: reason=EXECUTION_CHAINS_EMPTY source=position_reader"
         )
         return []
 
-    reader = ArbitrumUniswapV3PositionReader(rpc_url=rpc_url)
-    try:
-        states = await reader.load_active_position_states(wallet_address)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning(
-            "Execution state source unavailable: reason=POSITION_READER_ERROR err=%s source=position_reader",
-            exc.__class__.__name__,
+    states: list[PositionState] = []
+    stale_count = 0
+    for chain_name in sorted(chains.keys(), key=lambda item: str(item).lower()):
+        chain_cfg = chains[chain_name]
+        try:
+            reader = _build_execution_position_reader(
+                chain_name=chain_name,
+                chain_cfg=chain_cfg,
+            )
+            chain_states = await reader.load_active_position_states(wallet_address)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Execution state source degraded: chain=%s reason=POSITION_READER_ERROR err=%s source=position_reader",
+                chain_name,
+                exc.__class__.__name__,
+            )
+            continue
+
+        chain_stale_count = sum(1 for state in chain_states if state.stale)
+        stale_count += chain_stale_count
+        logger.info(
+            "Execution states loaded: source=position_reader chain=%s active_states=%s",
+            chain_name,
+            len(chain_states),
         )
-        return []
+        states.extend(chain_states)
 
     if not states:
         logger.warning(
@@ -281,18 +299,49 @@ async def _load_execution_states(config: ScoutConfig) -> list[PositionState]:
         )
         return []
 
-    stale_count = sum(1 for state in states if state.stale)
+    states = sorted(states, key=_execution_state_sort_key)
+
     if stale_count > 0:
         logger.warning(
             "Execution state quality: source=position_reader stale_states=%s reason=STALE_POSITION_DATA mode=%s",
             stale_count,
             config.execution.mode,
         )
-    logger.info(
-        "Execution states loaded: source=position_reader chain=Arbitrum active_states=%s",
-        len(states),
-    )
+
     return states
+
+
+def _build_execution_position_reader(
+    *,
+    chain_name: str,
+    chain_cfg: ExecutionChainConfig,
+) -> BaseUniswapV3PositionReader:
+    return BaseUniswapV3PositionReader(
+        chain_name=chain_name,
+        rpc_url=chain_cfg.rpc_url,
+        coingecko_platform_id=chain_cfg.coingecko_platform_id,
+        position_manager_address=chain_cfg.uniswap_v3.position_manager_proxy,
+        factory_address=chain_cfg.uniswap_v3.factory_proxy,
+    )
+
+
+def _execution_state_sort_key(state: PositionState) -> tuple[str, int, str]:
+    chain_name = str(state.chain or "").strip().lower()
+    token_id = _position_state_token_id(state)
+    return (chain_name, token_id, str(state.position_ref or ""))
+
+
+def _position_state_token_id(state: PositionState) -> int:
+    metadata = state.metadata if isinstance(state.metadata, dict) else {}
+    token_id_raw = metadata.get("token_id")
+    try:
+        return int(token_id_raw)
+    except (TypeError, ValueError):
+        pass
+    match = re.search(r"uni-v3:(\d+)$", str(state.position_ref or ""))
+    if match is None:
+        return sys.maxsize
+    return int(match.group(1))
 
 
 def _build_execution_adapter(config: ScoutConfig):
