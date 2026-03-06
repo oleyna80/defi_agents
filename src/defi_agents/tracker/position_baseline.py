@@ -35,11 +35,18 @@ class BaselineLookupResult:
 
 
 class PositionEntryBaselineProvider(Protocol):
-    def lookup(self, position_ref: str) -> BaselineLookupResult: ...
+    def lookup(
+        self, position_ref: str, chain_name: str | None = None
+    ) -> BaselineLookupResult: ...
 
 
 class FileBackedPositionBaselineProvider:
-    """Deterministic file-backed baseline provider keyed by position_ref (`uni-v3:<token_id>`)."""
+    """Deterministic file-backed baseline provider.
+
+    Preferred key format is chain-aware (`<chain>:uni-v3:<token_id>`).
+    Legacy single-chain key format (`uni-v3:<token_id>`) is supported
+    as read-only fallback.
+    """
 
     def __init__(self, path: str | Path = DEFAULT_ENTRY_BASELINE_PATH) -> None:
         self._path = Path(path)
@@ -48,7 +55,9 @@ class FileBackedPositionBaselineProvider:
         self._baselines: dict[str, PositionEntryBaseline] = {}
         self._entry_errors: dict[str, str] = {}
 
-    def lookup(self, position_ref: str) -> BaselineLookupResult:
+    def lookup(
+        self, position_ref: str, chain_name: str | None = None
+    ) -> BaselineLookupResult:
         ref = self._normalize_position_ref(position_ref)
         if not ref:
             return BaselineLookupResult(reason_code=ENTRY_BASELINE_MISSING)
@@ -58,15 +67,33 @@ class FileBackedPositionBaselineProvider:
         if self._global_error_reason is not None:
             return BaselineLookupResult(reason_code=self._global_error_reason)
 
-        baseline = self._baselines.get(ref)
-        if baseline is not None:
-            return BaselineLookupResult(baseline=baseline)
+        # Read order contract:
+        # 1) chain-aware key
+        # 2) legacy key fallback
+        for key in self._lookup_keys(ref, chain_name):
+            baseline = self._baselines.get(key)
+            if baseline is not None:
+                return BaselineLookupResult(baseline=baseline)
 
-        entry_error = self._entry_errors.get(ref)
-        if entry_error is not None:
-            return BaselineLookupResult(reason_code=entry_error)
+            entry_error = self._entry_errors.get(key)
+            if entry_error is not None:
+                return BaselineLookupResult(reason_code=entry_error)
 
         return BaselineLookupResult(reason_code=ENTRY_BASELINE_MISSING)
+
+    @classmethod
+    def make_chain_aware_key(cls, chain_name: str, position_ref: str) -> str:
+        """Build canonical storage key for all new writes."""
+
+        chain = cls._normalize_chain_name(chain_name)
+        if not chain:
+            raise ValueError("CHAIN_NAME_MISSING")
+        ref = cls._normalize_position_ref(position_ref)
+        if not ref:
+            raise ValueError("POSITION_REF_MISSING")
+        if cls._is_chain_aware_key(ref):
+            return ref
+        return f"{chain}:{ref}"
 
     def _ensure_loaded(self) -> None:
         if self._loaded:
@@ -148,3 +175,36 @@ class FileBackedPositionBaselineProvider:
         text = str(value or "").strip().lower()
         return text
 
+    @staticmethod
+    def _normalize_chain_name(value: Any) -> str:
+        return str(value or "").strip().lower()
+
+    @staticmethod
+    def _is_chain_aware_key(position_ref: str) -> bool:
+        ref = str(position_ref or "").strip().lower()
+        return not ref.startswith("uni-v3:") and ":uni-v3:" in ref
+
+    @classmethod
+    def _lookup_keys(
+        cls,
+        position_ref: str,
+        chain_name: str | None,
+    ) -> list[str]:
+        keys: list[str] = []
+        ref = cls._normalize_position_ref(position_ref)
+        if not ref:
+            return keys
+
+        chain = cls._normalize_chain_name(chain_name)
+        if chain and not cls._is_chain_aware_key(ref):
+            keys.append(f"{chain}:{ref}")
+
+        keys.append(ref)
+
+        # When caller already provides chain-aware ref, keep legacy fallback.
+        if cls._is_chain_aware_key(ref):
+            _, legacy = ref.split(":", 1)
+            if legacy and legacy not in keys:
+                keys.append(legacy)
+
+        return keys

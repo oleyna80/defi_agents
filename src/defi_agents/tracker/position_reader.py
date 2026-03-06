@@ -21,8 +21,20 @@ PriceRequestFn = Callable[[list[str], float], Awaitable[dict[str, Any]]]
 
 ARBITRUM_CHAIN_NAME = "Arbitrum"
 ARBITRUM_COINGECKO_PLATFORM_ID = "arbitrum-one"
+BASE_CHAIN_NAME = "Base"
+BASE_COINGECKO_PLATFORM_ID = "base"
+OPTIMISM_CHAIN_NAME = "Optimism"
+OPTIMISM_COINGECKO_PLATFORM_ID = "optimism"
+HYPEEVM_CHAIN_NAME = "HypeEVM"
+HYPEEVM_COINGECKO_PLATFORM_ID = "hypeevm"
 UNISWAP_V3_POSITION_MANAGER_ARBITRUM = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
 UNISWAP_V3_FACTORY_ARBITRUM = "0x1F98431c8aD98523631AE4a59f267346ea31F984"
+UNISWAP_V3_POSITION_MANAGER_BASE = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
+UNISWAP_V3_FACTORY_BASE = "0x33128a8fC17869897dcE68Ed026d694621f6FDfD"
+UNISWAP_V3_POSITION_MANAGER_OPTIMISM = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
+UNISWAP_V3_FACTORY_OPTIMISM = "0x1F98431c8aD98523631AE4a59f267346ea31F984"
+UNISWAP_V3_POSITION_MANAGER_HYPEEVM = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
+UNISWAP_V3_FACTORY_HYPEEVM = "0x1F98431c8aD98523631AE4a59f267346ea31F984"
 COINGECKO_TOKEN_PRICE_URL_TEMPLATE = (
     "https://api.coingecko.com/api/v3/simple/token_price/{platform_id}"
 )
@@ -213,7 +225,7 @@ class BaseUniswapV3PositionReader:
         unclaimed_fees_usd: float,
         valuation_reason_codes: list[str],
     ) -> dict[str, Any]:
-        lookup = self._baseline_provider.lookup(position_ref)
+        lookup = self._baseline_provider.lookup(position_ref, chain_name=self.chain_name)
         baseline = lookup.baseline
         if baseline is None:
             reason = str(lookup.reason_code or ENTRY_BASELINE_MISSING)
@@ -661,6 +673,108 @@ class ArbitrumUniswapV3PositionReader(BaseUniswapV3PositionReader):
     ) -> None:
         super().__init__(
             chain_name=ARBITRUM_CHAIN_NAME,
+            rpc_url=rpc_url,
+            coingecko_platform_id=coingecko_platform_id,
+            position_manager_address=position_manager_address,
+            factory_address=factory_address,
+            timeout_seconds=timeout_seconds,
+            stale_after_seconds=stale_after_seconds,
+            price_ttl_seconds=price_ttl_seconds,
+            request_fn=request_fn,
+            price_request_fn=price_request_fn,
+            baseline_provider=baseline_provider,
+            now_fn=now_fn,
+        )
+
+
+class BaseUniswapV3ChainPositionReader(BaseUniswapV3PositionReader):
+    """Direct-RPC reader for active Uniswap v3 NFT positions on Base."""
+
+    def __init__(
+        self,
+        *,
+        rpc_url: str,
+        position_manager_address: str = UNISWAP_V3_POSITION_MANAGER_BASE,
+        factory_address: str = UNISWAP_V3_FACTORY_BASE,
+        coingecko_platform_id: str = BASE_COINGECKO_PLATFORM_ID,
+        timeout_seconds: float = 8.0,
+        stale_after_seconds: int = 120,
+        price_ttl_seconds: int = 60,
+        request_fn: RequestFn | None = None,
+        price_request_fn: PriceRequestFn | None = None,
+        baseline_provider: PositionEntryBaselineProvider | None = None,
+        now_fn: Callable[[], float] | None = None,
+    ) -> None:
+        super().__init__(
+            chain_name=BASE_CHAIN_NAME,
+            rpc_url=rpc_url,
+            coingecko_platform_id=coingecko_platform_id,
+            position_manager_address=position_manager_address,
+            factory_address=factory_address,
+            timeout_seconds=timeout_seconds,
+            stale_after_seconds=stale_after_seconds,
+            price_ttl_seconds=price_ttl_seconds,
+            request_fn=request_fn,
+            price_request_fn=price_request_fn,
+            baseline_provider=baseline_provider,
+            now_fn=now_fn,
+        )
+
+
+class OptimismUniswapV3PositionReader(BaseUniswapV3PositionReader):
+    """Direct-RPC reader for active Uniswap v3 NFT positions on Optimism."""
+
+    def __init__(
+        self,
+        *,
+        rpc_url: str,
+        position_manager_address: str = UNISWAP_V3_POSITION_MANAGER_OPTIMISM,
+        factory_address: str = UNISWAP_V3_FACTORY_OPTIMISM,
+        coingecko_platform_id: str = OPTIMISM_COINGECKO_PLATFORM_ID,
+        timeout_seconds: float = 8.0,
+        stale_after_seconds: int = 120,
+        price_ttl_seconds: int = 60,
+        request_fn: RequestFn | None = None,
+        price_request_fn: PriceRequestFn | None = None,
+        baseline_provider: PositionEntryBaselineProvider | None = None,
+        now_fn: Callable[[], float] | None = None,
+    ) -> None:
+        super().__init__(
+            chain_name=OPTIMISM_CHAIN_NAME,
+            rpc_url=rpc_url,
+            coingecko_platform_id=coingecko_platform_id,
+            position_manager_address=position_manager_address,
+            factory_address=factory_address,
+            timeout_seconds=timeout_seconds,
+            stale_after_seconds=stale_after_seconds,
+            price_ttl_seconds=price_ttl_seconds,
+            request_fn=request_fn,
+            price_request_fn=price_request_fn,
+            baseline_provider=baseline_provider,
+            now_fn=now_fn,
+        )
+
+
+class HypeEVMUniswapV3PositionReader(BaseUniswapV3PositionReader):
+    """Direct-RPC reader for active Uniswap v3 NFT positions on HypeEVM."""
+
+    def __init__(
+        self,
+        *,
+        rpc_url: str,
+        position_manager_address: str = UNISWAP_V3_POSITION_MANAGER_HYPEEVM,
+        factory_address: str = UNISWAP_V3_FACTORY_HYPEEVM,
+        coingecko_platform_id: str = HYPEEVM_COINGECKO_PLATFORM_ID,
+        timeout_seconds: float = 8.0,
+        stale_after_seconds: int = 120,
+        price_ttl_seconds: int = 60,
+        request_fn: RequestFn | None = None,
+        price_request_fn: PriceRequestFn | None = None,
+        baseline_provider: PositionEntryBaselineProvider | None = None,
+        now_fn: Callable[[], float] | None = None,
+    ) -> None:
+        super().__init__(
+            chain_name=HYPEEVM_CHAIN_NAME,
             rpc_url=rpc_url,
             coingecko_platform_id=coingecko_platform_id,
             position_manager_address=position_manager_address,

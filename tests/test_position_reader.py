@@ -7,7 +7,16 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from defi_agents.tracker.position_reader import (  # noqa: E402
     ArbitrumUniswapV3PositionReader,
+    BaseUniswapV3ChainPositionReader,
+    HypeEVMUniswapV3PositionReader,
+    OptimismUniswapV3PositionReader,
+    UNISWAP_V3_FACTORY_BASE,
     UNISWAP_V3_FACTORY_ARBITRUM,
+    UNISWAP_V3_FACTORY_HYPEEVM,
+    UNISWAP_V3_FACTORY_OPTIMISM,
+    UNISWAP_V3_POSITION_MANAGER_BASE,
+    UNISWAP_V3_POSITION_MANAGER_HYPEEVM,
+    UNISWAP_V3_POSITION_MANAGER_OPTIMISM,
     UNISWAP_V3_POSITION_MANAGER_ARBITRUM,
 )
 from defi_agents.tracker.position_baseline import (  # noqa: E402
@@ -32,11 +41,18 @@ class _StaticBaselineProvider:
         }
         self._default_reason = default_reason
 
-    def lookup(self, position_ref: str) -> BaselineLookupResult:
-        return self._lookup_by_ref.get(
-            str(position_ref).lower(),
-            BaselineLookupResult(reason_code=self._default_reason),
-        )
+    def lookup(
+        self, position_ref: str, chain_name: str | None = None
+    ) -> BaselineLookupResult:
+        ref = str(position_ref).lower()
+        chain = str(chain_name or "").strip().lower()
+        if chain:
+            chain_ref = f"{chain}:{ref}"
+            hit = self._lookup_by_ref.get(chain_ref)
+            if hit is not None:
+                return hit
+
+        return self._lookup_by_ref.get(ref, BaselineLookupResult(reason_code=self._default_reason))
 
 
 def _uint_word(value: int) -> str:
@@ -145,9 +161,9 @@ def test_position_reader_loads_only_active_positions():
         price_request_fn=price_request_fn,
         baseline_provider=_StaticBaselineProvider(
             {
-                "uni-v3:2": BaselineLookupResult(
+                "arbitrum:uni-v3:2": BaselineLookupResult(
                     baseline=PositionEntryBaseline(
-                        position_ref="uni-v3:2",
+                        position_ref="arbitrum:uni-v3:2",
                         entry_token0_amount=0.25,
                         entry_token1_amount=0.01,
                         entry_price_token0_usd=1.0,
@@ -616,3 +632,32 @@ def test_position_reader_raw_amounts_respect_range_state():
     )
     assert amount0_mid > 0.0
     assert amount1_mid > 0.0
+
+
+def test_chain_specific_position_readers_use_expected_defaults():
+    base_reader = BaseUniswapV3ChainPositionReader(
+        rpc_url="https://base-rpc.local",
+        baseline_provider=_StaticBaselineProvider(),
+    )
+    assert base_reader.chain_name == "Base"
+    assert base_reader.position_manager_address == UNISWAP_V3_POSITION_MANAGER_BASE.lower()
+    assert base_reader.factory_address == UNISWAP_V3_FACTORY_BASE.lower()
+
+    optimism_reader = OptimismUniswapV3PositionReader(
+        rpc_url="https://optimism-rpc.local",
+        baseline_provider=_StaticBaselineProvider(),
+    )
+    assert optimism_reader.chain_name == "Optimism"
+    assert (
+        optimism_reader.position_manager_address
+        == UNISWAP_V3_POSITION_MANAGER_OPTIMISM.lower()
+    )
+    assert optimism_reader.factory_address == UNISWAP_V3_FACTORY_OPTIMISM.lower()
+
+    hype_reader = HypeEVMUniswapV3PositionReader(
+        rpc_url="https://hypeevm-rpc.local",
+        baseline_provider=_StaticBaselineProvider(),
+    )
+    assert hype_reader.chain_name == "HypeEVM"
+    assert hype_reader.position_manager_address == UNISWAP_V3_POSITION_MANAGER_HYPEEVM.lower()
+    assert hype_reader.factory_address == UNISWAP_V3_FACTORY_HYPEEVM.lower()
