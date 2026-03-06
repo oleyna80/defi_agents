@@ -323,6 +323,34 @@ class ExecutionPolicyConfig(BaseModel):
     kill_switch: bool = False
 
 
+class ExecutionUniswapV3ChainConfig(BaseModel):
+    factory_proxy: str = ""
+    position_manager_proxy: str = ""
+
+    @property
+    def is_complete(self) -> bool:
+        return bool(
+            str(self.factory_proxy).strip()
+            and str(self.position_manager_proxy).strip()
+        )
+
+
+class ExecutionChainConfig(BaseModel):
+    rpc_url: str = ""
+    coingecko_platform_id: str = ""
+    uniswap_v3: ExecutionUniswapV3ChainConfig = Field(
+        default_factory=ExecutionUniswapV3ChainConfig
+    )
+
+    @property
+    def is_active(self) -> bool:
+        return bool(
+            str(self.rpc_url).strip()
+            and str(self.coingecko_platform_id).strip()
+            and self.uniswap_v3.is_complete
+        )
+
+
 class ExecutionConfig(BaseModel):
     enabled: bool = False
     mode: Literal["PAPER", "SHADOW", "LIVE"] = "PAPER"
@@ -378,6 +406,7 @@ class ExecutionConfig(BaseModel):
     native_live_timeout_seconds: float = Field(default=12.0, ge=1.0)
     native_live_receipt_timeout_seconds: float = Field(default=45.0, ge=0.0)
     native_live_receipt_poll_seconds: float = Field(default=1.5, ge=0.1)
+    chains: Dict[str, ExecutionChainConfig] = Field(default_factory=dict)
     policy: ExecutionPolicyConfig = Field(default_factory=ExecutionPolicyConfig)
 
     @model_validator(mode="after")
@@ -397,6 +426,26 @@ class ExecutionConfig(BaseModel):
             raise ValueError(
                 "execution.primary_adapter=v3utils_live requires execution.v3utils_enabled=true"
             )
+
+        active_chains: Dict[str, ExecutionChainConfig] = {}
+        import logging as _logging
+
+        execution_logger = _logging.getLogger(__name__)
+        for chain_name, chain_cfg in dict(self.chains).items():
+            normalized_chain_name = str(chain_name).strip()
+            if not normalized_chain_name:
+                execution_logger.warning(
+                    "Execution chain excluded: reason=EXECUTION_CHAIN_NAME_MISSING"
+                )
+                continue
+            if chain_cfg.is_active:
+                active_chains[normalized_chain_name] = chain_cfg
+                continue
+            execution_logger.warning(
+                "Execution chain excluded: chain=%s reason=EXECUTION_CHAIN_CONFIG_INCOMPLETE",
+                normalized_chain_name,
+            )
+        self.chains = active_chains
         return self
 
 

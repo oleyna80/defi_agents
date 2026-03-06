@@ -20,10 +20,11 @@ RequestFn = Callable[[str, dict[str, Any], float], Awaitable[dict[str, Any]]]
 PriceRequestFn = Callable[[list[str], float], Awaitable[dict[str, Any]]]
 
 ARBITRUM_CHAIN_NAME = "Arbitrum"
+ARBITRUM_COINGECKO_PLATFORM_ID = "arbitrum-one"
 UNISWAP_V3_POSITION_MANAGER_ARBITRUM = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
 UNISWAP_V3_FACTORY_ARBITRUM = "0x1F98431c8aD98523631AE4a59f267346ea31F984"
-COINGECKO_TOKEN_PRICE_URL = (
-    "https://api.coingecko.com/api/v3/simple/token_price/arbitrum-one"
+COINGECKO_TOKEN_PRICE_URL_TEMPLATE = (
+    "https://api.coingecko.com/api/v3/simple/token_price/{platform_id}"
 )
 
 # ABI selectors (keccak(function_signature)[:4])
@@ -56,15 +57,17 @@ class _RawPosition:
     tokens_owed_1: int
 
 
-class ArbitrumUniswapV3PositionReader:
-    """Direct-RPC reader for active Uniswap v3 NFT positions on Arbitrum."""
+class BaseUniswapV3PositionReader:
+    """Direct-RPC reader for active Uniswap v3 NFT positions (chain-parameterized)."""
 
     def __init__(
         self,
         *,
+        chain_name: str,
         rpc_url: str,
-        position_manager_address: str = UNISWAP_V3_POSITION_MANAGER_ARBITRUM,
-        factory_address: str = UNISWAP_V3_FACTORY_ARBITRUM,
+        coingecko_platform_id: str,
+        position_manager_address: str,
+        factory_address: str,
         timeout_seconds: float = 8.0,
         stale_after_seconds: int = 120,
         price_ttl_seconds: int = 60,
@@ -73,10 +76,21 @@ class ArbitrumUniswapV3PositionReader:
         baseline_provider: PositionEntryBaselineProvider | None = None,
         now_fn: Callable[[], float] | None = None,
     ) -> None:
+        chain = str(chain_name or "").strip()
+        if not chain:
+            raise ValueError("CHAIN_NAME_MISSING")
         rpc = (rpc_url or "").strip()
         if not rpc:
             raise ValueError("RPC_URL_MISSING")
+        coingecko = str(coingecko_platform_id or "").strip()
+        if not coingecko:
+            raise ValueError("COINGECKO_PLATFORM_ID_MISSING")
+        self.chain_name = chain
         self.rpc_url = rpc
+        self.coingecko_platform_id = coingecko
+        self._coingecko_token_price_url = COINGECKO_TOKEN_PRICE_URL_TEMPLATE.format(
+            platform_id=coingecko
+        )
         self.position_manager_address = self._normalize_address(
             position_manager_address
         )
@@ -156,7 +170,7 @@ class ArbitrumUniswapV3PositionReader:
 
             states.append(
                 PositionState(
-                    chain=ARBITRUM_CHAIN_NAME,
+                    chain=self.chain_name,
                     position_ref=position_ref,
                     current_tick=(
                         current_tick if current_tick is not None else raw.tick_lower
@@ -456,7 +470,7 @@ class ArbitrumUniswapV3PositionReader:
             for token in tokens:
                 try:
                     params = {"contract_addresses": token, "vs_currencies": "usd"}
-                    resp = await client.get(COINGECKO_TOKEN_PRICE_URL, params=params)
+                    resp = await client.get(self._coingecko_token_price_url, params=params)
                     resp.raise_for_status()
                     body = resp.json()
                     if isinstance(body, dict):
@@ -624,4 +638,38 @@ class ArbitrumUniswapV3PositionReader:
             + cls._encode_address_word(token0)
             + cls._encode_address_word(token1)
             + cls._encode_uint_word(fee)
+        )
+
+
+class ArbitrumUniswapV3PositionReader(BaseUniswapV3PositionReader):
+    """Direct-RPC reader for active Uniswap v3 NFT positions on Arbitrum."""
+
+    def __init__(
+        self,
+        *,
+        rpc_url: str,
+        position_manager_address: str = UNISWAP_V3_POSITION_MANAGER_ARBITRUM,
+        factory_address: str = UNISWAP_V3_FACTORY_ARBITRUM,
+        coingecko_platform_id: str = ARBITRUM_COINGECKO_PLATFORM_ID,
+        timeout_seconds: float = 8.0,
+        stale_after_seconds: int = 120,
+        price_ttl_seconds: int = 60,
+        request_fn: RequestFn | None = None,
+        price_request_fn: PriceRequestFn | None = None,
+        baseline_provider: PositionEntryBaselineProvider | None = None,
+        now_fn: Callable[[], float] | None = None,
+    ) -> None:
+        super().__init__(
+            chain_name=ARBITRUM_CHAIN_NAME,
+            rpc_url=rpc_url,
+            coingecko_platform_id=coingecko_platform_id,
+            position_manager_address=position_manager_address,
+            factory_address=factory_address,
+            timeout_seconds=timeout_seconds,
+            stale_after_seconds=stale_after_seconds,
+            price_ttl_seconds=price_ttl_seconds,
+            request_fn=request_fn,
+            price_request_fn=price_request_fn,
+            baseline_provider=baseline_provider,
+            now_fn=now_fn,
         )
