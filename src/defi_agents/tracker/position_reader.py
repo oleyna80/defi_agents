@@ -557,22 +557,34 @@ class BaseUniswapV3PositionReader:
             if isinstance(response, dict):
                 return response
             raise PositionReaderError("RPC_INVALID_RESPONSE")
-        try:
-            async with httpx.AsyncClient(
-                timeout=self.timeout_seconds, http2=False
-            ) as client:
-                resp = await client.post(self.rpc_url, json=payload)
-                resp.raise_for_status()
-                body = resp.json()
-            if not isinstance(body, dict):
-                raise PositionReaderError("RPC_INVALID_JSON")
-            return body
-        except httpx.TimeoutException as exc:
-            raise PositionReaderError("RPC_TIMEOUT") from exc
-        except httpx.HTTPError as exc:
-            raise PositionReaderError("RPC_HTTP_ERROR") from exc
-        except ValueError as exc:
-            raise PositionReaderError("RPC_INVALID_JSON") from exc
+            
+        attempts = 3
+        last_exc: Exception | None = None
+        for attempt in range(attempts):
+            try:
+                async with httpx.AsyncClient(
+                    timeout=self.timeout_seconds, http2=False
+                ) as client:
+                    resp = await client.post(self.rpc_url, json=payload)
+                    resp.raise_for_status()
+                    body = resp.json()
+                if not isinstance(body, dict):
+                    raise PositionReaderError("RPC_INVALID_JSON")
+                return body
+            except (httpx.TimeoutException, httpx.HTTPError) as exc:
+                last_exc = exc
+                if attempt < attempts - 1:
+                    import asyncio
+                    await asyncio.sleep(1.0 * (attempt + 1))
+                continue
+            except ValueError as exc:
+                raise PositionReaderError("RPC_INVALID_JSON") from exc
+                
+        if isinstance(last_exc, httpx.TimeoutException):
+            raise PositionReaderError("RPC_TIMEOUT") from last_exc
+        if isinstance(last_exc, httpx.HTTPError):
+            raise PositionReaderError("RPC_HTTP_ERROR") from last_exc
+        raise PositionReaderError("RPC_UNEXPECTED_ERROR")
 
     @staticmethod
     def _normalize_address(value: str) -> str:

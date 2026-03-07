@@ -316,10 +316,11 @@ async def _load_execution_states(config: ScoutConfig) -> list[PositionState]:
             )
             chain_states = await reader.load_active_position_states(wallet_address)
         except Exception as exc:  # noqa: BLE001
+            err_class = getattr(exc, "reason_code", exc.__class__.__name__)
             logger.warning(
                 "Execution state source degraded: chain=%s reason=POSITION_READER_ERROR err=%s source=position_reader",
                 chain_name,
-                exc.__class__.__name__,
+                err_class,
             )
             failed_chains.append(str(chain_name))
             continue

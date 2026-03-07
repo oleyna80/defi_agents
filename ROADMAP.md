@@ -335,12 +335,13 @@
     - минимум 3 реальные позиции с отклонением расчёта `P&L < 1%` от ручной проверки,
     - стабильная работа reader path в SHADOW без runtime failures.
 
-- **Gate-3 evidence status (2026-03-02):** `FAIL` (insufficient evidence in repo-local artifacts)
-    - в текущем evidence pack нет подтверждённых `>=3` реальных позиций с заполненным `pnl_vs_hodl`;
-    - нет подтверждения SHADOW-критерия из runbook (`reader_ok >= 90` в 48h окне);
-    - reader-only fail-closed контракт подтверждён, но этого недостаточно для PASS Gate-3.
+- **Gate-3 evidence status (2026-03-07):** `FAIL` (insufficient evidence based on actual VPS 48h SHADOW run)
+    - **Blocker 1**: `VALIDATED_POSITIONS_BELOW_MIN_THRESHOLD` - в текущем evidence pack найдена только 1 реальная позиция с заполненным `pnl_vs_hodl` (требуется >=3).
+    - **Blocker 2**: `READER_OK_BELOW_THRESHOLD` - нет подтверждения `reader_ok_count >= 90` в 48h окне.
+    - **Blocker 3**: Ошибки в логах: зафиксировано 3 ошибки `Traceback|CRITICAL` и 7 случаев `POSITION_READER_ALL_CHAINS_FAILED`.
+    - Необходимые действия: устранить критические ошибки в ридере, обеспечить стабильную работу без ALL_CHAINS_FAILED на протяжении 48h, добавить как минимум 2 дополнительные позиции в baseline.
 
-DoD: Gate-3 canary и любой `LIVE` execution остаются заблокированными до закрытия Phase 3.0.
+DoD: Gate-3 canary и любой `LIVE` execution остаются заблокированными до устранения blockers и закрытия Phase 3.0.
 
 ### Phase 3.1 — Strategy Calibration + Forward Simulation (P1)
 *Калибровка параметров и stress-test на текущем state (не классический бэктест — ликвидность нестационарна).*
