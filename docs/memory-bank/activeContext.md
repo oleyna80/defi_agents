@@ -346,3 +346,4 @@ Active Task: Plan 035 Gate-3 PASS enablement (evidence sufficiency) в repo-loca
 2. Decide next execution backend path for real canary: official Krystal execution API (when available) vs native on-chain sender implementation
 3. Define canary acceptance evidence template (receipt fields, gas/slippage/net checks, rollback trigger thresholds)
 4. Execute first true LIVE canary only after adapter capability + endpoint contract are validated and operator approval is explicit
+2026-03-07: Phase 3.0.1 Multi-chain Reader SHADOW window started for 48 hours.
