@@ -659,6 +659,10 @@ class LpEntryTargetingConfig(BaseModel):
 
     enabled: bool = False
     target_pair: str = ""
+    range_mode: Literal["SYMMETRIC", "ASYMMETRIC", "AUTO"] = "AUTO"
+    market_regime: Literal["SIDEWAYS", "UPTREND", "DOWNTREND"] = "SIDEWAYS"
+    range_lower: int | None = None
+    range_upper: int | None = None
     allowed_chains: List[str] = Field(default_factory=list)
     allowed_projects: List[str] = Field(default_factory=list)
     top_n: int | None = Field(default=None, ge=1)
@@ -682,6 +686,20 @@ class LpEntryTargetingConfig(BaseModel):
         if any(not str(project).strip() for project in self.allowed_projects):
             raise ValueError(
                 "lp_entry_targeting.allowed_projects must not contain empty values"
+            )
+
+        if (self.range_lower is None) != (self.range_upper is None):
+            raise ValueError(
+                "lp_entry_targeting.range_lower and range_upper must be provided together"
+            )
+
+        if (
+            self.range_lower is not None
+            and self.range_upper is not None
+            and int(self.range_lower) >= int(self.range_upper)
+        ):
+            raise ValueError(
+                "lp_entry_targeting.range_lower must be < lp_entry_targeting.range_upper"
             )
         return self
 

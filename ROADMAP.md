@@ -9,6 +9,7 @@
 ## 🎯 Product Focus (актуализация)
 - Мы **не** фокусируемся на поиске “чужих готовых пулов” как конечной цели.
 - Основной режим: выбирать, **где и с какими активами создавать свои пулы** (сеть + протокол + пара), и управлять ими через мониторинг/ребаланс.
+- Приоритетный операторский сценарий v1 (2026-03-08): для заданных `pair + range` (симметричный/асимметричный, включая `AUTO` по режиму рынка) выбирать `network + protocol` с минимальной in-range конкурирующей ликвидностью при приемлемом риске и издержках.
 - На **первом этапе** работаем только с ограниченной вселенной активов:
   - топовые токены: `BTC`, `ETH` (и их ликвидные эквиваленты),
   - стейблкоины: топ‑ликвидные USD/fiat-pegged stable assets.
@@ -240,6 +241,22 @@
   - Инварианты:
     - Fail-safe contract сохраняется (`degraded/stale/diverged/invalid-range` не становятся actionable).
     - Нет LIVE/infra/secrets изменений, только WSL/repo scope.
+
+- [ ] **Phase 2.7.9 (P0, NEXT): Cross-Protocol Range Competition Selector**
+  - Цель: по входу оператора `pair + range` (симметричный/асимметричный) выбирать лучшую точку входа `network + protocol` на основе конкуренции ликвидности в целевом диапазоне и ожидаемого fee-potential.
+  - План исполнения: `docs/plans/036-cross-protocol-range-competition-selector-v1-plan.md`.
+  - Scope:
+    - Входной контракт: `target_pair`, `range_mode=SYMMETRIC|ASYMMETRIC|AUTO`, `market_regime=SIDEWAYS|UPTREND|DOWNTREND`, optional manual `range_lower/range_upper`, allowlist `chains/projects`.
+    - Cross-venue сравнение в рамках поддерживаемых CLMM по сети: `uniswap-v3`, `aerodrome-slipstream`, `sushiswap-v3` (и аналогичные venue в зависимости от сети).
+    - Ранжирование `network x protocol x pair x range` по детерминированному score (`in_range_liquidity_competition`, volume/fee proxy, gas/cost sanity).
+    - Явный вывод причин и confidence: почему выбран этот протокол/сеть, почему альтернативы ниже в рейтинге.
+  - Инварианты:
+    - Fail-safe не ослабляется: degraded/stale/diverged/invalid-range не переходят в actionable.
+    - Нет auto-execution; только decision-grade recommendation layer.
+  - DoD:
+    - Для `ETH/USDT` в SHADOW выдаётся Top-N по нескольким сетям и протоколам с machine-readable метриками конкуренции.
+    - В отчёте есть отдельный блок сравнения `network/protocol/range` с объяснимым ранжированием.
+    - Тесты на математику score/ranking/tie-break и fail-safe деградацию проходят стабильно.
 
 ---
 

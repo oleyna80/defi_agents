@@ -34,4 +34,5 @@
 - 034-multi-chain-reader-plan.md
 - 034-phase301-multichain-position-reader-roo-task.md
 - 035-gate3-pass-enablement-evidence-sufficiency.md
+- 036-cross-protocol-range-competition-selector-v1-plan.md
 - (add plans here)

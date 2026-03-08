@@ -3,10 +3,12 @@ from __future__ import annotations
 import sys
 from types import SimpleNamespace
 from pathlib import Path
+from collections.abc import Mapping
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
 from defi_agents.lp.band_depth import (
@@ -24,6 +26,7 @@ from defi_agents.lp.models import (
 from defi_agents.lp.tick_provider import TickProviderError, UniswapV3TickProvider
 from defi_agents.lp.readiness import normalize_readiness_blocker_code
 from defi_agents.scout.config import ScoutConfig
+import main as sentinel_main
 
 
 class _DummyProvider:
@@ -381,3 +384,49 @@ def test_normalize_readiness_blocker_code_maps_legacy_tokens(
     raw: str, expected: str
 ) -> None:
     assert normalize_readiness_blocker_code(raw) == expected
+
+
+def test_resolve_tick_density_provider_supports_sushiswap_v3_compat_fallback() -> None:
+    uniswap_providers: Mapping[str, object] = {"Arbitrum": object()}
+    aerodrome_providers: Mapping[str, object] = {"Base": object()}
+
+    resolved = sentinel_main._resolve_tick_density_provider_for_project(
+        project="sushiswap-v3",
+        chain="Arbitrum",
+        uniswap_chain_providers=uniswap_providers,
+        aerodrome_chain_providers=aerodrome_providers,
+    )
+    assert resolved is uniswap_providers["Arbitrum"]
+
+
+def test_resolve_tick_density_provider_returns_none_when_sushi_provider_missing() -> None:
+    resolved = sentinel_main._resolve_tick_density_provider_for_project(
+        project="sushiswap-v3",
+        chain="Base",
+        uniswap_chain_providers={},
+        aerodrome_chain_providers={},
+    )
+    assert resolved is None
+
+
+def test_sushi_missing_provider_has_machine_readable_reason() -> None:
+    reason = sentinel_main._tick_density_provider_unavailable_reason_code(
+        "sushiswap-v3"
+    )
+    assert reason == "SUSHISWAP_V3_PROVIDER_UNAVAILABLE"
+
+
+def test_apply_sushi_provider_unavailable_metadata_forces_degraded_state() -> None:
+    metadata = {
+        "tick_data_quality": "OK",
+        "tick_degradation_reason": "NONE",
+        "readiness_blocker": "NONE",
+    }
+    sentinel_main._apply_tick_provider_unavailable_metadata(
+        metadata,
+        reason_code="SUSHISWAP_V3_PROVIDER_UNAVAILABLE",
+        project="sushiswap-v3",
+    )
+    assert metadata["tick_data_quality"] == "DEGRADED"
+    assert metadata["tick_degradation_reason"] == "PROVIDER_UNAVAILABLE_SUSHISWAP_V3"
+    assert metadata["readiness_blocker"] == "SUSHISWAP_V3_PROVIDER_UNAVAILABLE"

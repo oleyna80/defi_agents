@@ -8,6 +8,13 @@ from .band_depth import (
     tick_to_price,
     validate_tick_freshness,
 )
+from .cross_protocol_selector import (
+    compute_rank_v1_components,
+    normalize_market_regime,
+    normalize_range_mode,
+    rank_v1,
+    resolve_selector_range,
+)
 from .entry_recommendation import (
     build_ineligible_entry_recommendations,
     build_entry_recommendations,
@@ -102,6 +109,7 @@ __all__ = [
     "align_tick_down",
     "align_tick_up",
     "build_price_bins",
+    "compute_rank_v1_components",
     "build_ineligible_entry_recommendations",
     "build_entry_recommendations",
     "calculate_band_depth_windows",
@@ -113,6 +121,8 @@ __all__ = [
     "fetch_slot0_tick",
     "find_liquidity_pits",
     "normalize_pool_ids",
+    "normalize_market_regime",
+    "normalize_range_mode",
     "normalize_readiness_blocker_code",
     "normalize_readiness_blocker_counts",
     "normalize_watchlist_reason",
@@ -120,6 +130,8 @@ __all__ = [
     "parse_tick_density_readiness_telemetry_line",
     "price_to_tick",
     "readiness_blocker_from_tick_degradation_reason",
+    "rank_v1",
+    "resolve_selector_range",
     "scan_pool_band_depth",
     "split_lp_entry_eligibility",
     "suggest_range",

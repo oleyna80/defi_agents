@@ -9,9 +9,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from defi_agents.lp.entry_recommendation import build_entry_recommendations
+from defi_agents.lp.entry_recommendation import _sort_key_actionable, build_entry_recommendations
 from defi_agents.history import save_to_history
-from defi_agents.lp.models import EntryActionability, EntryConfidenceBand
+from defi_agents.lp.models import EntryActionability, EntryConfidenceBand, EntryRecommendation
 from defi_agents.lp.stability import (
     compute_stability_observation_counts,
     summarize_entry_stability_telemetry,
@@ -26,6 +26,7 @@ from defi_agents.lp.entry_recommendation import (
     summarize_watchlist_blocker_reason_counts,
     summarize_watchlist_reason_counts,
 )
+from defi_agents.lp.cross_protocol_selector import rank_v1
 from defi_agents.scout.models import (
     PriorityTier,
     ScoutCandidate,
@@ -116,6 +117,46 @@ def test_entry_recommendation_rank_and_top_n_are_deterministic() -> None:
     # Deterministic ordering by rank desc then tie-breakers.
     assert [item.source_pool_id for item in out] == ["pool-2", "pool-1"]
     assert all(item.actionability == EntryActionability.ACTIONABLE for item in out)
+
+
+def test_actionable_tie_break_prefers_higher_in_range_competition() -> None:
+    better_competition = EntryRecommendation(
+        chain="Base",
+        project="uniswap-v3",
+        pair="ETH/USDT",
+        fee_tier=500,
+        suggested_range_lower_tick=-100,
+        suggested_range_upper_tick=100,
+        in_range_liquidity_competition=0.9,
+        volume_fee_proxy=0.4,
+        cost_penalty=0.1,
+        confidence_score=0.8,
+        confidence=EntryConfidenceBand.HIGH,
+        actionability=EntryActionability.ACTIONABLE,
+        rank_v1=0.5,
+        source_pool_id="pool-better",
+    )
+    worse_competition = EntryRecommendation(
+        chain="Base",
+        project="uniswap-v3",
+        pair="ETH/USDT",
+        fee_tier=500,
+        suggested_range_lower_tick=-100,
+        suggested_range_upper_tick=100,
+        in_range_liquidity_competition=0.2,
+        volume_fee_proxy=0.4,
+        cost_penalty=0.1,
+        confidence_score=0.8,
+        confidence=EntryConfidenceBand.HIGH,
+        actionability=EntryActionability.ACTIONABLE,
+        rank_v1=0.5,
+        source_pool_id="pool-worse",
+    )
+    ordered = sorted(
+        [worse_competition, better_competition],
+        key=_sort_key_actionable,
+    )
+    assert [item.source_pool_id for item in ordered] == ["pool-better", "pool-worse"]
 
 
 def test_entry_recommendation_fail_safe_invalid_or_missing_range_to_watchlist() -> None:
@@ -343,10 +384,33 @@ def test_lp_entry_eligibility_split_and_ineligible_reason_taxonomy() -> None:
     )
     eligible.candidate.yield_type = YieldType.LP_FEES
 
-    eligible_results, ineligible = split_lp_entry_eligibility(
-        [non_lp, unsupported_venue, missing_ref, eligible]
+    sushi_supported = _result(
+        chain="Arbitrum",
+        project="sushiswap-v3",
+        symbol="WETH-USDC",
+        pool_id="pool-sushi-supported",
+        score=4.5,
+        metadata={
+            "tick_pool_address": "0x4444444444444444444444444444444444444444",
+            "report_group": "ACTIONABLE",
+            "freshness_status": "FRESH",
+            "source_confidence": "VERIFIED",
+            "tick_data_quality": "OK",
+            "suggested_range_lower_tick": "-90",
+            "suggested_range_upper_tick": "95",
+            "score_raw": "4.5",
+            "net_profit_1k_usd": "9.0",
+        },
     )
-    assert [r.candidate.pool_id for r in eligible_results] == ["pool-eligible"]
+    sushi_supported.candidate.yield_type = YieldType.LP_FEES
+
+    eligible_results, ineligible = split_lp_entry_eligibility(
+        [non_lp, unsupported_venue, missing_ref, eligible, sushi_supported]
+    )
+    assert sorted(r.candidate.pool_id for r in eligible_results) == [
+        "pool-eligible",
+        "pool-sushi-supported",
+    ]
     assert sorted(reason for _, reason in ineligible) == [
         "MISSING_POOL_REFERENCE",
         "NON_LP_YIELD_TYPE",
@@ -423,8 +487,85 @@ def test_entry_recommendation_calibration_factors_affect_confidence_and_rank() -
     rec = out[0]
     assert rec.actionability == EntryActionability.ACTIONABLE
     assert rec.confidence == EntryConfidenceBand.HIGH
-    # Deterministic expected rank: 5.0 * (0.9^2) * sqrt(1 + 50/100)
-    assert rec.rank_v1 == pytest.approx(5.0 * (0.9**2) * ((1.5) ** 0.5), rel=1e-6)
+    # Deterministic expected selector score in [0, 1] from rank_v1 components.
+    assert rec.rank_v1 == pytest.approx(0.5970, rel=1e-6)
+
+
+def test_entry_recommendation_emits_selector_score_components() -> None:
+    result = _result(
+        chain="Base",
+        project="uniswap-v3",
+        symbol="WETH-USDT",
+        pool_id="pool-selector-components",
+        score=5.0,
+        metadata={
+            "report_group": "ACTIONABLE",
+            "freshness_status": "FRESH",
+            "source_confidence": "VERIFIED",
+            "tick_data_quality": "OK",
+            "suggested_range_lower_tick": "-100",
+            "suggested_range_upper_tick": "100",
+            "tick_pool_fee_tier": "500",
+            "band_depth_2_5pct_usd": "50000",
+            "volume_24h_usd": "1200000",
+            "net_profit_1k_usd": "15",
+        },
+    )
+
+    out = build_entry_recommendations([result], top_n=5)
+    assert len(out) == 1
+    rec = out[0]
+    assert rec.actionability == EntryActionability.ACTIONABLE
+    assert rec.in_range_liquidity_competition > 0.0
+    assert rec.volume_fee_proxy > 0.0
+    assert rec.cost_penalty >= 0.0
+    assert rec.confidence_score > 0.0
+    assert rec.rank_v1 == pytest.approx(
+        rank_v1(
+            {
+                "in_range_liquidity_competition": rec.in_range_liquidity_competition,
+                "volume_fee_proxy": rec.volume_fee_proxy,
+                "cost_penalty": rec.cost_penalty,
+                "confidence": rec.confidence_score,
+            }
+        ),
+        rel=1e-9,
+    )
+
+
+def test_entry_recommendation_auto_range_mode_respects_market_regime() -> None:
+    result = _result(
+        chain="Base",
+        project="uniswap-v3",
+        symbol="WETH-USDT",
+        pool_id="pool-auto-range",
+        score=5.0,
+        metadata={
+            "report_group": "ACTIONABLE",
+            "freshness_status": "FRESH",
+            "source_confidence": "VERIFIED",
+            "tick_data_quality": "OK",
+            "suggested_range_lower_tick": "-100",
+            "suggested_range_upper_tick": "100",
+            "tick_pool_fee_tier": "500",
+            "band_depth_2_5pct_usd": "50000",
+            "volume_24h_usd": "1200000",
+            "net_profit_1k_usd": "15",
+        },
+    )
+
+    out = build_entry_recommendations(
+        [result],
+        top_n=5,
+        range_mode="AUTO",
+        market_regime="UPTREND",
+    )
+    assert len(out) == 1
+    rec = out[0]
+    assert rec.range_mode == "ASYMMETRIC"
+    assert rec.market_regime == "UPTREND"
+    assert rec.suggested_range_lower_tick == -80
+    assert rec.suggested_range_upper_tick == 120
 
 
 def test_compute_stability_observation_counts_respects_time_window(

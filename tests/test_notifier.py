@@ -879,6 +879,7 @@ def test_report_blocks_include_lp_entry_recommendations_section():
     blocks = notifier._format_report_blocks([], entry_recommendations=recs)
     joined = "\n".join(blocks)
     assert "LP Entry Recommendations" in joined
+    assert "LP Entry — Network/Protocol/Range Selector" in joined
     assert "- Actionable:" in joined
     assert "- Watchlist:" in joined
     assert "Range: [-120,120]" in joined

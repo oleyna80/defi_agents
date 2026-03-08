@@ -322,35 +322,35 @@
       "native_live_receipt_poll_seconds": 1.5,
       "chains": {
         "Arbitrum": {
-          "rpc_url": "https://arb-mainnet.g.alchemy.com/v2/2Hu8D0gC4pmXTmatT15Je",
+          "rpc_url": "https://arb1.arbitrum.io/rpc",
           "coingecko_platform_id": "arbitrum-one",
           "uniswap_v3": {
-            "factory_proxy": "0x1111111111111111111111111111111111111111",
-            "position_manager_proxy": "0x2222222222222222222222222222222222222222"
+            "factory_proxy": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+            "position_manager_proxy": "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
           }
         },
         "Base": {
           "rpc_url": "https://mainnet.base.org",
           "coingecko_platform_id": "base",
           "uniswap_v3": {
-            "factory_proxy": "0x3333333333333333333333333333333333333333",
-            "position_manager_proxy": "0x4444444444444444444444444444444444444444"
+            "factory_proxy": "0x33128a8fC17869897dcE68Ed026d694621f6FDfD",
+            "position_manager_proxy": "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
           }
         },
         "Optimism": {
-          "rpc_url": "https://optimism.example.invalid",
+          "rpc_url": "https://mainnet.optimism.io",
           "coingecko_platform_id": "optimistic-ethereum",
           "uniswap_v3": {
-            "factory_proxy": "0x5555555555555555555555555555555555555555",
-            "position_manager_proxy": "0x6666666666666666666666666666666666666666"
+            "factory_proxy": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+            "position_manager_proxy": "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
           }
         },
         "HypeEVM": {
-          "rpc_url": "https://hype-evm.example.invalid",
+          "rpc_url": "https://rpc.hyperliquid.xyz/evm",
           "coingecko_platform_id": "hyperevm",
           "uniswap_v3": {
-            "factory_proxy": "0x7777777777777777777777777777777777777777",
-            "position_manager_proxy": "0x8888888888888888888888888888888888888888"
+            "factory_proxy": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+            "position_manager_proxy": "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
           }
         }
       },
@@ -473,10 +473,21 @@
     },
     "lp_entry_targeting": {
       "enabled": false,
-      "target_pair": "",
-      "allowed_chains": [],
-      "allowed_projects": [],
-      "top_n": null
+      "target_pair": "WETH-USDT",
+      "range_mode": "AUTO",
+      "market_regime": "SIDEWAYS",
+      "range_lower": null,
+      "range_upper": null,
+      "allowed_chains": [
+        "Base",
+        "Arbitrum"
+      ],
+      "allowed_projects": [
+        "uniswap-v3",
+        "aerodrome-slipstream",
+        "sushiswap-v3"
+      ],
+      "top_n": 3
     },
     "min_warn_score": 0.0,
     "confidence_factors": {

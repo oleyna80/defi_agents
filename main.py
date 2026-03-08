@@ -86,6 +86,10 @@ logger = logging.getLogger("Sentinel")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
+_TICK_PROVIDER_BLOCKER_SUSHISWAP_V3_UNAVAILABLE = (
+    "SUSHISWAP_V3_PROVIDER_UNAVAILABLE"
+)
+
 
 def _format_reason_counts_for_log(counts: Mapping[str, int] | None) -> str:
     if not counts:
@@ -182,6 +186,60 @@ def _range_watchlist_reason(
     if lower_tick is None or upper_tick is None or lower_tick >= upper_tick:
         return "INVALID_OR_MISSING_RANGE"
     return None
+
+
+def _normalize_tick_project_name(project: object) -> str:
+    return (
+        str(project or "")
+        .strip()
+        .lower()
+        .replace(" ", "")
+        .replace("-", "")
+        .replace("_", "")
+    )
+
+
+def _resolve_tick_density_provider_for_project(
+    *,
+    project: object,
+    chain: str,
+    uniswap_chain_providers: Mapping[str, object],
+    aerodrome_chain_providers: Mapping[str, object],
+) -> object | None:
+    project_norm = _normalize_tick_project_name(project)
+    if "aerodromeslipstream" in project_norm:
+        return aerodrome_chain_providers.get(chain)
+    if "uniswapv3" in project_norm:
+        return uniswap_chain_providers.get(chain)
+    if "sushiswapv3" in project_norm:
+        # Compatible fallback path: Sushi v3 pools are scanned via Uni v3-style schema
+        # whenever the chain has a healthy Uni-compatible tick provider.
+        return uniswap_chain_providers.get(chain)
+    return None
+
+
+def _tick_density_provider_unavailable_reason_code(project: object) -> str | None:
+    project_norm = _normalize_tick_project_name(project)
+    if "sushiswapv3" in project_norm:
+        return _TICK_PROVIDER_BLOCKER_SUSHISWAP_V3_UNAVAILABLE
+    return None
+
+
+def _apply_tick_provider_unavailable_metadata(
+    metadata: Mapping[str, str] | dict[str, str] | None,
+    *,
+    reason_code: str,
+    project: object,
+) -> None:
+    if not isinstance(metadata, dict):
+        return
+    # Fail-safe: provider unavailability must always force degraded tick quality,
+    # even if metadata already contained optimistic values.
+    metadata["tick_data_quality"] = "DEGRADED"
+    project_norm = _normalize_tick_project_name(project)
+    if "sushiswapv3" in project_norm:
+        metadata["tick_degradation_reason"] = "PROVIDER_UNAVAILABLE_SUSHISWAP_V3"
+    metadata["readiness_blocker"] = str(reason_code).strip().upper()
 
 
 def _percentile(values: list[float], q: float) -> float | None:
@@ -850,13 +908,16 @@ async def run_sentinel_cycle() -> None:
             def _provider_for_candidate(
                 candidate,
             ) -> UniswapV3TickProvider | None:  # noqa: ANN001
-                project_lower = (candidate.project or "").lower().replace(" ", "")
                 chain = candidate.chain or ""
-                if "aerodrome-slipstream" in project_lower:
-                    return aerodrome_chain_providers.get(chain)
-                if "uniswap-v3" in project_lower or "uniswapv3" in project_lower:
-                    return uniswap_chain_providers.get(chain)
-                return None
+                resolved = _resolve_tick_density_provider_for_project(
+                    project=candidate.project,
+                    chain=chain,
+                    uniswap_chain_providers=uniswap_chain_providers,
+                    aerodrome_chain_providers=aerodrome_chain_providers,
+                )
+                if not isinstance(resolved, UniswapV3TickProvider):
+                    return None
+                return resolved
 
             def _normalize_evm_address(value: object) -> str | None:
                 if not isinstance(value, str):
@@ -946,6 +1007,17 @@ async def run_sentinel_cycle() -> None:
                 c = opt.candidate
                 provider = _provider_for_candidate(c)
                 if provider is None:
+                    reason_code = _tick_density_provider_unavailable_reason_code(
+                        c.project
+                    )
+                    if reason_code:
+                        _inc_td_blocker(reason_code)
+                        metadata = getattr(opt, "metadata", None)
+                        _apply_tick_provider_unavailable_metadata(
+                            metadata,
+                            reason_code=reason_code,
+                            project=c.project,
+                        )
                     td_skipped += 1
                     continue
                 if not _candidate_scan_eligible(c):
@@ -1111,6 +1183,11 @@ async def run_sentinel_cycle() -> None:
             for c in discovery_candidates_raw:
                 provider = _provider_for_candidate(c)
                 if provider is None:
+                    reason_code = _tick_density_provider_unavailable_reason_code(
+                        c.project
+                    )
+                    if reason_code:
+                        _inc_td_blocker(reason_code)
                     td_discovery_skipped += 1
                     continue
                 if not _candidate_scan_eligible(c):
@@ -1358,6 +1435,10 @@ async def run_sentinel_cycle() -> None:
         entry_target_matched_total = entry_target_input_total
         entry_target_excluded_total = 0
         entry_target_reason = "NONE"
+        entry_selector_range_mode = str(lp_entry_target_cfg.range_mode or "AUTO").upper()
+        entry_selector_market_regime = str(
+            lp_entry_target_cfg.market_regime or "SIDEWAYS"
+        ).upper()
 
         if lp_entry_target_cfg.enabled and (
             lp_entry_eligible_results or lp_entry_ineligible
@@ -1425,6 +1506,10 @@ async def run_sentinel_cycle() -> None:
         eligible_recommendations = build_entry_recommendations(
             lp_entry_eligible_results,
             top_n=max(1, recommendation_top_n),
+            range_mode=entry_selector_range_mode,
+            market_regime=entry_selector_market_regime,
+            range_lower_tick=lp_entry_target_cfg.range_lower,
+            range_upper_tick=lp_entry_target_cfg.range_upper,
             stability_observation_counts=stability_observation_counts,
             stability_min_observations=stability_min_observations,
             calibration=lp_entry_cfg,
@@ -1451,6 +1536,10 @@ async def run_sentinel_cycle() -> None:
         watchlist_blocker_reason_counts = summarize_watchlist_blocker_reason_counts(
             entry_recommendations
         )
+        entry_selector_input_total = entry_target_matched_total
+        entry_selector_matched_total = len(entry_recommendations)
+        entry_selector_actionable_total = stability_telemetry.entry_actionable
+        entry_selector_watchlist_total = stability_telemetry.entry_watchlist
         topn_cache.set(
             "topn_pool_ids",
             stability_telemetry.topn_pool_ids,
@@ -1463,7 +1552,11 @@ async def run_sentinel_cycle() -> None:
             "entry_range_ready_total=%s entry_range_missing_total=%s "
             "entry_target_scope_enabled=%s entry_target_input_total=%s "
             "entry_target_matched_total=%s entry_target_excluded_total=%s "
-            "entry_target_reason=%s watchlist_reason_counts=%s "
+            "entry_target_reason=%s "
+            "entry_selector_range_mode=%s entry_selector_market_regime=%s "
+            "entry_selector_input_total=%s entry_selector_matched_total=%s "
+            "entry_selector_actionable_total=%s entry_selector_watchlist_total=%s "
+            "watchlist_reason_counts=%s "
             "watchlist_blocker_reason_counts=%s",
             stability_telemetry.entry_total,
             stability_telemetry.entry_actionable,
@@ -1480,6 +1573,12 @@ async def run_sentinel_cycle() -> None:
             entry_target_matched_total,
             entry_target_excluded_total,
             entry_target_reason,
+            entry_selector_range_mode,
+            entry_selector_market_regime,
+            entry_selector_input_total,
+            entry_selector_matched_total,
+            entry_selector_actionable_total,
+            entry_selector_watchlist_total,
             _format_reason_counts_for_log(watchlist_reason_counts),
             _format_reason_counts_for_log(watchlist_blocker_reason_counts),
         )

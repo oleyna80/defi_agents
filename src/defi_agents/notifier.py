@@ -454,7 +454,15 @@ class TelegramNotifier:
             for item in watchlist:
                 lines.append(self._format_entry_recommendation_line(item))
         lines.append("")
-        return [lines]
+
+        selector_lines: List[str] = ["*LP Entry — Network/Protocol/Range Selector*", "- Top-N comparison:"]
+        for item in actionable:
+            selector_lines.append(self._format_entry_selector_line(item))
+        if not actionable:
+            selector_lines.append("  - no actionable selector matches (WATCHLIST-only cycle)")
+        selector_lines.append("")
+
+        return [lines, selector_lines]
 
     def _format_entry_recommendation_line(self, item: EntryRecommendation) -> str:
         range_part = "Range: n/a"
@@ -471,6 +479,23 @@ class TelegramNotifier:
         return (
             f"  - `{item.chain}` `{item.pair}` | `{item.project}` | {fee_part} | "
             f"{range_part} | Conf `{item.confidence.value}` | Rank {item.rank_v1:.4f}{reason_part}"
+        )
+
+    def _format_entry_selector_line(self, item: EntryRecommendation) -> str:
+        range_repr = "n/a"
+        if (
+            item.suggested_range_lower_tick is not None
+            and item.suggested_range_upper_tick is not None
+        ):
+            range_repr = (
+                f"[{item.suggested_range_lower_tick},{item.suggested_range_upper_tick}]"
+            )
+        fee_part = f"{item.fee_tier}bps" if item.fee_tier is not None else "n/a"
+        return (
+            f"  - `{item.chain}`/`{item.project}` | Pair `{item.pair}` | Range `{range_repr}` "
+            f"({item.range_mode}/{item.market_regime}) | fee `{fee_part}` | "
+            f"comp={item.in_range_liquidity_competition:.4f} vol_fee={item.volume_fee_proxy:.4f} "
+            f"cost={item.cost_penalty:.4f} conf={item.confidence_score:.4f} | rank_v1={item.rank_v1:.4f}"
         )
 
     def _format_opportunity_section_lines(

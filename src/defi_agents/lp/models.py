@@ -84,8 +84,14 @@ class EntryRecommendation(BaseModel):
     project: str
     pair: str
     fee_tier: int | None = None
+    range_mode: str = "AUTO"
+    market_regime: str = "SIDEWAYS"
     suggested_range_lower_tick: int | None = None
     suggested_range_upper_tick: int | None = None
+    in_range_liquidity_competition: float = 0.0
+    volume_fee_proxy: float = 0.0
+    cost_penalty: float = 0.0
+    confidence_score: float = 0.0
     confidence: EntryConfidenceBand = EntryConfidenceBand.LOW
     reasons: list[str] = Field(default_factory=list)
     watchlist_reason: str | None = None

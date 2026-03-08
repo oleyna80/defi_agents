@@ -725,6 +725,10 @@ def test_lp_entry_targeting_defaults_are_safe() -> None:
     targeting = cfg.lp_entry_targeting
     assert targeting.enabled is False
     assert targeting.target_pair == ""
+    assert targeting.range_mode == "AUTO"
+    assert targeting.market_regime == "SIDEWAYS"
+    assert targeting.range_lower is None
+    assert targeting.range_upper is None
     assert targeting.allowed_chains == []
     assert targeting.allowed_projects == []
     assert targeting.top_n is None
@@ -735,16 +739,32 @@ def test_lp_entry_targeting_accepts_valid_eth_usdt_target_scope() -> None:
         lp_entry_targeting={
             "enabled": True,
             "target_pair": "WETH-USDT",
+            "range_mode": "AUTO",
+            "market_regime": "UPTREND",
+            "range_lower": -180,
+            "range_upper": 220,
             "allowed_chains": ["Base", "Arbitrum"],
-            "allowed_projects": ["uniswap-v3", "aerodrome-slipstream"],
+            "allowed_projects": [
+                "uniswap-v3",
+                "aerodrome-slipstream",
+                "sushiswap-v3",
+            ],
             "top_n": 3,
         }
     )
     targeting = cfg.lp_entry_targeting
     assert targeting.enabled is True
     assert targeting.target_pair == "WETH-USDT"
+    assert targeting.range_mode == "AUTO"
+    assert targeting.market_regime == "UPTREND"
+    assert targeting.range_lower == -180
+    assert targeting.range_upper == 220
     assert targeting.allowed_chains == ["Base", "Arbitrum"]
-    assert targeting.allowed_projects == ["uniswap-v3", "aerodrome-slipstream"]
+    assert targeting.allowed_projects == [
+        "uniswap-v3",
+        "aerodrome-slipstream",
+        "sushiswap-v3",
+    ]
     assert targeting.top_n == 3
 
 
@@ -761,6 +781,29 @@ def test_lp_entry_targeting_rejects_invalid_pair_format() -> None:
 def test_lp_entry_targeting_rejects_three_token_pair_format() -> None:
     with pytest.raises(ValueError):
         ScoutConfig(lp_entry_targeting={"enabled": True, "target_pair": "ETH-USDT-USDC"})
+
+
+def test_lp_entry_targeting_rejects_partial_manual_range() -> None:
+    with pytest.raises(ValueError):
+        ScoutConfig(
+            lp_entry_targeting={
+                "enabled": True,
+                "target_pair": "ETH-USDT",
+                "range_lower": -100,
+            }
+        )
+
+
+def test_lp_entry_targeting_rejects_invalid_manual_range_order() -> None:
+    with pytest.raises(ValueError):
+        ScoutConfig(
+            lp_entry_targeting={
+                "enabled": True,
+                "target_pair": "ETH-USDT",
+                "range_lower": 100,
+                "range_upper": 100,
+            }
+        )
 
 
 def test_reporting_opportunity_sections_flag_defaults_and_override() -> None:

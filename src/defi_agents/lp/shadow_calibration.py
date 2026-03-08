@@ -29,6 +29,12 @@ _TELEMETRY_RE = re.compile(
     r"(?:\s+entry_target_matched_total=(?P<entry_target_matched_total>\d+))?"
     r"(?:\s+entry_target_excluded_total=(?P<entry_target_excluded_total>\d+))?"
     r"(?:\s+entry_target_reason=(?P<entry_target_reason>[A-Z0-9_]+))?"
+    r"(?:\s+entry_selector_range_mode=(?P<entry_selector_range_mode>[A-Z]+))?"
+    r"(?:\s+entry_selector_market_regime=(?P<entry_selector_market_regime>[A-Z]+))?"
+    r"(?:\s+entry_selector_input_total=(?P<entry_selector_input_total>\d+))?"
+    r"(?:\s+entry_selector_matched_total=(?P<entry_selector_matched_total>\d+))?"
+    r"(?:\s+entry_selector_actionable_total=(?P<entry_selector_actionable_total>\d+))?"
+    r"(?:\s+entry_selector_watchlist_total=(?P<entry_selector_watchlist_total>\d+))?"
     r"(?:\s+watchlist_reason_counts=(?P<watchlist_reason_counts>\S+))?"
     r"(?:\s+watchlist_blocker_reason_counts=(?P<watchlist_blocker_reason_counts>\S+))?"
 )

@@ -4,6 +4,11 @@ import re
 from collections.abc import Mapping, Sequence
 
 from ..scout.models import ScoutResult
+from .cross_protocol_selector import (
+    compute_rank_v1_components,
+    rank_v1,
+    resolve_selector_range,
+)
 from .models import EntryActionability, EntryConfidenceBand, EntryRecommendation
 from .readiness import normalize_readiness_blocker_code
 
@@ -159,12 +164,18 @@ def build_ineligible_entry_recommendations(
                 project=result.candidate.project,
                 pair=result.candidate.symbol,
                 fee_tier=_fee_tier_bps(result),
+                range_mode=str(meta.get("entry_range_mode") or "AUTO").upper(),
+                market_regime=str(meta.get("entry_market_regime") or "SIDEWAYS").upper(),
                 suggested_range_lower_tick=_as_int(
                     meta.get("suggested_range_lower_tick")
                 ),
                 suggested_range_upper_tick=_as_int(
                     meta.get("suggested_range_upper_tick")
                 ),
+                in_range_liquidity_competition=0.0,
+                volume_fee_proxy=0.0,
+                cost_penalty=0.0,
+                confidence_score=0.0,
                 confidence=EntryConfidenceBand.LOW,
                 reasons=reasons,
                 watchlist_reason=deterministic_reason,
@@ -224,6 +235,10 @@ def build_entry_recommendations(
     results: list[ScoutResult],
     *,
     top_n: int = 5,
+    range_mode: str = "AUTO",
+    market_regime: str = "SIDEWAYS",
+    range_lower_tick: int | None = None,
+    range_upper_tick: int | None = None,
     stability_observation_counts: Mapping[str, int] | None = None,
     stability_min_observations: int = 0,
     calibration: object | None = None,
@@ -246,6 +261,10 @@ def build_entry_recommendations(
     recommendations = [
         _build_one(
             result,
+            range_mode=range_mode,
+            market_regime=market_regime,
+            range_lower_tick=range_lower_tick,
+            range_upper_tick=range_upper_tick,
             stability_observation_counts=stability_counts,
             stability_min_observations=minimum_observations,
             calibration=calibration_values,
@@ -269,6 +288,10 @@ def build_entry_recommendations(
 def _build_one(
     result: ScoutResult,
     *,
+    range_mode: str,
+    market_regime: str,
+    range_lower_tick: int | None,
+    range_upper_tick: int | None,
     stability_observation_counts: Mapping[str, int],
     stability_min_observations: int,
     calibration: dict[str, object],
@@ -278,8 +301,16 @@ def _build_one(
     freshness_status = str(meta.get("freshness_status") or "UNVERIFIED").upper()
     tick_quality = str(meta.get("tick_data_quality") or "").upper()
 
-    lower_tick = _as_int(meta.get("suggested_range_lower_tick"))
-    upper_tick = _as_int(meta.get("suggested_range_upper_tick"))
+    base_lower_tick = _as_int(meta.get("suggested_range_lower_tick"))
+    base_upper_tick = _as_int(meta.get("suggested_range_upper_tick"))
+    lower_tick, upper_tick, effective_range_mode = resolve_selector_range(
+        base_lower_tick=base_lower_tick,
+        base_upper_tick=base_upper_tick,
+        range_mode=range_mode,
+        market_regime=market_regime,
+        manual_lower_tick=range_lower_tick,
+        manual_upper_tick=range_upper_tick,
+    )
     has_valid_range = (
         lower_tick is not None and upper_tick is not None and lower_tick < upper_tick
     )
@@ -358,93 +389,85 @@ def _build_one(
         calibration=calibration,
     )
 
+    confidence_factor = _resolve_confidence_factor(
+        source_confidence=source_confidence,
+        meta=meta,
+        calibration=calibration,
+    )
+
     reasons = _parse_reason_codes(meta.get("warn_reasons"))
     if watchlist_reason and watchlist_reason not in reasons:
         reasons.append(watchlist_reason)
 
     fee_tier = _fee_tier_bps(result)
-    rank_v1 = _rank_v1(
+    rank_components = compute_rank_v1_components(
         result=result,
         source_confidence=source_confidence,
+        confidence_factor=confidence_factor,
         tick_quality=tick_quality,
         has_valid_range=has_valid_range,
-        calibration=calibration,
+        range_lower_tick=lower_tick,
+        range_upper_tick=upper_tick,
+        fee_tier=fee_tier,
     )
+    rank_value = rank_v1(rank_components)
 
-    if actionability == EntryActionability.WATCHLIST and rank_v1 > 0:
+    if actionability == EntryActionability.WATCHLIST and rank_value > 0:
         # Fail-closed: watchlist entries must not compete with actionable by score.
-        rank_v1 = 0.0
+        rank_value = 0.0
+
+    meta["entry_range_mode"] = effective_range_mode
+    meta["entry_market_regime"] = str(market_regime or "SIDEWAYS").upper()
+    meta["in_range_liquidity_competition"] = (
+        f"{rank_components['in_range_liquidity_competition']:.6f}"
+    )
+    meta["volume_fee_proxy"] = f"{rank_components['volume_fee_proxy']:.6f}"
+    meta["cost_penalty"] = f"{rank_components['cost_penalty']:.6f}"
+    meta["entry_confidence_score"] = f"{rank_components['confidence']:.6f}"
 
     return EntryRecommendation(
         chain=result.candidate.chain,
         project=result.candidate.project,
         pair=result.candidate.symbol,
         fee_tier=fee_tier,
+        range_mode=effective_range_mode,
+        market_regime=str(market_regime or "SIDEWAYS").upper(),
         suggested_range_lower_tick=lower_tick,
         suggested_range_upper_tick=upper_tick,
+        in_range_liquidity_competition=rank_components[
+            "in_range_liquidity_competition"
+        ],
+        volume_fee_proxy=rank_components["volume_fee_proxy"],
+        cost_penalty=rank_components["cost_penalty"],
+        confidence_score=rank_components["confidence"],
         confidence=confidence,
         reasons=reasons,
         watchlist_reason=watchlist_reason,
         watchlist_blocker_reason=watchlist_blocker_reason,
         actionability=actionability,
-        rank_v1=rank_v1,
+        rank_v1=rank_value,
         source_pool_id=result.candidate.pool_id,
     )
 
 
-def _rank_v1(
+def _resolve_confidence_factor(
     *,
-    result: ScoutResult,
     source_confidence: str,
-    tick_quality: str,
-    has_valid_range: bool,
+    meta: Mapping[str, str],
     calibration: dict[str, object],
 ) -> float:
-    meta = result.metadata
-    base_score = _as_float(meta.get("score_raw"))
-    if base_score is None:
-        base_score = float(result.score or 0.0)
-
     confidence_factor = _as_float(meta.get("confidence_factor"))
     if confidence_factor is None:
         source_factors = calibration.get("source_confidence_factors")
         if isinstance(source_factors, dict):
             confidence_factor = _as_float(source_factors.get(source_confidence))
-        if confidence_factor is None:
-            confidence_factor = _SOURCE_CONFIDENCE_FACTOR.get(source_confidence, 0.85)
-
+    if confidence_factor is None:
+        confidence_factor = _SOURCE_CONFIDENCE_FACTOR.get(source_confidence, 0.85)
     confidence_power = _as_float(calibration.get("rank_confidence_power"))
     if confidence_power is None:
         confidence_power = 1.0
     confidence_power = max(0.0, confidence_power)
-    confidence_factor = max(0.0, float(confidence_factor)) ** confidence_power
-
-    tick_quality_factor = 1.0 if tick_quality in {"", "OK"} else 0.0
-    range_quality_factor = 1.0 if has_valid_range else 0.0
-
-    net_1k = _as_float(meta.get("net_profit_1k_usd"))
-    economics_factor = 1.0
-    if net_1k is not None and net_1k > 0:
-        economics_cap = _as_float(calibration.get("economics_cap_usd"))
-        if economics_cap is None:
-            economics_cap = 100.0
-        economics_cap = max(0.0, economics_cap)
-        economics_factor = 1.0 + min(net_1k, economics_cap) / 100.0
-
-    economics_power = _as_float(calibration.get("rank_economics_power"))
-    if economics_power is None:
-        economics_power = 1.0
-    economics_power = max(0.0, economics_power)
-    economics_factor = economics_factor**economics_power
-
-    return max(
-        0.0,
-        float(base_score)
-        * float(confidence_factor)
-        * tick_quality_factor
-        * range_quality_factor
-        * economics_factor,
-    )
+    return max(0.0, float(confidence_factor)) ** confidence_power
 
 
 def _confidence_band(
@@ -559,6 +582,8 @@ def _lp_entry_ineligible_reason(result: ScoutResult) -> str | None:
         or "uniswapv3" in project_norm
         or "aerodrome-slipstream" in project_norm
         or "aerodromeslipstream" in project_norm
+        or "sushiswap-v3" in project_norm
+        or "sushiswapv3" in project_norm
     ):
         return "UNSUPPORTED_ENTRY_VENUE"
 
@@ -608,7 +633,7 @@ def _parse_reason_codes(raw: object) -> list[str]:
 
 def _sort_key_actionable(
     item: EntryRecommendation,
-) -> tuple[float, int, float, str, str, str, int, str]:
+) -> tuple[float, float, float, float, float, int, float, str, str, str, int, str]:
     width_ticks = 0.0
     if (
         item.suggested_range_lower_tick is not None
@@ -620,6 +645,10 @@ def _sort_key_actionable(
     fee = item.fee_tier if item.fee_tier is not None else 10**9
     return (
         -float(item.rank_v1),
+        -float(item.in_range_liquidity_competition),
+        -float(item.volume_fee_proxy),
+        float(item.cost_penalty),
+        -float(item.confidence_score),
         -_CONFIDENCE_ORDER.get(item.confidence, 0),
         width_ticks,
         item.chain.lower(),
