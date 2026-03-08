@@ -365,13 +365,42 @@ def _build_execution_position_reader(
     chain_name: str,
     chain_cfg: ExecutionChainConfig,
 ) -> BaseUniswapV3PositionReader:
+    configured_rpc_url = str(chain_cfg.rpc_url or "").strip()
+    rpc_url, rpc_env_key = _resolve_execution_chain_rpc_url(
+        chain_name=chain_name,
+        configured_rpc_url=configured_rpc_url,
+    )
+    if rpc_env_key and rpc_url != configured_rpc_url:
+        logger.info(
+            "Execution chain RPC override applied: chain=%s env_key=%s source=position_reader",
+            chain_name,
+            rpc_env_key,
+        )
     return BaseUniswapV3PositionReader(
         chain_name=chain_name,
-        rpc_url=chain_cfg.rpc_url,
+        rpc_url=rpc_url,
         coingecko_platform_id=chain_cfg.coingecko_platform_id,
         position_manager_address=chain_cfg.uniswap_v3.position_manager_proxy,
         factory_address=chain_cfg.uniswap_v3.factory_proxy,
     )
+
+
+def _execution_chain_rpc_env_key(chain_name: str) -> str:
+    normalized = re.sub(r"[^a-zA-Z0-9]+", "_", str(chain_name or "").strip())
+    normalized = normalized.strip("_")
+    if not normalized:
+        return "RPC_URL"
+    return f"RPC_URL_{normalized.upper()}"
+
+
+def _resolve_execution_chain_rpc_url(
+    *, chain_name: str, configured_rpc_url: str
+) -> tuple[str, str | None]:
+    env_key = _execution_chain_rpc_env_key(chain_name)
+    env_rpc_url = os.getenv(env_key, "").strip()
+    if env_rpc_url:
+        return env_rpc_url, env_key
+    return str(configured_rpc_url or "").strip(), None
 
 
 def _execution_state_sort_key(state: PositionState) -> tuple[str, int, str]:

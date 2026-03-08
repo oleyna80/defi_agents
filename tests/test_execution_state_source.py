@@ -200,3 +200,51 @@ def test_execution_state_source_keeps_entry_baseline_missing_reason_code(
         state.metadata.get("hodl_reason_codes") == ["ENTRY_BASELINE_MISSING"]
         for state in states
     )
+
+
+def test_execution_chain_rpc_env_key_normalizes_hypeevm() -> None:
+    assert sentinel_main._execution_chain_rpc_env_key("HypeEVM") == "RPC_URL_HYPEEVM"
+
+
+def test_build_execution_position_reader_uses_env_rpc_override(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    cfg = _config_with_chains()
+    chain_cfg = cfg.execution.chains["Optimism"]
+    monkeypatch.setenv("RPC_URL_OPTIMISM", "https://rpc.override.local")
+    captured: dict[str, object] = {}
+
+    class _CaptureReader:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(sentinel_main, "BaseUniswapV3PositionReader", _CaptureReader)
+
+    sentinel_main._build_execution_position_reader(
+        chain_name="Optimism",
+        chain_cfg=chain_cfg,
+    )
+
+    assert captured["rpc_url"] == "https://rpc.override.local"
+
+
+def test_build_execution_position_reader_falls_back_to_config_rpc(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    cfg = _config_with_chains()
+    chain_cfg = cfg.execution.chains["Base"]
+    monkeypatch.delenv("RPC_URL_BASE", raising=False)
+    captured: dict[str, object] = {}
+
+    class _CaptureReader:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(sentinel_main, "BaseUniswapV3PositionReader", _CaptureReader)
+
+    sentinel_main._build_execution_position_reader(
+        chain_name="Base",
+        chain_cfg=chain_cfg,
+    )
+
+    assert captured["rpc_url"] == chain_cfg.rpc_url
