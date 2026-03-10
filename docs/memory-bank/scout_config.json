@@ -1,13 +1,15 @@
 {
   "scout_settings": {
     "target_chains": [],
-    "min_tvl_usd": 500000,
-    "min_apy": 8.0,
+    "min_tvl_usd": 100000,
+    "min_apy": 5.0,
     "global_search": true,
     "reporting": {
       "telegram_digest_interval_seconds": 21600,
       "telegram_report_mode": "snapshot",
       "telegram_top_n_per_section": 10,
+      "telegram_opportunity_sections_enabled": false,
+      "telegram_lp_entry_watchlist_enabled": false,
       "telegram_turnover_section_enabled": false,
       "telegram_turnover_top_n": 10,
       "telegram_turnover_min_tvl_usd": 100000,
@@ -33,7 +35,7 @@
       "telegram_show_source_confidence": true,
       "telegram_show_market_signals": true,
       "telegram_shadow_mode_enabled": true,
-      "telegram_shadow_prefix": "⚠️ SHADOW — DO NOT ACT",
+      "telegram_shadow_prefix": "\u26a0\ufe0f SHADOW \u2014 DO NOT ACT",
       "telegram_shadow_chat_id_env": "TELEGRAM_SHADOW_CHAT_ID",
       "telegram_shadow_metrics_horizon_seconds": 86400,
       "telegram_shadow_capture_interval_seconds": 21600,
@@ -319,6 +321,40 @@
       "native_live_timeout_seconds": 12.0,
       "native_live_receipt_timeout_seconds": 45.0,
       "native_live_receipt_poll_seconds": 1.5,
+      "chains": {
+        "Arbitrum": {
+          "rpc_url": "https://arb1.arbitrum.io/rpc",
+          "coingecko_platform_id": "arbitrum-one",
+          "uniswap_v3": {
+            "factory_proxy": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+            "position_manager_proxy": "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
+          }
+        },
+        "Base": {
+          "rpc_url": "https://mainnet.base.org",
+          "coingecko_platform_id": "base",
+          "uniswap_v3": {
+            "factory_proxy": "0x33128a8fC17869897dcE68Ed026d694621f6FDfD",
+            "position_manager_proxy": "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
+          }
+        },
+        "Optimism": {
+          "rpc_url": "https://mainnet.optimism.io",
+          "coingecko_platform_id": "optimistic-ethereum",
+          "uniswap_v3": {
+            "factory_proxy": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+            "position_manager_proxy": "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
+          }
+        },
+        "HypeEVM": {
+          "rpc_url": "https://rpc.hyperliquid.xyz/evm",
+          "coingecko_platform_id": "hyperevm",
+          "uniswap_v3": {
+            "factory_proxy": "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+            "position_manager_proxy": "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
+          }
+        }
+      },
       "policy": {
         "max_gas_usd_per_tx": 15.0,
         "max_slippage_bps": 100,
@@ -435,6 +471,31 @@
         "whale": 70
       },
       "min_data_completeness_pct": 80.0
+    },
+    "lp_entry_targeting": {
+      "enabled": true,
+      "target_pair": "",
+      "target_pairs": [
+        "ETH/USDT",
+        "ETH/USDC",
+        "ETH/USDS",
+        "ETH/USDE",
+        "ETH/DAI",
+        "ETH/PYUSD",
+        "ETH/USDG",
+        "ETH/RLUSD"
+      ],
+      "range_mode": "AUTO",
+      "market_regime": "SIDEWAYS",
+      "range_lower": null,
+      "range_upper": null,
+      "allowed_chains": [],
+      "allowed_projects": [
+        "uniswap-v3",
+        "aerodrome-slipstream",
+        "sushiswap-v3"
+      ],
+      "top_n": 3
     },
     "min_warn_score": 0.0,
     "confidence_factors": {

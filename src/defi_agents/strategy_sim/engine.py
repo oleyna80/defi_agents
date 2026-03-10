@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from typing import List, Optional, Dict, Any
 from .models import (
     StrategyId,
@@ -13,6 +14,12 @@ from ..scout.models import ScoutResult, ScoutCandidate
 from ..scout.config import ScoutConfig
 
 logger = logging.getLogger(__name__)
+
+_SIM_POLICY_REASON_BY_STATUS: dict[str, str] = {
+    SimStatus.PARTIAL.value: "SIM_STATUS_PARTIAL",
+    SimStatus.UNSUPPORTED.value: "SIM_STATUS_UNSUPPORTED",
+}
+_SIM_POLICY_REASON_RISK_ABOVE_PROFILE = "SIM_RISK_ABOVE_PROFILE"
 
 
 class StrategySimEngine:
@@ -134,19 +141,58 @@ class StrategySimEngine:
                 missing.append(field)
             elif field == "fees_24h_usd" and not self._has_fees(candidate, metadata):
                 missing.append(field)
-            elif field == "utilization" and not self._has_utilization(metadata):
+            elif field == "utilization" and not self._has_utilization(candidate, metadata):
                 missing.append(field)
-            elif field == "supply_rate" and not self._has_supply_rate(metadata):
+            elif field == "supply_rate" and not self._has_supply_rate(candidate, metadata):
                 missing.append(field)
-            elif field == "protocol_yield" and not self._has_protocol_yield(metadata):
+            elif field == "protocol_yield" and not self._has_protocol_yield(candidate, metadata):
                 missing.append(field)
-            elif field == "staking_rate" and not self._has_staking_rate(metadata):
+            elif field == "staking_rate" and not self._has_staking_rate(candidate, metadata):
                 missing.append(field)
             elif field == "price_range" and not self._has_price_range(metadata):
                 missing.append(field)
             elif field == "volatility_proxy" and not self._has_volatility_proxy(metadata):
                 missing.append(field)
         return missing
+
+    def _parse_finite_float(self, raw: Any) -> Optional[float]:
+        if isinstance(raw, bool):
+            return None
+        if isinstance(raw, (int, float)):
+            value = float(raw)
+            return value if math.isfinite(value) else None
+        if isinstance(raw, str):
+            token = raw.strip()
+            if not token:
+                return None
+            try:
+                value = float(token)
+            except ValueError:
+                return None
+            return value if math.isfinite(value) else None
+        return None
+
+    def _metadata_value(self, metadata: Dict[str, str], *keys: str) -> Optional[float]:
+        for key in keys:
+            value = self._parse_finite_float(metadata.get(key))
+            if value is not None:
+                return value
+        return None
+
+    def _read_strict_metadata_values(
+        self, metadata: Dict[str, str], *keys: str
+    ) -> tuple[bool, Optional[list[float]]]:
+        present = False
+        parsed_values: list[float] = []
+        for key in keys:
+            if key not in metadata:
+                continue
+            present = True
+            parsed = self._parse_finite_float(metadata.get(key))
+            if parsed is None:
+                return True, None
+            parsed_values.append(parsed)
+        return present, parsed_values
 
     def _has_volume(self, candidate: ScoutCandidate, metadata: Dict[str, str]) -> bool:
         vol = getattr(candidate, "volume_24h_usd", None)
@@ -161,24 +207,118 @@ class StrategySimEngine:
             return False
 
     def _has_fees(self, candidate: ScoutCandidate, metadata: Dict[str, str]) -> bool:
-        return False
+        fees_present, fee_values = self._read_strict_metadata_values(
+            metadata, "fees_24h_usd", "fee_24h_usd", "fees_usd_24h"
+        )
+        if fees_present:
+            if fee_values is None:
+                return False
+            return any(v > 0 for v in fee_values)
 
-    def _has_utilization(self, metadata: Dict[str, str]) -> bool:
-        return False
+        apr_present, apr_values = self._read_strict_metadata_values(metadata, "fee_apr", "fees_apr")
+        if apr_present:
+            if apr_values is None:
+                return False
+            return any(v > 0 for v in apr_values)
 
-    def _has_supply_rate(self, metadata: Dict[str, str]) -> bool:
-        return False
+        apy_base = self._parse_finite_float(getattr(candidate, "apy_base", None))
+        return apy_base is not None and apy_base > 0
 
-    def _has_protocol_yield(self, metadata: Dict[str, str]) -> bool:
-        return False
+    def _has_utilization(self, candidate: ScoutCandidate, metadata: Dict[str, str]) -> bool:
+        present, values = self._read_strict_metadata_values(
+            metadata, "utilization", "utilization_ratio", "borrow_utilization"
+        )
+        if present:
+            if values is None:
+                return False
+            return all(0 <= v <= 1 for v in values)
 
-    def _has_staking_rate(self, metadata: Dict[str, str]) -> bool:
-        return False
+        supply = self._parse_finite_float(getattr(candidate, "total_supply_usd", None))
+        borrow = self._parse_finite_float(getattr(candidate, "total_borrow_usd", None))
+        if supply is None or borrow is None:
+            return False
+        if supply <= 0 or borrow < 0:
+            return False
+        return borrow <= supply
+
+    def _has_supply_rate(self, candidate: ScoutCandidate, metadata: Dict[str, str]) -> bool:
+        present, values = self._read_strict_metadata_values(
+            metadata, "supply_rate", "supply_apy", "lending_supply_apy"
+        )
+        if present:
+            if values is None:
+                return False
+            return any(v > 0 for v in values)
+
+        apy_base = self._parse_finite_float(getattr(candidate, "apy_base", None))
+        return apy_base is not None and apy_base > 0
+
+    def _has_protocol_yield(self, candidate: ScoutCandidate, metadata: Dict[str, str]) -> bool:
+        present, values = self._read_strict_metadata_values(
+            metadata, "protocol_yield", "protocol_yield_rate", "apy_base_7d"
+        )
+        if present:
+            if values is None:
+                return False
+            return any(v > 0 for v in values)
+
+        apy_base = self._parse_finite_float(getattr(candidate, "apy_base", None))
+        return apy_base is not None and apy_base > 0
+
+    def _has_staking_rate(self, candidate: ScoutCandidate, metadata: Dict[str, str]) -> bool:
+        present, values = self._read_strict_metadata_values(
+            metadata, "staking_rate", "staking_rewards", "reward_rate"
+        )
+        if present:
+            if values is None:
+                return False
+            return any(v > 0 for v in values)
+
+        apy_reward = self._parse_finite_float(getattr(candidate, "apy_reward", None))
+        return apy_reward is not None and apy_reward > 0
 
     def _has_price_range(self, metadata: Dict[str, str]) -> bool:
+        has_lower = "suggested_range_lower_tick" in metadata or "price_range_lower" in metadata
+        has_upper = "suggested_range_upper_tick" in metadata or "price_range_upper" in metadata
+        if has_lower or has_upper:
+            lower = self._metadata_value(metadata, "suggested_range_lower_tick", "price_range_lower")
+            upper = self._metadata_value(metadata, "suggested_range_upper_tick", "price_range_upper")
+            if lower is None or upper is None:
+                return False
+            return upper > lower
+
+        present, widths = self._read_strict_metadata_values(
+            metadata,
+            "price_range",
+            "range_width",
+            "range_width_pct",
+            "tick_range_half_width_pct",
+        )
+        if present:
+            if widths is None:
+                return False
+            return any(v > 0 for v in widths)
         return False
 
     def _has_volatility_proxy(self, metadata: Dict[str, str]) -> bool:
+        present, values = self._read_strict_metadata_values(
+            metadata,
+            "volatility_proxy",
+            "tick_daily_vol",
+            "tick_annual_vol",
+            "daily_vol",
+            "annual_vol",
+            "sigma",
+            "price_vol_7d",
+            "apy_sigma_30d",
+            "apy_pct_1d",
+            "apy_pct_7d",
+            "apy_pct_30d",
+        )
+        if present:
+            if values is None:
+                return False
+            return any(v > 0 for v in values)
         return False
 
     def _compute_fit_score(
@@ -280,6 +420,11 @@ class StrategySimEngine:
             if sim_status in (SimStatus.PARTIAL.value, SimStatus.UNSUPPORTED.value):
                 if meta.get("report_group") != "WATCHLIST":
                     meta["report_group"] = "WATCHLIST"
+                    reason_code = _SIM_POLICY_REASON_BY_STATUS.get(
+                        sim_status, "SIM_STATUS_UNSUPPORTED"
+                    )
+                    meta["watchlist_reason"] = reason_code
+                    meta["sim_policy_reason"] = reason_code
                     counters.downgraded_to_watchlist_count += 1
                 if sim_status == SimStatus.PARTIAL.value:
                     counters.watchlist_by_missing_data_count += 1
@@ -287,5 +432,7 @@ class StrategySimEngine:
             elif sim_status == SimStatus.OK.value and sim_risk > threshold:
                 if meta.get("report_group") != "WATCHLIST":
                     meta["report_group"] = "WATCHLIST"
+                    meta["watchlist_reason"] = _SIM_POLICY_REASON_RISK_ABOVE_PROFILE
+                    meta["sim_policy_reason"] = _SIM_POLICY_REASON_RISK_ABOVE_PROFILE
                     counters.downgraded_to_watchlist_count += 1
         return counters

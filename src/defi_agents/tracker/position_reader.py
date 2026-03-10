@@ -20,10 +20,23 @@ RequestFn = Callable[[str, dict[str, Any], float], Awaitable[dict[str, Any]]]
 PriceRequestFn = Callable[[list[str], float], Awaitable[dict[str, Any]]]
 
 ARBITRUM_CHAIN_NAME = "Arbitrum"
+ARBITRUM_COINGECKO_PLATFORM_ID = "arbitrum-one"
+BASE_CHAIN_NAME = "Base"
+BASE_COINGECKO_PLATFORM_ID = "base"
+OPTIMISM_CHAIN_NAME = "Optimism"
+OPTIMISM_COINGECKO_PLATFORM_ID = "optimism"
+HYPEEVM_CHAIN_NAME = "HypeEVM"
+HYPEEVM_COINGECKO_PLATFORM_ID = "hypeevm"
 UNISWAP_V3_POSITION_MANAGER_ARBITRUM = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
 UNISWAP_V3_FACTORY_ARBITRUM = "0x1F98431c8aD98523631AE4a59f267346ea31F984"
-COINGECKO_TOKEN_PRICE_URL = (
-    "https://api.coingecko.com/api/v3/simple/token_price/arbitrum-one"
+UNISWAP_V3_POSITION_MANAGER_BASE = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
+UNISWAP_V3_FACTORY_BASE = "0x33128a8fC17869897dcE68Ed026d694621f6FDfD"
+UNISWAP_V3_POSITION_MANAGER_OPTIMISM = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
+UNISWAP_V3_FACTORY_OPTIMISM = "0x1F98431c8aD98523631AE4a59f267346ea31F984"
+UNISWAP_V3_POSITION_MANAGER_HYPEEVM = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
+UNISWAP_V3_FACTORY_HYPEEVM = "0x1F98431c8aD98523631AE4a59f267346ea31F984"
+COINGECKO_TOKEN_PRICE_URL_TEMPLATE = (
+    "https://api.coingecko.com/api/v3/simple/token_price/{platform_id}"
 )
 
 # ABI selectors (keccak(function_signature)[:4])
@@ -56,15 +69,17 @@ class _RawPosition:
     tokens_owed_1: int
 
 
-class ArbitrumUniswapV3PositionReader:
-    """Direct-RPC reader for active Uniswap v3 NFT positions on Arbitrum."""
+class BaseUniswapV3PositionReader:
+    """Direct-RPC reader for active Uniswap v3 NFT positions (chain-parameterized)."""
 
     def __init__(
         self,
         *,
+        chain_name: str,
         rpc_url: str,
-        position_manager_address: str = UNISWAP_V3_POSITION_MANAGER_ARBITRUM,
-        factory_address: str = UNISWAP_V3_FACTORY_ARBITRUM,
+        coingecko_platform_id: str,
+        position_manager_address: str,
+        factory_address: str,
         timeout_seconds: float = 8.0,
         stale_after_seconds: int = 120,
         price_ttl_seconds: int = 60,
@@ -73,10 +88,21 @@ class ArbitrumUniswapV3PositionReader:
         baseline_provider: PositionEntryBaselineProvider | None = None,
         now_fn: Callable[[], float] | None = None,
     ) -> None:
+        chain = str(chain_name or "").strip()
+        if not chain:
+            raise ValueError("CHAIN_NAME_MISSING")
         rpc = (rpc_url or "").strip()
         if not rpc:
             raise ValueError("RPC_URL_MISSING")
+        coingecko = str(coingecko_platform_id or "").strip()
+        if not coingecko:
+            raise ValueError("COINGECKO_PLATFORM_ID_MISSING")
+        self.chain_name = chain
         self.rpc_url = rpc
+        self.coingecko_platform_id = coingecko
+        self._coingecko_token_price_url = COINGECKO_TOKEN_PRICE_URL_TEMPLATE.format(
+            platform_id=coingecko
+        )
         self.position_manager_address = self._normalize_address(
             position_manager_address
         )
@@ -156,7 +182,7 @@ class ArbitrumUniswapV3PositionReader:
 
             states.append(
                 PositionState(
-                    chain=ARBITRUM_CHAIN_NAME,
+                    chain=self.chain_name,
                     position_ref=position_ref,
                     current_tick=(
                         current_tick if current_tick is not None else raw.tick_lower
@@ -199,7 +225,7 @@ class ArbitrumUniswapV3PositionReader:
         unclaimed_fees_usd: float,
         valuation_reason_codes: list[str],
     ) -> dict[str, Any]:
-        lookup = self._baseline_provider.lookup(position_ref)
+        lookup = self._baseline_provider.lookup(position_ref, chain_name=self.chain_name)
         baseline = lookup.baseline
         if baseline is None:
             reason = str(lookup.reason_code or ENTRY_BASELINE_MISSING)
@@ -456,7 +482,7 @@ class ArbitrumUniswapV3PositionReader:
             for token in tokens:
                 try:
                     params = {"contract_addresses": token, "vs_currencies": "usd"}
-                    resp = await client.get(COINGECKO_TOKEN_PRICE_URL, params=params)
+                    resp = await client.get(self._coingecko_token_price_url, params=params)
                     resp.raise_for_status()
                     body = resp.json()
                     if isinstance(body, dict):
@@ -531,22 +557,34 @@ class ArbitrumUniswapV3PositionReader:
             if isinstance(response, dict):
                 return response
             raise PositionReaderError("RPC_INVALID_RESPONSE")
-        try:
-            async with httpx.AsyncClient(
-                timeout=self.timeout_seconds, http2=False
-            ) as client:
-                resp = await client.post(self.rpc_url, json=payload)
-                resp.raise_for_status()
-                body = resp.json()
-            if not isinstance(body, dict):
-                raise PositionReaderError("RPC_INVALID_JSON")
-            return body
-        except httpx.TimeoutException as exc:
-            raise PositionReaderError("RPC_TIMEOUT") from exc
-        except httpx.HTTPError as exc:
-            raise PositionReaderError("RPC_HTTP_ERROR") from exc
-        except ValueError as exc:
-            raise PositionReaderError("RPC_INVALID_JSON") from exc
+            
+        attempts = 3
+        last_exc: Exception | None = None
+        for attempt in range(attempts):
+            try:
+                async with httpx.AsyncClient(
+                    timeout=self.timeout_seconds, http2=False
+                ) as client:
+                    resp = await client.post(self.rpc_url, json=payload)
+                    resp.raise_for_status()
+                    body = resp.json()
+                if not isinstance(body, dict):
+                    raise PositionReaderError("RPC_INVALID_JSON")
+                return body
+            except (httpx.TimeoutException, httpx.HTTPError) as exc:
+                last_exc = exc
+                if attempt < attempts - 1:
+                    import asyncio
+                    await asyncio.sleep(1.0 * (attempt + 1))
+                continue
+            except ValueError as exc:
+                raise PositionReaderError("RPC_INVALID_JSON") from exc
+                
+        if isinstance(last_exc, httpx.TimeoutException):
+            raise PositionReaderError("RPC_TIMEOUT") from last_exc
+        if isinstance(last_exc, httpx.HTTPError):
+            raise PositionReaderError("RPC_HTTP_ERROR") from last_exc
+        raise PositionReaderError("RPC_UNEXPECTED_ERROR")
 
     @staticmethod
     def _normalize_address(value: str) -> str:
@@ -624,4 +662,140 @@ class ArbitrumUniswapV3PositionReader:
             + cls._encode_address_word(token0)
             + cls._encode_address_word(token1)
             + cls._encode_uint_word(fee)
+        )
+
+
+class ArbitrumUniswapV3PositionReader(BaseUniswapV3PositionReader):
+    """Direct-RPC reader for active Uniswap v3 NFT positions on Arbitrum."""
+
+    def __init__(
+        self,
+        *,
+        rpc_url: str,
+        position_manager_address: str = UNISWAP_V3_POSITION_MANAGER_ARBITRUM,
+        factory_address: str = UNISWAP_V3_FACTORY_ARBITRUM,
+        coingecko_platform_id: str = ARBITRUM_COINGECKO_PLATFORM_ID,
+        timeout_seconds: float = 8.0,
+        stale_after_seconds: int = 120,
+        price_ttl_seconds: int = 60,
+        request_fn: RequestFn | None = None,
+        price_request_fn: PriceRequestFn | None = None,
+        baseline_provider: PositionEntryBaselineProvider | None = None,
+        now_fn: Callable[[], float] | None = None,
+    ) -> None:
+        super().__init__(
+            chain_name=ARBITRUM_CHAIN_NAME,
+            rpc_url=rpc_url,
+            coingecko_platform_id=coingecko_platform_id,
+            position_manager_address=position_manager_address,
+            factory_address=factory_address,
+            timeout_seconds=timeout_seconds,
+            stale_after_seconds=stale_after_seconds,
+            price_ttl_seconds=price_ttl_seconds,
+            request_fn=request_fn,
+            price_request_fn=price_request_fn,
+            baseline_provider=baseline_provider,
+            now_fn=now_fn,
+        )
+
+
+class BaseUniswapV3ChainPositionReader(BaseUniswapV3PositionReader):
+    """Direct-RPC reader for active Uniswap v3 NFT positions on Base."""
+
+    def __init__(
+        self,
+        *,
+        rpc_url: str,
+        position_manager_address: str = UNISWAP_V3_POSITION_MANAGER_BASE,
+        factory_address: str = UNISWAP_V3_FACTORY_BASE,
+        coingecko_platform_id: str = BASE_COINGECKO_PLATFORM_ID,
+        timeout_seconds: float = 8.0,
+        stale_after_seconds: int = 120,
+        price_ttl_seconds: int = 60,
+        request_fn: RequestFn | None = None,
+        price_request_fn: PriceRequestFn | None = None,
+        baseline_provider: PositionEntryBaselineProvider | None = None,
+        now_fn: Callable[[], float] | None = None,
+    ) -> None:
+        super().__init__(
+            chain_name=BASE_CHAIN_NAME,
+            rpc_url=rpc_url,
+            coingecko_platform_id=coingecko_platform_id,
+            position_manager_address=position_manager_address,
+            factory_address=factory_address,
+            timeout_seconds=timeout_seconds,
+            stale_after_seconds=stale_after_seconds,
+            price_ttl_seconds=price_ttl_seconds,
+            request_fn=request_fn,
+            price_request_fn=price_request_fn,
+            baseline_provider=baseline_provider,
+            now_fn=now_fn,
+        )
+
+
+class OptimismUniswapV3PositionReader(BaseUniswapV3PositionReader):
+    """Direct-RPC reader for active Uniswap v3 NFT positions on Optimism."""
+
+    def __init__(
+        self,
+        *,
+        rpc_url: str,
+        position_manager_address: str = UNISWAP_V3_POSITION_MANAGER_OPTIMISM,
+        factory_address: str = UNISWAP_V3_FACTORY_OPTIMISM,
+        coingecko_platform_id: str = OPTIMISM_COINGECKO_PLATFORM_ID,
+        timeout_seconds: float = 8.0,
+        stale_after_seconds: int = 120,
+        price_ttl_seconds: int = 60,
+        request_fn: RequestFn | None = None,
+        price_request_fn: PriceRequestFn | None = None,
+        baseline_provider: PositionEntryBaselineProvider | None = None,
+        now_fn: Callable[[], float] | None = None,
+    ) -> None:
+        super().__init__(
+            chain_name=OPTIMISM_CHAIN_NAME,
+            rpc_url=rpc_url,
+            coingecko_platform_id=coingecko_platform_id,
+            position_manager_address=position_manager_address,
+            factory_address=factory_address,
+            timeout_seconds=timeout_seconds,
+            stale_after_seconds=stale_after_seconds,
+            price_ttl_seconds=price_ttl_seconds,
+            request_fn=request_fn,
+            price_request_fn=price_request_fn,
+            baseline_provider=baseline_provider,
+            now_fn=now_fn,
+        )
+
+
+class HypeEVMUniswapV3PositionReader(BaseUniswapV3PositionReader):
+    """Direct-RPC reader for active Uniswap v3 NFT positions on HypeEVM."""
+
+    def __init__(
+        self,
+        *,
+        rpc_url: str,
+        position_manager_address: str = UNISWAP_V3_POSITION_MANAGER_HYPEEVM,
+        factory_address: str = UNISWAP_V3_FACTORY_HYPEEVM,
+        coingecko_platform_id: str = HYPEEVM_COINGECKO_PLATFORM_ID,
+        timeout_seconds: float = 8.0,
+        stale_after_seconds: int = 120,
+        price_ttl_seconds: int = 60,
+        request_fn: RequestFn | None = None,
+        price_request_fn: PriceRequestFn | None = None,
+        baseline_provider: PositionEntryBaselineProvider | None = None,
+        now_fn: Callable[[], float] | None = None,
+    ) -> None:
+        super().__init__(
+            chain_name=HYPEEVM_CHAIN_NAME,
+            rpc_url=rpc_url,
+            coingecko_platform_id=coingecko_platform_id,
+            position_manager_address=position_manager_address,
+            factory_address=factory_address,
+            timeout_seconds=timeout_seconds,
+            stale_after_seconds=stale_after_seconds,
+            price_ttl_seconds=price_ttl_seconds,
+            request_fn=request_fn,
+            price_request_fn=price_request_fn,
+            baseline_provider=baseline_provider,
+            now_fn=now_fn,
         )

@@ -1,0 +1,46 @@
+{
+  "source": {
+    "unit": "defi-sentinel.service",
+    "window": "48 hours ago",
+    "from_file": "docs/reports/artifacts/lp_entry_shadow_runtime_2026-03-04_post_plan030.log"
+  },
+  "thresholds": {
+    "telemetry_min_cycles": 24,
+    "max_insufficient_history_ratio": 0.35,
+    "max_topn_churn_avg": 0.45,
+    "max_topn_churn_p95": 0.75
+  },
+  "snapshot": {
+    "cycles_with_entry_telemetry": 0,
+    "entry_total_sum": 0,
+    "actionable_ratio": 0.0,
+    "watchlist_ratio": 0.0,
+    "insufficient_history_ratio": 0.0,
+    "topn_churn_avg": 0.0,
+    "topn_churn_p95": 0.0,
+    "entry_input_total_sum": 0,
+    "entry_lp_eligible_total_sum": 0,
+    "entry_lp_ineligible_total_sum": 0,
+    "entry_range_ready_total_sum": 0,
+    "entry_range_missing_total_sum": 0,
+    "watchlist_reason_counts": {},
+    "tick_density_readiness_blocker_counts": {},
+    "telemetry_parse_errors": 0,
+    "runtime_error_lines": 40,
+    "total_errors": 40
+  },
+  "gate_checks": {
+    "errors_zero_pass": false,
+    "telemetry_min_cycles_pass": false,
+    "actionable_ratio_positive_pass": false,
+    "insufficient_history_ratio_pass": true,
+    "topn_churn_avg_pass": true,
+    "topn_churn_p95_pass": true,
+    "all_pass": false
+  },
+  "actionable_enablement": {
+    "actionable_ratio": 0.0,
+    "actionable_ratio_positive_pass": false,
+    "top_watchlist_reasons": []
+  }
+}

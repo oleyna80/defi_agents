@@ -79,6 +79,8 @@ class TelegramNotifier:
         self,
         include_tags: bool = False,
         top_n_per_section: int = 0,
+        show_opportunity_sections: bool = True,
+        show_lp_entry_watchlist: bool = True,
         show_source_confidence: bool = True,
         show_market_signals: bool = False,
         chat_id_env: str | None = None,
@@ -93,6 +95,8 @@ class TelegramNotifier:
         self.top_n_per_section = (
             int(top_n_per_section) if isinstance(top_n_per_section, int) else 0
         )
+        self.show_opportunity_sections = bool(show_opportunity_sections)
+        self.show_lp_entry_watchlist = bool(show_lp_entry_watchlist)
         self.show_source_confidence = show_source_confidence
         self.show_market_signals = show_market_signals
         self.message_prefix = (message_prefix or "").strip()
@@ -288,27 +292,28 @@ class TelegramNotifier:
         if not (directional_snapshot and directional_snapshot.has_any()):
             self._append_lending_snapshot(lines, lending_snapshot)
             self._append_turnover_snapshot(lines, turnover_snapshot)
-        results = [item for item in results if self._is_allowed_candidate(item)]
-        sections = [
-            (PriorityTier.LOW_VOLATILITY, "1) Stable/Stable"),
-            (PriorityTier.COIN_STABLE, "2) Token/Stable"),
-            (PriorityTier.COIN_COIN, "3) Token/Token"),
-        ]
-        for priority, title in sections:
-            section_results = [r for r in results if r.priority == priority]
-            if not section_results:
-                continue
-            section_results = sorted(
-                section_results,
-                key=lambda r: (r.candidate.apy or 0.0, r.candidate.tvl_usd or 0.0),
-                reverse=True,
-            )
-            if isinstance(self.top_n_per_section, int) and self.top_n_per_section > 0:
-                section_results = section_results[: self.top_n_per_section]
-            lines.append(f"*{title}*")
-            for r in section_results:
-                lines.append(self._format_opportunity_line(r))
-            lines.append("")
+        if self.show_opportunity_sections:
+            results = [item for item in results if self._is_allowed_candidate(item)]
+            sections = [
+                (PriorityTier.LOW_VOLATILITY, "1) Stable/Stable"),
+                (PriorityTier.COIN_STABLE, "2) Token/Stable"),
+                (PriorityTier.COIN_COIN, "3) Token/Token"),
+            ]
+            for priority, title in sections:
+                section_results = [r for r in results if r.priority == priority]
+                if not section_results:
+                    continue
+                section_results = sorted(
+                    section_results,
+                    key=lambda r: (r.candidate.apy or 0.0, r.candidate.tvl_usd or 0.0),
+                    reverse=True,
+                )
+                if isinstance(self.top_n_per_section, int) and self.top_n_per_section > 0:
+                    section_results = section_results[: self.top_n_per_section]
+                lines.append(f"*{title}*")
+                for r in section_results:
+                    lines.append(self._format_opportunity_line(r))
+                lines.append("")
         return "\n".join(lines)
 
     def _format_report_blocks(
@@ -359,11 +364,14 @@ class TelegramNotifier:
             if turnover_lines:
                 sections.append(turnover_lines)
 
-        sections.extend(
-            self._format_opportunity_section_lines(results, max_len=max_len)
-        )
+        if self.show_opportunity_sections:
+            sections.extend(
+                self._format_opportunity_section_lines(results, max_len=max_len)
+            )
 
         if not sections:
+            if not self.show_opportunity_sections:
+                return []
             return ["\n".join(header).strip()]
 
         blocks: List[str] = []
@@ -443,12 +451,20 @@ class TelegramNotifier:
             lines.append("- Actionable:")
             for item in actionable:
                 lines.append(self._format_entry_recommendation_line(item))
-        if watchlist:
+        if self.show_lp_entry_watchlist and watchlist:
             lines.append("- Watchlist:")
             for item in watchlist:
                 lines.append(self._format_entry_recommendation_line(item))
         lines.append("")
-        return [lines]
+
+        selector_lines: List[str] = ["*LP Entry — Network/Protocol/Range Selector*", "- Top-N comparison:"]
+        for item in actionable:
+            selector_lines.append(self._format_entry_selector_line(item))
+        if not actionable:
+            selector_lines.append("  - no actionable selector matches (WATCHLIST-only cycle)")
+        selector_lines.append("")
+
+        return [lines, selector_lines]
 
     def _format_entry_recommendation_line(self, item: EntryRecommendation) -> str:
         range_part = "Range: n/a"
@@ -465,6 +481,23 @@ class TelegramNotifier:
         return (
             f"  - `{item.chain}` `{item.pair}` | `{item.project}` | {fee_part} | "
             f"{range_part} | Conf `{item.confidence.value}` | Rank {item.rank_v1:.4f}{reason_part}"
+        )
+
+    def _format_entry_selector_line(self, item: EntryRecommendation) -> str:
+        range_repr = "n/a"
+        if (
+            item.suggested_range_lower_tick is not None
+            and item.suggested_range_upper_tick is not None
+        ):
+            range_repr = (
+                f"[{item.suggested_range_lower_tick},{item.suggested_range_upper_tick}]"
+            )
+        fee_part = f"{item.fee_tier}bps" if item.fee_tier is not None else "n/a"
+        return (
+            f"  - `{item.chain}`/`{item.project}` | Pair `{item.pair}` | Range `{range_repr}` "
+            f"({item.range_mode}/{item.market_regime}) | fee `{fee_part}` | "
+            f"comp={item.in_range_liquidity_competition:.4f} vol_fee={item.volume_fee_proxy:.4f} "
+            f"cost={item.cost_penalty:.4f} conf={item.confidence_score:.4f} | rank_v1={item.rank_v1:.4f}"
         )
 
     def _format_opportunity_section_lines(

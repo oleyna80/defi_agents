@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Literal
 from typing import List, Optional, Dict
@@ -8,6 +9,9 @@ from typing import List, Optional, Dict
 from pydantic import BaseModel, Field, model_validator
 
 from ..config import CONFIDENCE_PASS, CONFIDENCE_REJECT, CONFIDENCE_WARN
+
+
+_LP_ENTRY_PAIR_SPLIT_RE = re.compile(r"[\s/_-]+")
 
 
 class ReportingConfig(BaseModel):
@@ -25,6 +29,8 @@ class ReportingConfig(BaseModel):
     telegram_digest_interval_seconds: int = Field(default=0, ge=0)
     telegram_report_mode: Literal["delta", "snapshot"] = "delta"
     telegram_top_n_per_section: int = Field(default=0, ge=0)
+    telegram_opportunity_sections_enabled: bool = True
+    telegram_lp_entry_watchlist_enabled: bool = True
     telegram_turnover_section_enabled: bool = False
     telegram_turnover_top_n: int = Field(default=10, ge=0)
     telegram_turnover_min_tvl_usd: float = Field(default=100_000.0, ge=0.0)
@@ -323,6 +329,34 @@ class ExecutionPolicyConfig(BaseModel):
     kill_switch: bool = False
 
 
+class ExecutionUniswapV3ChainConfig(BaseModel):
+    factory_proxy: str = ""
+    position_manager_proxy: str = ""
+
+    @property
+    def is_complete(self) -> bool:
+        return bool(
+            str(self.factory_proxy).strip()
+            and str(self.position_manager_proxy).strip()
+        )
+
+
+class ExecutionChainConfig(BaseModel):
+    rpc_url: str = ""
+    coingecko_platform_id: str = ""
+    uniswap_v3: ExecutionUniswapV3ChainConfig = Field(
+        default_factory=ExecutionUniswapV3ChainConfig
+    )
+
+    @property
+    def is_active(self) -> bool:
+        return bool(
+            str(self.rpc_url).strip()
+            and str(self.coingecko_platform_id).strip()
+            and self.uniswap_v3.is_complete
+        )
+
+
 class ExecutionConfig(BaseModel):
     enabled: bool = False
     mode: Literal["PAPER", "SHADOW", "LIVE"] = "PAPER"
@@ -378,6 +412,7 @@ class ExecutionConfig(BaseModel):
     native_live_timeout_seconds: float = Field(default=12.0, ge=1.0)
     native_live_receipt_timeout_seconds: float = Field(default=45.0, ge=0.0)
     native_live_receipt_poll_seconds: float = Field(default=1.5, ge=0.1)
+    chains: Dict[str, ExecutionChainConfig] = Field(default_factory=dict)
     policy: ExecutionPolicyConfig = Field(default_factory=ExecutionPolicyConfig)
 
     @model_validator(mode="after")
@@ -397,6 +432,26 @@ class ExecutionConfig(BaseModel):
             raise ValueError(
                 "execution.primary_adapter=v3utils_live requires execution.v3utils_enabled=true"
             )
+
+        active_chains: Dict[str, ExecutionChainConfig] = {}
+        import logging as _logging
+
+        execution_logger = _logging.getLogger(__name__)
+        for chain_name, chain_cfg in dict(self.chains).items():
+            normalized_chain_name = str(chain_name).strip()
+            if not normalized_chain_name:
+                execution_logger.warning(
+                    "Execution chain excluded: reason=EXECUTION_CHAIN_NAME_MISSING"
+                )
+                continue
+            if chain_cfg.is_active:
+                active_chains[normalized_chain_name] = chain_cfg
+                continue
+            execution_logger.warning(
+                "Execution chain excluded: chain=%s reason=EXECUTION_CHAIN_CONFIG_INCOMPLETE",
+                normalized_chain_name,
+            )
+        self.chains = active_chains
         return self
 
 
@@ -600,6 +655,64 @@ class LpEntryCalibrationConfig(BaseModel):
         return self
 
 
+class LpEntryTargetingConfig(BaseModel):
+    """Config-driven LP Entry target scope filter (pre-recommendation)."""
+
+    enabled: bool = False
+    target_pair: str = ""
+    target_pairs: List[str] = Field(default_factory=list)
+    range_mode: Literal["SYMMETRIC", "ASYMMETRIC", "AUTO"] = "AUTO"
+    market_regime: Literal["SIDEWAYS", "UPTREND", "DOWNTREND"] = "SIDEWAYS"
+    range_lower: int | None = None
+    range_upper: int | None = None
+    allowed_chains: List[str] = Field(default_factory=list)
+    allowed_projects: List[str] = Field(default_factory=list)
+    top_n: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def _validate_targeting(self) -> "LpEntryTargetingConfig":
+        normalized_target_pair = _normalize_target_pair_for_config(self.target_pair)
+        if self.target_pair and not normalized_target_pair:
+            raise ValueError(
+                "lp_entry_targeting.target_pair must be a valid pair like ETH/USDT or WETH-USDT"
+            )
+        normalized_target_pairs = [
+            _normalize_target_pair_for_config(pair) for pair in self.target_pairs
+        ]
+        if any(not pair for pair in normalized_target_pairs):
+            raise ValueError(
+                "lp_entry_targeting.target_pairs must contain valid pairs like ETH/USDT or WETH-USDT"
+            )
+
+        if self.enabled and not (normalized_target_pair or normalized_target_pairs):
+            raise ValueError(
+                "lp_entry_targeting.enabled=true requires valid lp_entry_targeting.target_pair or lp_entry_targeting.target_pairs"
+            )
+
+        if any(not str(chain).strip() for chain in self.allowed_chains):
+            raise ValueError("lp_entry_targeting.allowed_chains must not contain empty values")
+
+        if any(not str(project).strip() for project in self.allowed_projects):
+            raise ValueError(
+                "lp_entry_targeting.allowed_projects must not contain empty values"
+            )
+
+        if (self.range_lower is None) != (self.range_upper is None):
+            raise ValueError(
+                "lp_entry_targeting.range_lower and range_upper must be provided together"
+            )
+
+        if (
+            self.range_lower is not None
+            and self.range_upper is not None
+            and int(self.range_lower) >= int(self.range_upper)
+        ):
+            raise ValueError(
+                "lp_entry_targeting.range_lower must be < lp_entry_targeting.range_upper"
+            )
+        return self
+
+
 class ScoutConfig(BaseModel):
     min_tvl_usd: float = Field(default=1_000_000, ge=100_000)
     min_apy: float = 0.0
@@ -624,6 +737,9 @@ class ScoutConfig(BaseModel):
     execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
     hedger: HedgerConfig = Field(default_factory=HedgerConfig)
     strategy_sim: StrategySimConfig = Field(default_factory=StrategySimConfig)
+    lp_entry_targeting: LpEntryTargetingConfig = Field(
+        default_factory=LpEntryTargetingConfig
+    )
     lp_entry_calibration: LpEntryCalibrationConfig = Field(
         default_factory=LpEntryCalibrationConfig
     )
@@ -701,3 +817,20 @@ class ScoutConfig(BaseModel):
         if "scout_settings" in data:
             data = data["scout_settings"]
         return cls(**data)
+
+
+def _normalize_target_pair_for_config(raw_pair: object) -> str:
+    if not isinstance(raw_pair, str):
+        return ""
+    parts = [
+        part for part in _LP_ENTRY_PAIR_SPLIT_RE.split(raw_pair.strip().upper()) if part
+    ]
+    # Target scope accepts only canonical two-token pairs.
+    if len(parts) != 2:
+        return ""
+    left = "ETH" if parts[0] == "WETH" else parts[0]
+    right = "ETH" if parts[1] == "WETH" else parts[1]
+    if not left or not right or left == right:
+        return ""
+    ordered = sorted((left, right))
+    return f"{ordered[0]}/{ordered[1]}"

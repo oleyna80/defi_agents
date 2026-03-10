@@ -25,7 +25,11 @@ def test_parse_entry_stability_telemetry_line_normal() -> None:
         "entry_watchlist=2 entry_watchlist_insufficient_history=1 entry_topn_churn=0.2500 "
         "entry_input_total=7 entry_lp_eligible_total=5 entry_lp_ineligible_total=2 "
         "entry_range_ready_total=4 entry_range_missing_total=1 "
-        "watchlist_reason_counts=INVALID_OR_MISSING_RANGE:1,TICK_DATA_DEGRADED:1"
+        "entry_target_scope_enabled=1 entry_target_input_total=5 "
+        "entry_target_matched_total=3 entry_target_excluded_total=2 "
+        "entry_target_reason=NONE "
+        "watchlist_reason_counts=INVALID_OR_MISSING_RANGE:1,TICK_DATA_DEGRADED:1 "
+        "watchlist_blocker_reason_counts=TICK_PROVIDER_RUNTIME_ERROR:1"
     )
     point = parse_entry_stability_telemetry_line(line)
     assert point is not None
@@ -39,9 +43,17 @@ def test_parse_entry_stability_telemetry_line_normal() -> None:
     assert point.entry_lp_ineligible_total == 2
     assert point.entry_range_ready_total == 4
     assert point.entry_range_missing_total == 1
+    assert point.entry_target_scope_enabled == 1
+    assert point.entry_target_input_total == 5
+    assert point.entry_target_matched_total == 3
+    assert point.entry_target_excluded_total == 2
+    assert point.entry_target_reason == "NONE"
     assert point.watchlist_reason_counts == {
         "INVALID_OR_MISSING_RANGE": 1,
         "TICK_DATA_DEGRADED": 1,
+    }
+    assert point.watchlist_blocker_reason_counts == {
+        "TICK_PROVIDER_RUNTIME_ERROR": 1,
     }
 
 
@@ -61,7 +73,7 @@ def test_parse_tick_density_readiness_telemetry_line_normal() -> None:
     parsed = parse_tick_density_readiness_telemetry_line(line)
     assert parsed == {
         "GRAPH_API_KEY_MISSING": 5,
-        "PROVIDER_INIT_SUBGRAPH_ERROR": 2,
+        "TICK_PROVIDER_INIT_ERROR": 2,
     }
 
 
@@ -72,20 +84,31 @@ def test_summarize_entry_shadow_calibration_normal_and_malformed() -> None:
             "entry_watchlist=2 entry_watchlist_insufficient_history=1 entry_topn_churn=0.1000 "
             "entry_input_total=7 entry_lp_eligible_total=5 entry_lp_ineligible_total=2 "
             "entry_range_ready_total=4 entry_range_missing_total=1 "
-            "watchlist_reason_counts=INVALID_OR_MISSING_RANGE:2"
+            "entry_target_scope_enabled=1 entry_target_input_total=5 "
+            "entry_target_matched_total=4 entry_target_excluded_total=1 "
+            "entry_target_reason=NONE "
+            "watchlist_reason_counts=INVALID_OR_MISSING_RANGE:2 "
+            "watchlist_blocker_reason_counts=PROVIDER_UNAVAILABLE_SUBGRAPH_TIMEOUT:1"
         ),
         (
             "2026-03-03 INFO LP entry stability telemetry: entry_total=4 entry_actionable=2 "
             "entry_watchlist=2 entry_watchlist_insufficient_history=0 entry_topn_churn=0.4000 "
             "entry_input_total=6 entry_lp_eligible_total=4 entry_lp_ineligible_total=2 "
             "entry_range_ready_total=3 entry_range_missing_total=1 "
-            "watchlist_reason_counts=TICK_DATA_DEGRADED:1,INVALID_OR_MISSING_RANGE:1"
+            "entry_target_scope_enabled=1 entry_target_input_total=4 "
+            "entry_target_matched_total=2 entry_target_excluded_total=2 "
+            "entry_target_reason=TARGET_SCOPE_EMPTY "
+            "watchlist_reason_counts=TICK_DATA_DEGRADED:1,INVALID_OR_MISSING_RANGE:1 "
+            "watchlist_blocker_reason_counts=RPC_UNAVAILABLE:1,TICK_PROVIDER_RUNTIME_ERROR:1"
         ),
         (
             "2026-03-03 INFO LP entry stability telemetry: entry_total=6 entry_actionable=3 "
             "entry_watchlist=3 entry_watchlist_insufficient_history=2 entry_topn_churn=0.7000 "
             "entry_input_total=8 entry_lp_eligible_total=6 entry_lp_ineligible_total=2 "
-            "entry_range_ready_total=4 entry_range_missing_total=2"
+            "entry_range_ready_total=4 entry_range_missing_total=2 "
+            "entry_target_scope_enabled=0 entry_target_input_total=6 "
+            "entry_target_matched_total=6 entry_target_excluded_total=0 "
+            "entry_target_reason=NONE"
         ),
         (
             "2026-03-03 INFO Tick density readiness telemetry: "
@@ -110,13 +133,30 @@ def test_summarize_entry_shadow_calibration_normal_and_malformed() -> None:
     assert snapshot.entry_lp_ineligible_total_sum == 6
     assert snapshot.entry_range_ready_total_sum == 11
     assert snapshot.entry_range_missing_total_sum == 4
+    assert snapshot.entry_target_scope_enabled_cycles == 2
+    assert snapshot.entry_target_input_total_sum == 15
+    assert snapshot.entry_target_matched_total_sum == 12
+    assert snapshot.entry_target_excluded_total_sum == 3
+    assert (
+        snapshot.entry_target_input_total_sum
+        == snapshot.entry_target_matched_total_sum
+        + snapshot.entry_target_excluded_total_sum
+    )
+    assert snapshot.entry_target_reason_counts == {
+        "NONE": 2,
+        "TARGET_SCOPE_EMPTY": 1,
+    }
     assert snapshot.watchlist_reason_counts == {
         "INVALID_OR_MISSING_RANGE": 3,
         "TICK_DATA_DEGRADED": 1,
     }
+    assert snapshot.watchlist_blocker_reason_counts == {
+        "RPC_TICK_UNAVAILABLE": 1,
+        "TICK_PROVIDER_RUNTIME_ERROR": 2,
+    }
     assert snapshot.tick_density_readiness_blocker_counts == {
         "GRAPH_API_KEY_MISSING": 6,
-        "PROVIDER_INIT_VALUEERROR": 1,
+        "TICK_PROVIDER_INIT_ERROR": 1,
     }
     assert snapshot.telemetry_parse_errors == 1
     assert snapshot.runtime_error_lines == 1
@@ -142,7 +182,18 @@ def test_summarize_entry_shadow_calibration_no_data() -> None:
     assert snapshot.entry_lp_ineligible_total_sum == 0
     assert snapshot.entry_range_ready_total_sum == 0
     assert snapshot.entry_range_missing_total_sum == 0
+    assert snapshot.entry_target_scope_enabled_cycles == 0
+    assert snapshot.entry_target_input_total_sum == 0
+    assert snapshot.entry_target_matched_total_sum == 0
+    assert snapshot.entry_target_excluded_total_sum == 0
+    assert (
+        snapshot.entry_target_input_total_sum
+        == snapshot.entry_target_matched_total_sum
+        + snapshot.entry_target_excluded_total_sum
+    )
+    assert snapshot.entry_target_reason_counts == {}
     assert snapshot.watchlist_reason_counts == {}
+    assert snapshot.watchlist_blocker_reason_counts == {}
     assert snapshot.tick_density_readiness_blocker_counts == {}
     assert snapshot.telemetry_parse_errors == 0
     assert snapshot.runtime_error_lines == 0
@@ -254,3 +305,15 @@ def test_evaluate_shadow_calibration_gates_fails_when_actionable_ratio_zero() ->
     assert gates["telemetry_min_cycles_pass"] is True
     assert gates["actionable_ratio_positive_pass"] is False
     assert gates["all_pass"] is False
+
+
+def test_parse_tick_density_readiness_telemetry_line_rpc_unavailable_normalized() -> None:
+    line = (
+        "Tick density readiness telemetry: "
+        "blocker_counts=RPC_UNAVAILABLE:2,PROVIDER_UNAVAILABLE_SUBGRAPH_TIMEOUT:1"
+    )
+    parsed = parse_tick_density_readiness_telemetry_line(line)
+    assert parsed == {
+        "RPC_TICK_UNAVAILABLE": 2,
+        "TICK_PROVIDER_RUNTIME_ERROR": 1,
+    }

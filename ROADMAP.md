@@ -9,6 +9,7 @@
 ## 🎯 Product Focus (актуализация)
 - Мы **не** фокусируемся на поиске “чужих готовых пулов” как конечной цели.
 - Основной режим: выбирать, **где и с какими активами создавать свои пулы** (сеть + протокол + пара), и управлять ими через мониторинг/ребаланс.
+- Приоритетный операторский сценарий v1 (2026-03-08): для заданных `pair + range` (симметричный/асимметричный, включая `AUTO` по режиму рынка) выбирать `network + protocol` с минимальной in-range конкурирующей ликвидностью при приемлемом риске и издержках.
 - На **первом этапе** работаем только с ограниченной вселенной активов:
   - топовые токены: `BTC`, `ETH` (и их ликвидные эквиваленты),
   - стейблкоины: топ‑ликвидные USD/fiat-pegged stable assets.
@@ -175,7 +176,7 @@
 
 ---
 
-## 🟥 Phase 2.7.5: LP Entry Recommendation Engine (Новый приоритет: Critical, NEXT)
+## 🟥 Phase 2.7.5: LP Entry Recommendation Engine (Новый приоритет: Critical, CLOSED)
 *Цель: из текущего Scout/Tick-Density пайплайна получать детерминированную рекомендацию для входа в позицию: `сеть + протокол + пара + диапазон`.*
 
 - **Spec baseline:** `docs/specs/lp-decision-engine-v1.md` (APPROVED)
@@ -201,22 +202,95 @@
   - Для degraded tick/freshness данных рекомендации помечаются как WATCHLIST (без false-actionable).
   - Тесты на ранжирование/диапазон/fail-safe проходят стабильно.
 
-- [x] **Phase 2.7.6 (P1): Stability + Shadow Calibration**
+- [x] **Phase 2.7.6 (P1, CLOSED): Stability + Shadow Calibration**
   - [x] Ввести history/stability gate для actionable (`>=3 observations / 6h`).
   - [x] Добавить telemetry метрики churn/stability для Top-N.
   - [x] Выполнить controlled calibration `rank_v1`/confidence thresholds на SHADOW evidence.
     - 2026-03-03 window-24 evidence (`docs/reports/lp-entry-shadow-calibration-2026-03-03.md`): `all_pass=true` (`cycles_with_entry_telemetry=24`, `errors_zero_pass=true`), решение `KEEP` (без retune) как evidence-backed no-op.
   - [x] Закрыть через `docs/plans/028-lp-entry-shadow-evidence-calibration-roo-task.md` (evidence gate + controlled retune).
 
-- [ ] **Phase 2.7.7 (P1, IN PROGRESS): Actionable Enablement**
+- [x] **Phase 2.7.7 (P1, CLOSED): Actionable Enablement**
   - [x] Добавлен детерминированный reason-level telemetry контракт для `WATCHLIST` (`watchlist_reason_counts`) в cycle-level LP entry telemetry.
   - [x] Формализованы и выведены в evidence data-readiness блокеры tick-density (`GRAPH_API_KEY_MISSING`, provider/subgraph init/schema blockers).
   - [x] Расширен calibration tooling: gate `actionable_ratio_positive_pass` + top-3 watchlist reasons при `actionable_ratio == 0`.
   - [x] Выпущен отчёт `docs/reports/lp-entry-actionable-enablement-2026-03-03.md` с before/after snapshot и blocker section.
   - [x] Реализован root-cause slice Plan 030 в runtime/tests: LP-only eligibility pre-filter перед `build_entry_recommendations(...)`, machine-code taxonomy для ineligible/range-path (`NON_LP_YIELD_TYPE`, `UNSUPPORTED_ENTRY_VENUE`, `MISSING_POOL_REFERENCE`, `RANGE_NOT_COMPUTED`, `INVALID_OR_MISSING_RANGE`), coverage counters `entry_input_total/entry_lp_eligible_total/entry_lp_ineligible_total/entry_range_ready_total/entry_range_missing_total`.
     - Реализация: `main.py`, `src/defi_agents/lp/entry_recommendation.py`, `src/defi_agents/lp/shadow_calibration.py`, тесты/репорт синхронизированы.
-  - [ ] Закрыть фазу после устойчивого SHADOW-окна с ненулевым `actionable_ratio` или после evidence-backed reversible tune итерации (макс 1-2 параметра за итерацию).
-  - Трек ведётся через `docs/plans/029-lp-entry-actionable-enablement-roo-task.md` и `docs/plans/030-lp-entry-lp-scope-range-coverage-roo-task.md`.
+  - [x] Проведён post-Plan030 diagnostic SHADOW evidence (2026-03-04): при валидном runtime окне (`cycles_with_entry_telemetry=4`) зафиксировано `actionable_ratio=0.0` при `entry_lp_eligible_total_sum=26`, `entry_range_ready_total_sum=23` и доминации `REPORT_GROUP_WATCHLIST` в LP-eligible subset; зафиксирован следующий root-cause track через Plan 031.
+  - [x] Реализован Plan 031 (StrategySim decoupling + deterministic sim policy reasons):
+    - LP entry builder теперь использует seed-поля `lp_entry_seed_report_group`/`lp_entry_seed_watchlist_reason` (pre-StrategySim snapshot), поэтому generic StrategySim downgrade (`PARTIAL/UNSUPPORTED/risk`) больше не подавляет LP-eligible/range-ready actionable path структурно.
+    - В `strategy_sim.apply_policy(...)` добавлены machine-readable причины downgrade без free-text: `SIM_STATUS_PARTIAL`, `SIM_STATUS_UNSUPPORTED`, `SIM_RISK_ABOVE_PROFILE` (в `watchlist_reason` + `sim_policy_reason`).
+    - LP fail-safe контракт сохранён без ослабления (`degraded/stale/diverged/invalid-range/insufficient-history` -> `WATCHLIST`).
+    - Post-fix SHADOW evidence: `docs/reports/artifacts/lp_entry_shadow_calibration_post_plan031_mockai_2026-03-04.json` => `actionable_ratio_positive_pass=true`, `errors_zero_pass=true`.
+  - [x] Выполнить long-window closeout после Plan 031 через `docs/plans/032-lp-entry-phase277-shadow-closeout-roo-task.md`:
+    - sustained SHADOW window (`>=24` cycles) + повторная проверка gate-метрик,
+    - optional reversible tune только при необходимости (max 1-2 knobs),
+    - финальное решение `KEEP/ADJUST/ROLLBACK` и формальное закрытие Phase 2.7.7.
+    - 2026-03-04 closeout evidence (`docs/reports/artifacts/lp_entry_shadow_calibration_phase277_closeout_mockai_2026-03-04.json`): `cycles_with_entry_telemetry=24`, `errors_zero_pass=true`, `actionable_ratio_positive_pass=true`, churn gates pass (`topn_churn_avg=0.0605`, `topn_churn_p95=0.375`), decision `KEEP` (no tune required).
+  - [x] Закрыть фазу после устойчивого SHADOW-окна с ненулевым `actionable_ratio` или после evidence-backed reversible tune итерации (макс 1-2 параметра за итерацию).
+  - Трек ведётся через `docs/plans/029-lp-entry-actionable-enablement-roo-task.md`, `docs/plans/030-lp-entry-lp-scope-range-coverage-roo-task.md`, `docs/plans/031-lp-entry-strategysim-decoupling-roo-task.md`, `docs/plans/032-lp-entry-phase277-shadow-closeout-roo-task.md`.
+
+- [x] **Phase 2.7.8 (P1, CLOSED): ETH/USDT Targeted Cross-Network Selector (SHADOW)**
+  - Цель: дать оператору целевой режим поиска `network + protocol + range` для пары `ETH/USDT` (с нормализацией `WETH-USDT`) в рамках поддерживаемых venue.
+  - План исполнения: `docs/plans/033-lp-entry-eth-usdt-target-scope-roo-task.md`.
+  - Scope:
+    - Config-driven target scope (`pair/chains/projects/top_n`) без ломки текущего LP Entry report path.
+    - Сравнение внутри target scope по нескольким сетям и поддерживаемым протоколам (`uniswap-v3`, `aerodrome-slipstream`).
+    - Deterministic telemetry counters для target filtering и empty-target случаев.
+  - 2026-03-04 (Plan 033): реализованы `lp_entry_targeting` schema/config validation, pair-normalization для target matching (`ETH/USDT` ↔ `WETH-USDT`) без изменения display symbols, pre-build target filtering перед `build_entry_recommendations(...)`, target-scope telemetry counters (`entry_target_scope_enabled`, `entry_target_input_total`, `entry_target_matched_total`, `entry_target_excluded_total`) и marker `entry_target_reason=TARGET_SCOPE_EMPTY`; regression coverage и обязательные проверки пройдены.
+  - Инварианты:
+    - Fail-safe contract сохраняется (`degraded/stale/diverged/invalid-range` не становятся actionable).
+    - Нет LIVE/infra/secrets изменений, только WSL/repo scope.
+
+- [ ] **Phase 2.7.9 (P0, NEXT): Cross-Protocol Range Competition Selector**
+  - Цель: по входу оператора `pair + range` (симметричный/асимметричный) выбирать лучшую точку входа `network + protocol` на основе конкуренции ликвидности в целевом диапазоне и ожидаемого fee-potential.
+  - План исполнения: `docs/plans/036-cross-protocol-range-competition-selector-v1-plan.md`.
+  - Scope:
+    - Входной контракт: `target_pair`, `range_mode=SYMMETRIC|ASYMMETRIC|AUTO`, `market_regime=SIDEWAYS|UPTREND|DOWNTREND`, optional manual `range_lower/range_upper`, allowlist `chains/projects`.
+    - Cross-venue сравнение в рамках поддерживаемых CLMM по сети: `uniswap-v3`, `aerodrome-slipstream`, `sushiswap-v3` (и аналогичные venue в зависимости от сети).
+    - Ранжирование `network x protocol x pair x range` по детерминированному score (`in_range_liquidity_competition`, volume/fee proxy, gas/cost sanity).
+    - Явный вывод причин и confidence: почему выбран этот протокол/сеть, почему альтернативы ниже в рейтинге.
+  - Инварианты:
+    - Fail-safe не ослабляется: degraded/stale/diverged/invalid-range не переходят в actionable.
+    - Нет auto-execution; только decision-grade recommendation layer.
+  - DoD:
+    - Для `ETH/USDT` в SHADOW выдаётся Top-N по нескольким сетям и протоколам с machine-readable метриками конкуренции.
+    - В отчёте есть отдельный блок сравнения `network/protocol/range` с объяснимым ранжированием.
+    - Тесты на математику score/ranking/tie-break и fail-safe деградацию проходят стабильно.
+  - 2026-03-09 (Plan 036 Stage-4 closeout, repo-local SHADOW evidence):
+    - добавлены артефакты startup/runtime/evidence:
+      - `docs/reports/artifacts/plan036_stage4_startup_check_2026-03-09.txt`
+      - `docs/reports/artifacts/plan036_stage4_shadow_runtime_2026-03-09T16-10-16Z.log`
+      - `docs/reports/artifacts/plan036_stage4_shadow_runtime_mockfallback_multicycle_2026-03-09T16-27-16Z.log`
+      - `docs/reports/artifacts/plan036_stage4_shadow_evidence_2026-03-09.json`
+    - selector evidence snapshot: `cycles_with_selector_telemetry=3`,
+      `entry_selector_input_total_sum=42`, `entry_selector_matched_total_sum=42`,
+      `entry_selector_actionable_total_sum=7`, `entry_selector_watchlist_total_sum=35`,
+      `entry_selector_actionable_ratio=0.1667`;
+    - dominant watchlist/blocker reasons:
+      `NON_LP_YIELD_TYPE`, `INSUFFICIENT_STABILITY_HISTORY`, `UNSUPPORTED_ENTRY_VENUE`,
+      blocker `SUBGRAPH_SCHEMA_UNSUPPORTED`;
+    - top-N stability/churn snapshot: values `[0.0, 1.0, 0.25]`, `topn_churn_avg=0.4167`, `topn_churn_p95=1.0000`;
+    - verdict: `ADJUST` (short-window churn instability + runtime/env drift on strict startup without `DEEPSEEK_API_KEY`; fail-safe contract unchanged, decision logic unchanged).
+  - 2026-03-09 (Plan 036 Stage-5 closeout, repo-local SHADOW evidence):
+    - устранён startup drift для базового SHADOW run без command-scoped fallback:
+      в `main.py` добавлен SHADOW-only startup path для AI provider при `DEEPSEEK_API_KEY` missing,
+      без изменения selector/ranking decision logic и без ослабления fail-safe контракта;
+      runtime теперь пишет machine-readable marker:
+      `AI startup path: provider=... reason=MOCK_FALLBACK_SHADOW_DEEPSEEK_API_KEY_MISSING shadow_mode=1 allow_mock_fallback=0`.
+    - Stage-5 артефакты:
+      - `docs/reports/artifacts/plan036_stage5_startup_check_2026-03-09.txt`
+      - `docs/reports/artifacts/plan036_stage5_shadow_runtime_2026-03-09T19-21-40Z.log`
+      - `docs/reports/artifacts/plan036_stage5_shadow_evidence_2026-03-09.json`
+      - `docs/reports/plan036-stage5-closeout-shadow-2026-03-09.md`
+    - sustained evidence: `24` successful SHADOW cycles (`rc=0` each), selector telemetry present на каждом цикле;
+      snapshot totals: `entry_selector_input_total_sum=360`, `entry_selector_matched_total_sum=360`,
+      `entry_selector_actionable_total_sum=117`, `entry_selector_watchlist_total_sum=243`,
+      `entry_selector_actionable_ratio=0.3250`.
+    - top-N stability/churn: `entry_topn_churn_avg=0.0354`, `entry_topn_churn_p95=0.2000`;
+      gate checks: `all_pass=true`.
+    - verdict: `KEEP` (evidence>=24 cycles, стабильные selector counters/reasons/churn,
+      базовый SHADOW evidence run не требует command-scoped fallback).
 
 ---
 
@@ -312,12 +386,13 @@
     - минимум 3 реальные позиции с отклонением расчёта `P&L < 1%` от ручной проверки,
     - стабильная работа reader path в SHADOW без runtime failures.
 
-- **Gate-3 evidence status (2026-03-02):** `FAIL` (insufficient evidence in repo-local artifacts)
-    - в текущем evidence pack нет подтверждённых `>=3` реальных позиций с заполненным `pnl_vs_hodl`;
-    - нет подтверждения SHADOW-критерия из runbook (`reader_ok >= 90` в 48h окне);
-    - reader-only fail-closed контракт подтверждён, но этого недостаточно для PASS Gate-3.
+- **Gate-3 evidence status (2026-03-07):** `FAIL` (insufficient evidence based on actual VPS 48h SHADOW run)
+    - **Blocker 1**: `VALIDATED_POSITIONS_BELOW_MIN_THRESHOLD` - в текущем evidence pack найдена только 1 реальная позиция с заполненным `pnl_vs_hodl` (требуется >=3).
+    - **Blocker 2**: `READER_OK_BELOW_THRESHOLD` - нет подтверждения `reader_ok_count >= 90` в 48h окне.
+    - **Blocker 3**: Ошибки в логах: зафиксировано 3 ошибки `Traceback|CRITICAL` и 7 случаев `POSITION_READER_ALL_CHAINS_FAILED`.
+    - Необходимые действия: устранить критические ошибки в ридере, обеспечить стабильную работу без ALL_CHAINS_FAILED на протяжении 48h, добавить как минимум 2 дополнительные позиции в baseline.
 
-DoD: Gate-3 canary и любой `LIVE` execution остаются заблокированными до закрытия Phase 3.0.
+DoD: Gate-3 canary и любой `LIVE` execution остаются заблокированными до устранения blockers и закрытия Phase 3.0.
 
 ### Phase 3.1 — Strategy Calibration + Forward Simulation (P1)
 *Калибровка параметров и stress-test на текущем state (не классический бэктест — ликвидность нестационарна).*

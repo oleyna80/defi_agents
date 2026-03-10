@@ -28,4 +28,11 @@
 - 028-lp-entry-shadow-evidence-calibration-roo-task.md
 - 029-lp-entry-actionable-enablement-roo-task.md
 - 030-lp-entry-lp-scope-range-coverage-roo-task.md
+- 031-lp-entry-strategysim-decoupling-roo-task.md
+- 032-lp-entry-phase277-shadow-closeout-roo-task.md
+- 033-lp-entry-eth-usdt-target-scope-roo-task.md
+- 034-multi-chain-reader-plan.md
+- 034-phase301-multichain-position-reader-roo-task.md
+- 035-gate3-pass-enablement-evidence-sufficiency.md
+- 036-cross-protocol-range-competition-selector-v1-plan.md
 - (add plans here)

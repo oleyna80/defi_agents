@@ -4,10 +4,10 @@ After=network.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=%h/projects/defi_agents
-EnvironmentFile=%h/projects/defi_agents/.env
-Environment=PYTHONPATH=%h/projects/defi_agents/src
-ExecStart=%h/projects/defi_agents/.venv/bin/python %h/projects/defi_agents/main.py
+WorkingDirectory=/home/dmitrii/projects/defi_agents
+EnvironmentFile=/home/dmitrii/projects/defi_agents/.env
+Environment=PYTHONPATH=/home/dmitrii/projects/defi_agents/src
+ExecStart=/home/dmitrii/projects/defi_agents/.venv/bin/python /home/dmitrii/projects/defi_agents/main.py
 TimeoutStartSec=300
 
 [Install]

@@ -2,6 +2,29 @@
 
 ## Architecture Decisions
 - YYYY-MM-DD: <Decision> - <Rationale>
+- 2026-03-04: LP Entry target scope is a config-driven pre-build filter over LP-eligible candidates with canonical pair matching and explicit empty-target marker:
+  - runtime applies target scope before `build_entry_recommendations(...)` using `lp_entry_targeting` (`target_pair`, `allowed_chains`, `allowed_projects`, optional `top_n`),
+  - pair matching uses normalization only for filtering (`ETH/USDT` ↔ `WETH-USDT`), while displayed symbols remain unchanged,
+  - telemetry emits deterministic target counters (`entry_target_scope_enabled`, `entry_target_input_total`, `entry_target_matched_total`, `entry_target_excluded_total`) and machine-readable `entry_target_reason=TARGET_SCOPE_EMPTY` when no matches.
+  Rationale: enable operator-targeted cross-network/cross-venue LP search without widening runtime blast radius or weakening existing fail-safe downgrade invariants.
+
+- 2026-03-04: LP Entry target scope filtering and telemetry accounting are full-scope and pair-strict:
+  - pair normalization/validation accepts only deterministic two-token symbols (e.g., `ETH/USDT`, `WETH-USDT`), rejecting ambiguous `3+` token symbols,
+  - when target scope is enabled, runtime applies matching consistently to both LP-eligible and LP-ineligible recommendation paths, preventing non-target watchlist leakage into target reports,
+  - target counters are computed over full recommendation input (`eligible + ineligible`) so `matched + excluded = input` per cycle.
+  Rationale: avoid subtle recommendation/report drift and counter-math inconsistencies in target mode under partial/degraded market universes.
+
+- 2026-03-04: LP Entry actionability must be seeded before StrategySim policy and evaluated from seed state (not mutable post-sim `report_group`):
+  - runtime writes pre-sim seed fields (`lp_entry_seed_report_group`, `lp_entry_seed_watchlist_reason`) immediately before StrategySim policy,
+  - LP entry builder consumes seed fields first, so generic sim policy downgrades do not structurally suppress LP-eligible/range-ready actionability,
+  - fail-safe LP gates remain authoritative (`TICK_DATA_DEGRADED`, `SOURCE_CONFIDENCE_*`, `FRESHNESS_STALE`, range/stability gates).
+  Rationale: keep StrategySim observability/guardrails intact while decoupling LP entry decision contract from generic sim limitations (`PARTIAL/UNSUPPORTED`).
+
+- 2026-03-04: StrategySim policy downgrade reasons are machine-readable reason-codes only:
+  - `strategy_sim.apply_policy(...)` writes deterministic reason codes for downgrade events (`SIM_STATUS_PARTIAL`, `SIM_STATUS_UNSUPPORTED`, `SIM_RISK_ABOVE_PROFILE`) into metadata (`watchlist_reason`, `sim_policy_reason`),
+  - free-text downgrade reasons are not used on this path.
+  Rationale: stable telemetry taxonomy for LP/actionable evidence, deterministic aggregation, and operator-safe runbook interpretation.
+
 - 2026-03-03: LP Entry actionable contract must be LP-scoped before ranking, not applied to the whole report shortlist:
   - `EntryRecommendation` input should be explicitly filtered to LP-eligible candidates (`yield_type=lp_fees` + range/tick-capable venue path),
   - telemetry must expose coverage chain `input -> lp-eligible -> range-ready` to localize where actionable candidates are lost,
@@ -479,6 +502,18 @@
   - `deploy/vps/preflight.sh` enforces strict mode with a POSIX-safe regex check for
     `ALLOW_MOCK_FALLBACK=true` and hard-fails deployment.
   - Rationale: avoid accidental mock operation in production.
+
+- 2026-03-09: Startup AI fallback policy tightening for SHADOW runtime:
+  - Startup fallback with reason `MOCK_FALLBACK_SHADOW_DEEPSEEK_API_KEY_MISSING`
+    is allowed only when runtime mode is `config.execution.mode == "SHADOW"`.
+  - `reporting.telegram_shadow_mode_enabled` is notification/report routing only and
+    must not relax startup provider policy.
+  - Explicit env override remains supported: `ALLOW_MOCK_FALLBACK=true` keeps dev
+    mock fallback path in any mode.
+  - Outside SHADOW with `ALLOW_MOCK_FALLBACK=false` and missing `DEEPSEEK_API_KEY`,
+    startup remains fail-closed with `Production AI Init Failure`.
+  - Rationale: enforce deterministic startup safety boundaries by execution runtime
+    mode, not by reporting flags.
 
 - 2026-02-03: Single-scheduler runtime policy:
   - When VPS timer is primary runtime, GitHub workflow trigger remains manual-only (`workflow_dispatch`);

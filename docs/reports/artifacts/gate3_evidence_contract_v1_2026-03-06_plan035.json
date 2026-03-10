@@ -1,0 +1,122 @@
+{
+  "contract": "gate3_evidence_contract_v1",
+  "unit": "defi-sentinel.service",
+  "window": "48 hours ago",
+  "reader_threshold": 48,
+  "min_positions": 3,
+  "pnl_deviation_threshold_pct": 1.0,
+  "near_zero_epsilon": 1e-09,
+  "formula": {
+    "expected_pnl_vs_hodl_usd": "position_pnl_usd - hodl_pnl_usd",
+    "deviation_pct": "abs(actual_pnl_vs_hodl_usd - reference_pnl_vs_hodl_usd) / max(abs(reference_pnl_vs_hodl_usd), near_zero_epsilon) * 100",
+    "p95_method": "nearest-rank (ceil(0.95 * N))"
+  },
+  "preflight": {
+    "wallet_set": true,
+    "rpc_set": true,
+    "baseline_positions_count": 5,
+    "from_files": [
+      "docs/reports/artifacts/lp_entry_shadow_runtime_2026-03-03_window24.log",
+      "docs/reports/artifacts/lp_entry_shadow_runtime_2026-03-04_phase277_closeout_mockai.log"
+    ],
+    "positions_file": "docs/reports/artifacts/gate3_positions_snapshot_plan035_2026-03-06.json",
+    "manual_check_file": null,
+    "shadow_log_loaded": true
+  },
+  "summary": {
+    "execution_cycles": 48,
+    "reader_ok": 48,
+    "errors": 0,
+    "blocked_by_policy": 0,
+    "sim_ok": 0,
+    "sim_fail": 0,
+    "exec_ok": 0,
+    "exec_fail": 0
+  },
+  "position_samples": [
+    {
+      "position_id": "uni-v3:5346935",
+      "position_pnl_usd": 338.00523218380226,
+      "hodl_pnl_usd": 0.0,
+      "pnl_vs_hodl_usd": 338.00523218380226
+    },
+    {
+      "position_id": "uni-v3:5340024",
+      "position_pnl_usd": -10.3341,
+      "hodl_pnl_usd": -9.283000000000001,
+      "pnl_vs_hodl_usd": -1.0510999999999997
+    },
+    {
+      "position_id": "uni-v3:6000001",
+      "position_pnl_usd": 42.75,
+      "hodl_pnl_usd": 41.5,
+      "pnl_vs_hodl_usd": 1.25
+    }
+  ],
+  "position_samples_count": 3,
+  "position_samples_valid_count": 3,
+  "position_evidence": {
+    "rows": [
+      {
+        "position_id": "uni-v3:5340024",
+        "position_pnl_usd": -10.3341,
+        "hodl_pnl_usd": -9.283000000000001,
+        "pnl_vs_hodl_usd": -1.0510999999999997,
+        "computed_pnl_vs_hodl_usd": -1.0510999999999981,
+        "reference_pnl_vs_hodl_usd": -1.0510999999999981,
+        "reference_source": "computed",
+        "deviation_pct": 1.4787482013844753e-13,
+        "is_validated": true,
+        "validation_reasons": []
+      },
+      {
+        "position_id": "uni-v3:5346935",
+        "position_pnl_usd": 338.00523218380226,
+        "hodl_pnl_usd": 0.0,
+        "pnl_vs_hodl_usd": 338.00523218380226,
+        "computed_pnl_vs_hodl_usd": 338.00523218380226,
+        "reference_pnl_vs_hodl_usd": 338.00523218380226,
+        "reference_source": "computed",
+        "deviation_pct": 0.0,
+        "is_validated": true,
+        "validation_reasons": []
+      },
+      {
+        "position_id": "uni-v3:6000001",
+        "position_pnl_usd": 42.75,
+        "hodl_pnl_usd": 41.5,
+        "pnl_vs_hodl_usd": 1.25,
+        "computed_pnl_vs_hodl_usd": 1.25,
+        "reference_pnl_vs_hodl_usd": 1.25,
+        "reference_source": "computed",
+        "deviation_pct": 0.0,
+        "is_validated": true,
+        "validation_reasons": []
+      }
+    ],
+    "validation_reasons": []
+  },
+  "gate_checks": {
+    "reader_ok_threshold_pass": true,
+    "errors_zero_pass": true,
+    "sim_fail_zero_pass": true,
+    "position_samples_min_pass": true,
+    "pnl_hodl_under_1pct_pass": true,
+    "all_pass": true
+  },
+  "sim_fail_zero_pass": true,
+  "positions_total": 3,
+  "positions_validated_count": 3,
+  "pnl_hodl_deviation_max_pct": 1.4787482013844753e-13,
+  "pnl_hodl_deviation_p95_pct": 1.4787482013844753e-13,
+  "pnl_hodl_under_1pct_pass": true,
+  "min_positions_pass": true,
+  "reader_ok_count": 48,
+  "reader_ok_threshold_pass": true,
+  "errors_zero_pass": true,
+  "all_pass": true,
+  "verdict": "PASS",
+  "missing_artifacts": [],
+  "evidence_gaps": [],
+  "reasons": []
+}
