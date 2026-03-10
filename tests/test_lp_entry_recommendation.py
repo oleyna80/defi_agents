@@ -21,6 +21,7 @@ from defi_agents.lp.entry_recommendation import (
     filter_lp_entry_target_scope,
     is_lp_entry_target_scope_match,
     normalize_pair_for_target_matching,
+    normalize_target_pairs_for_matching,
     normalize_watchlist_reason,
     split_lp_entry_eligibility,
     summarize_watchlist_blocker_reason_counts,
@@ -968,6 +969,13 @@ def test_target_pair_normalization_matches_eth_usdt_and_weth_usdt() -> None:
     assert normalize_pair_for_target_matching("ETH") == ""
 
 
+def test_target_pairs_normalization_merges_single_and_list() -> None:
+    assert normalize_target_pairs_for_matching(
+        target_pair="ETH/USDT",
+        target_pairs=["WETH-USDC", "ETH-USDE", "bad-pair-format-1-2-3"],
+    ) == {"ETH/USDT", "ETH/USDC", "ETH/USDE"}
+
+
 def test_filter_lp_entry_target_scope_applies_pair_chain_and_project_allowlists() -> None:
     base_meta = {
         "report_group": "ACTIONABLE",
@@ -1017,6 +1025,45 @@ def test_filter_lp_entry_target_scope_applies_pair_chain_and_project_allowlists(
         allowed_projects=["uniswap-v3"],
     )
     assert [item.candidate.pool_id for item in matched] == ["pool-target-ok"]
+
+
+def test_filter_lp_entry_target_scope_accepts_multiple_target_pairs() -> None:
+    target_usdt = _result(
+        chain="Base",
+        project="Uniswap V3",
+        symbol="WETH-USDT",
+        pool_id="pool-target-usdt",
+        score=6.0,
+        metadata={"report_group": "ACTIONABLE"},
+    )
+    target_usdc = _result(
+        chain="Base",
+        project="Uniswap V3",
+        symbol="ETH-USDC",
+        pool_id="pool-target-usdc",
+        score=5.0,
+        metadata={"report_group": "ACTIONABLE"},
+    )
+    non_target = _result(
+        chain="Base",
+        project="Uniswap V3",
+        symbol="ETH-DAI",
+        pool_id="pool-non-target",
+        score=4.0,
+        metadata={"report_group": "ACTIONABLE"},
+    )
+
+    matched = filter_lp_entry_target_scope(
+        [target_usdt, target_usdc, non_target],
+        target_pair="",
+        target_pairs=["ETH/USDT", "ETH-USDC"],
+        allowed_chains=[],
+        allowed_projects=[],
+    )
+    assert [item.candidate.pool_id for item in matched] == [
+        "pool-target-usdt",
+        "pool-target-usdc",
+    ]
 
 
 def test_filter_lp_entry_target_scope_with_empty_constraints_is_pair_only() -> None:

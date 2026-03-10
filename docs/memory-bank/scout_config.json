@@ -474,15 +474,22 @@
     },
     "lp_entry_targeting": {
       "enabled": true,
-      "target_pair": "ETH/USDT",
+      "target_pair": "",
+      "target_pairs": [
+        "ETH/USDT",
+        "ETH/USDC",
+        "ETH/USDS",
+        "ETH/USDE",
+        "ETH/DAI",
+        "ETH/PYUSD",
+        "ETH/USDG",
+        "ETH/RLUSD"
+      ],
       "range_mode": "AUTO",
       "market_regime": "SIDEWAYS",
       "range_lower": null,
       "range_upper": null,
-      "allowed_chains": [
-        "Base",
-        "Arbitrum"
-      ],
+      "allowed_chains": [],
       "allowed_projects": [
         "uniswap-v3",
         "aerodrome-slipstream",

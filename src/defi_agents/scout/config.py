@@ -660,6 +660,7 @@ class LpEntryTargetingConfig(BaseModel):
 
     enabled: bool = False
     target_pair: str = ""
+    target_pairs: List[str] = Field(default_factory=list)
     range_mode: Literal["SYMMETRIC", "ASYMMETRIC", "AUTO"] = "AUTO"
     market_regime: Literal["SIDEWAYS", "UPTREND", "DOWNTREND"] = "SIDEWAYS"
     range_lower: int | None = None
@@ -671,14 +672,21 @@ class LpEntryTargetingConfig(BaseModel):
     @model_validator(mode="after")
     def _validate_targeting(self) -> "LpEntryTargetingConfig":
         normalized_target_pair = _normalize_target_pair_for_config(self.target_pair)
-        if self.enabled and not normalized_target_pair:
-            raise ValueError(
-                "lp_entry_targeting.enabled=true requires valid lp_entry_targeting.target_pair"
-            )
-
         if self.target_pair and not normalized_target_pair:
             raise ValueError(
                 "lp_entry_targeting.target_pair must be a valid pair like ETH/USDT or WETH-USDT"
+            )
+        normalized_target_pairs = [
+            _normalize_target_pair_for_config(pair) for pair in self.target_pairs
+        ]
+        if any(not pair for pair in normalized_target_pairs):
+            raise ValueError(
+                "lp_entry_targeting.target_pairs must contain valid pairs like ETH/USDT or WETH-USDT"
+            )
+
+        if self.enabled and not (normalized_target_pair or normalized_target_pairs):
+            raise ValueError(
+                "lp_entry_targeting.enabled=true requires valid lp_entry_targeting.target_pair or lp_entry_targeting.target_pairs"
             )
 
         if any(not str(chain).strip() for chain in self.allowed_chains):

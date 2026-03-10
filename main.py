@@ -39,7 +39,7 @@ from defi_agents.lp.entry_recommendation import (
     build_entry_recommendations,
     filter_lp_entry_target_scope,
     is_lp_entry_target_scope_match,
-    normalize_pair_for_target_matching,
+    normalize_target_pairs_for_matching,
     split_lp_entry_eligibility,
     summarize_watchlist_blocker_reason_counts,
     summarize_watchlist_reason_counts,
@@ -1492,8 +1492,9 @@ async def run_sentinel_cycle() -> None:
         if lp_entry_target_cfg.enabled and (
             lp_entry_eligible_results or lp_entry_ineligible
         ):
-            normalized_target_pair = normalize_pair_for_target_matching(
-                lp_entry_target_cfg.target_pair
+            normalized_target_pairs = normalize_target_pairs_for_matching(
+                target_pair=lp_entry_target_cfg.target_pair,
+                target_pairs=lp_entry_target_cfg.target_pairs,
             )
             normalized_target_chains = {
                 str(chain).strip().lower()
@@ -1508,6 +1509,7 @@ async def run_sentinel_cycle() -> None:
             lp_entry_eligible_results = filter_lp_entry_target_scope(
                 lp_entry_eligible_results,
                 target_pair=lp_entry_target_cfg.target_pair,
+                target_pairs=lp_entry_target_cfg.target_pairs,
                 allowed_chains=lp_entry_target_cfg.allowed_chains,
                 allowed_projects=lp_entry_target_cfg.allowed_projects,
             )
@@ -1516,7 +1518,7 @@ async def run_sentinel_cycle() -> None:
                 for item, reason in lp_entry_ineligible
                 if is_lp_entry_target_scope_match(
                     item,
-                    normalized_target_pair=normalized_target_pair,
+                    normalized_target_pairs=normalized_target_pairs,
                     normalized_chains=normalized_target_chains,
                     normalized_projects=normalized_target_projects,
                 )

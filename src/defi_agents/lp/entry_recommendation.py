@@ -70,14 +70,35 @@ def normalize_pair_for_target_matching(raw_pair: object) -> str:
     return f"{ordered[0]}/{ordered[1]}"
 
 
+def normalize_target_pairs_for_matching(
+    *,
+    target_pair: str = "",
+    target_pairs: Sequence[str] | None = None,
+) -> set[str]:
+    normalized_pairs: set[str] = set()
+    normalized_single_pair = normalize_pair_for_target_matching(target_pair)
+    if normalized_single_pair:
+        normalized_pairs.add(normalized_single_pair)
+
+    for raw_pair in target_pairs or []:
+        normalized_pair = normalize_pair_for_target_matching(raw_pair)
+        if normalized_pair:
+            normalized_pairs.add(normalized_pair)
+    return normalized_pairs
+
+
 def filter_lp_entry_target_scope(
     results: Sequence[ScoutResult],
     *,
-    target_pair: str,
+    target_pair: str = "",
+    target_pairs: Sequence[str] | None = None,
     allowed_chains: Sequence[str] | None,
     allowed_projects: Sequence[str] | None,
 ) -> list[ScoutResult]:
-    normalized_target_pair = normalize_pair_for_target_matching(target_pair)
+    normalized_target_pairs = normalize_target_pairs_for_matching(
+        target_pair=target_pair,
+        target_pairs=target_pairs,
+    )
     normalized_chains = {
         str(chain).strip().lower()
         for chain in (allowed_chains or [])
@@ -93,7 +114,7 @@ def filter_lp_entry_target_scope(
     for result in results:
         if not is_lp_entry_target_scope_match(
             result,
-            normalized_target_pair=normalized_target_pair,
+            normalized_target_pairs=normalized_target_pairs,
             normalized_chains=normalized_chains,
             normalized_projects=normalized_projects,
         ):
@@ -105,12 +126,16 @@ def filter_lp_entry_target_scope(
 def is_lp_entry_target_scope_match(
     result: ScoutResult,
     *,
-    normalized_target_pair: str,
+    normalized_target_pair: str = "",
+    normalized_target_pairs: set[str] | None = None,
     normalized_chains: set[str],
     normalized_projects: set[str],
 ) -> bool:
     candidate_pair = normalize_pair_for_target_matching(result.candidate.symbol)
-    if normalized_target_pair and candidate_pair != normalized_target_pair:
+    effective_target_pairs = set(normalized_target_pairs or ())
+    if normalized_target_pair:
+        effective_target_pairs.add(normalized_target_pair)
+    if effective_target_pairs and candidate_pair not in effective_target_pairs:
         return False
     if (
         normalized_chains
