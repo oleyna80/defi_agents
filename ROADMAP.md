@@ -257,6 +257,40 @@
     - Для `ETH/USDT` в SHADOW выдаётся Top-N по нескольким сетям и протоколам с machine-readable метриками конкуренции.
     - В отчёте есть отдельный блок сравнения `network/protocol/range` с объяснимым ранжированием.
     - Тесты на математику score/ranking/tie-break и fail-safe деградацию проходят стабильно.
+  - 2026-03-09 (Plan 036 Stage-4 closeout, repo-local SHADOW evidence):
+    - добавлены артефакты startup/runtime/evidence:
+      - `docs/reports/artifacts/plan036_stage4_startup_check_2026-03-09.txt`
+      - `docs/reports/artifacts/plan036_stage4_shadow_runtime_2026-03-09T16-10-16Z.log`
+      - `docs/reports/artifacts/plan036_stage4_shadow_runtime_mockfallback_multicycle_2026-03-09T16-27-16Z.log`
+      - `docs/reports/artifacts/plan036_stage4_shadow_evidence_2026-03-09.json`
+    - selector evidence snapshot: `cycles_with_selector_telemetry=3`,
+      `entry_selector_input_total_sum=42`, `entry_selector_matched_total_sum=42`,
+      `entry_selector_actionable_total_sum=7`, `entry_selector_watchlist_total_sum=35`,
+      `entry_selector_actionable_ratio=0.1667`;
+    - dominant watchlist/blocker reasons:
+      `NON_LP_YIELD_TYPE`, `INSUFFICIENT_STABILITY_HISTORY`, `UNSUPPORTED_ENTRY_VENUE`,
+      blocker `SUBGRAPH_SCHEMA_UNSUPPORTED`;
+    - top-N stability/churn snapshot: values `[0.0, 1.0, 0.25]`, `topn_churn_avg=0.4167`, `topn_churn_p95=1.0000`;
+    - verdict: `ADJUST` (short-window churn instability + runtime/env drift on strict startup without `DEEPSEEK_API_KEY`; fail-safe contract unchanged, decision logic unchanged).
+  - 2026-03-09 (Plan 036 Stage-5 closeout, repo-local SHADOW evidence):
+    - устранён startup drift для базового SHADOW run без command-scoped fallback:
+      в `main.py` добавлен SHADOW-only startup path для AI provider при `DEEPSEEK_API_KEY` missing,
+      без изменения selector/ranking decision logic и без ослабления fail-safe контракта;
+      runtime теперь пишет machine-readable marker:
+      `AI startup path: provider=... reason=MOCK_FALLBACK_SHADOW_DEEPSEEK_API_KEY_MISSING shadow_mode=1 allow_mock_fallback=0`.
+    - Stage-5 артефакты:
+      - `docs/reports/artifacts/plan036_stage5_startup_check_2026-03-09.txt`
+      - `docs/reports/artifacts/plan036_stage5_shadow_runtime_2026-03-09T19-21-40Z.log`
+      - `docs/reports/artifacts/plan036_stage5_shadow_evidence_2026-03-09.json`
+      - `docs/reports/plan036-stage5-closeout-shadow-2026-03-09.md`
+    - sustained evidence: `24` successful SHADOW cycles (`rc=0` each), selector telemetry present на каждом цикле;
+      snapshot totals: `entry_selector_input_total_sum=360`, `entry_selector_matched_total_sum=360`,
+      `entry_selector_actionable_total_sum=117`, `entry_selector_watchlist_total_sum=243`,
+      `entry_selector_actionable_ratio=0.3250`.
+    - top-N stability/churn: `entry_topn_churn_avg=0.0354`, `entry_topn_churn_p95=0.2000`;
+      gate checks: `all_pass=true`.
+    - verdict: `KEEP` (evidence>=24 cycles, стабильные selector counters/reasons/churn,
+      базовый SHADOW evidence run не требует command-scoped fallback).
 
 ---
 

@@ -9,6 +9,7 @@
       "telegram_report_mode": "snapshot",
       "telegram_top_n_per_section": 10,
       "telegram_opportunity_sections_enabled": false,
+      "telegram_lp_entry_watchlist_enabled": false,
       "telegram_turnover_section_enabled": false,
       "telegram_turnover_top_n": 10,
       "telegram_turnover_min_tvl_usd": 100000,
@@ -472,8 +473,8 @@
       "min_data_completeness_pct": 80.0
     },
     "lp_entry_targeting": {
-      "enabled": false,
-      "target_pair": "WETH-USDT",
+      "enabled": true,
+      "target_pair": "ETH/USDT",
       "range_mode": "AUTO",
       "market_regime": "SIDEWAYS",
       "range_lower": null,

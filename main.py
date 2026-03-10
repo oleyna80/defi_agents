@@ -90,6 +90,13 @@ _TICK_PROVIDER_BLOCKER_SUSHISWAP_V3_UNAVAILABLE = (
     "SUSHISWAP_V3_PROVIDER_UNAVAILABLE"
 )
 
+_AI_STARTUP_REASON_PRIMARY_DEEPSEEK_READY = "PRIMARY_DEEPSEEK_READY"
+_AI_STARTUP_REASON_MOCK_ENV_FALLBACK = "MOCK_FALLBACK_ENV_ALLOW_MOCK_FALLBACK"
+_AI_STARTUP_REASON_MOCK_SHADOW_NO_DEEPSEEK_KEY = (
+    "MOCK_FALLBACK_SHADOW_DEEPSEEK_API_KEY_MISSING"
+)
+_AI_STARTUP_REASON_DEEPSEEK_INIT_FAILED = "DEEPSEEK_INIT_FAILED_FALLBACK_DISABLED"
+
 
 def _format_reason_counts_for_log(counts: Mapping[str, int] | None) -> str:
     if not counts:
@@ -147,6 +154,56 @@ def _load_env_file(path: str = ".env") -> None:
             value = value.strip()
             if key and value and key not in os.environ:
                 os.environ[key] = value
+
+
+def _is_shadow_startup_mode(config: ScoutConfig) -> bool:
+    execution_mode = str(getattr(getattr(config, "execution", None), "mode", "")).upper()
+    # Startup fallback policy is intentionally bound to runtime execution mode only.
+    # Reporting/notification shadow flags must not relax provider init behavior.
+    return execution_mode == "SHADOW"
+
+
+def _build_l3_provider(config: ScoutConfig):  # noqa: ANN201
+    shadow_mode = _is_shadow_startup_mode(config)
+    allow_mock_fallback = bool(should_allow_mock_fallback())
+    startup_reason = _AI_STARTUP_REASON_PRIMARY_DEEPSEEK_READY
+
+    try:
+        provider = DeepSeekProvider()
+        logger.info("DeepSeek provider initialized.")
+    except Exception as exc:  # noqa: BLE001
+        exc_message = str(exc or "")
+        if allow_mock_fallback:
+            logger.warning(
+                "AI init failed: %s. Falling back to MockAI (dev mode).", exc
+            )
+            provider = MockAIService()
+            startup_reason = _AI_STARTUP_REASON_MOCK_ENV_FALLBACK
+        elif shadow_mode and "DEEPSEEK_API_KEY is not set" in exc_message:
+            logger.warning(
+                "AI init degraded in SHADOW mode: missing DEEPSEEK_API_KEY; using MockAI startup path."
+            )
+            provider = MockAIService()
+            startup_reason = _AI_STARTUP_REASON_MOCK_SHADOW_NO_DEEPSEEK_KEY
+        else:
+            logger.critical("AI init failed and fallback disabled. Stopping startup.")
+            logger.info(
+                "AI startup path: provider=none reason=%s shadow_mode=%s allow_mock_fallback=%s error_class=%s",
+                _AI_STARTUP_REASON_DEEPSEEK_INIT_FAILED,
+                int(shadow_mode),
+                int(allow_mock_fallback),
+                exc.__class__.__name__,
+            )
+            raise RuntimeError("Production AI Init Failure") from exc
+
+    logger.info(
+        "AI startup path: provider=%s reason=%s shadow_mode=%s allow_mock_fallback=%s",
+        str(getattr(provider, "provider_name", "unknown") or "unknown"),
+        startup_reason,
+        int(shadow_mode),
+        int(allow_mock_fallback),
+    )
+    return provider
 
 
 def _is_excluded_by_l3(tag) -> bool:  # noqa: ANN001
@@ -618,24 +675,16 @@ async def run_sentinel_cycle() -> None:
     scout = YieldScout(config, client, auditor)
     turnover_snapshot = None
     directional_snapshot = None
-    try:
-        provider = DeepSeekProvider()
-        logger.info("DeepSeek provider initialized.")
-    except Exception as exc:  # noqa: BLE001
-        if should_allow_mock_fallback():
-            logger.warning(
-                "AI init failed: %s. Falling back to MockAI (dev mode).", exc
-            )
-            provider = MockAIService()
-        else:
-            logger.critical("AI init failed and fallback disabled. Stopping startup.")
-            raise RuntimeError("Production AI Init Failure") from exc
+    provider = _build_l3_provider(config)
     l3_manager = L3AnalysisManager(config=config, provider=provider)
     notifier = TelegramNotifier(
         include_tags=config.risk_policy.include_tags_in_report,
         top_n_per_section=getattr(config.reporting, "telegram_top_n_per_section", 0),
         show_opportunity_sections=getattr(
             config.reporting, "telegram_opportunity_sections_enabled", True
+        ),
+        show_lp_entry_watchlist=getattr(
+            config.reporting, "telegram_lp_entry_watchlist_enabled", True
         ),
         show_source_confidence=getattr(
             config.reporting, "telegram_show_source_confidence", True

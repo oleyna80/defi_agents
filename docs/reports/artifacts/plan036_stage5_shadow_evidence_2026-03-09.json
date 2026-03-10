@@ -1,0 +1,137 @@
+{
+  "plan": "036",
+  "stage": "5-closeout-shadow-evidence",
+  "timestamp_utc": "2026-03-09T20:41:35Z",
+  "sources": {
+    "multicycle_runtime_log": "docs/reports/artifacts/plan036_stage5_shadow_runtime_2026-03-09T19-21-40Z.log",
+    "startup_check": "docs/reports/artifacts/plan036_stage5_startup_check_2026-03-09.txt"
+  },
+  "startup_path": {
+    "requires_command_scoped_fallback": false,
+    "observed_reason_code": "MOCK_FALLBACK_SHADOW_DEEPSEEK_API_KEY_MISSING",
+    "startup_events_count": 24
+  },
+  "selector_snapshot": {
+    "cycles_with_selector_telemetry": 24,
+    "entry_selector_input_total_sum": 360,
+    "entry_selector_matched_total_sum": 360,
+    "entry_selector_actionable_total_sum": 117,
+    "entry_selector_watchlist_total_sum": 243,
+    "entry_selector_actionable_ratio": 0.325
+  },
+  "watchlist": {
+    "watchlist_reason_counts": {
+      "INSUFFICIENT_STABILITY_HISTORY": 2,
+      "NON_LP_YIELD_TYPE": 216,
+      "RANGE_NOT_COMPUTED": 1,
+      "UNSUPPORTED_ENTRY_VENUE": 24
+    },
+    "watchlist_blocker_reason_counts": {
+      "SUBGRAPH_SCHEMA_UNSUPPORTED": 240,
+      "TICK_PROVIDER_RUNTIME_ERROR": 1
+    },
+    "tick_density_readiness_blocker_counts": {
+      "SUBGRAPH_SCHEMA_UNSUPPORTED": 24
+    }
+  },
+  "topn_stability_churn": {
+    "entry_topn_churn_values": [
+      0.25,
+      0.0,
+      0.2,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.2,
+      0.2,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "entry_topn_churn_avg": 0.03541666666666667,
+    "entry_topn_churn_p95": 0.2,
+    "selector_actionable_per_cycle": [
+      4,
+      4,
+      5,
+      5,
+      5,
+      5,
+      5,
+      4,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5
+    ],
+    "selector_watchlist_per_cycle": [
+      11,
+      11,
+      10,
+      10,
+      10,
+      10,
+      10,
+      11,
+      10,
+      10,
+      10,
+      10,
+      10,
+      10,
+      10,
+      10,
+      10,
+      10,
+      10,
+      10,
+      10,
+      10,
+      10,
+      10
+    ]
+  },
+  "gate_checks": {
+    "errors_zero_pass": true,
+    "telemetry_min_cycles_pass": true,
+    "actionable_ratio_positive_pass": true,
+    "insufficient_history_ratio_pass": true,
+    "topn_churn_avg_pass": true,
+    "topn_churn_p95_pass": true,
+    "all_pass": true
+  },
+  "verdict": "KEEP",
+  "verdict_reasons": [
+    "all_pass=True",
+    "telemetry_min_cycles_pass=True",
+    "requires_command_scoped_fallback=False",
+    "startup_reason=MOCK_FALLBACK_SHADOW_DEEPSEEK_API_KEY_MISSING",
+    "entry_topn_churn_avg=0.0354",
+    "entry_topn_churn_p95=0.2000"
+  ]
+}

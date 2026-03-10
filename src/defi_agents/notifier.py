@@ -80,6 +80,7 @@ class TelegramNotifier:
         include_tags: bool = False,
         top_n_per_section: int = 0,
         show_opportunity_sections: bool = True,
+        show_lp_entry_watchlist: bool = True,
         show_source_confidence: bool = True,
         show_market_signals: bool = False,
         chat_id_env: str | None = None,
@@ -95,6 +96,7 @@ class TelegramNotifier:
             int(top_n_per_section) if isinstance(top_n_per_section, int) else 0
         )
         self.show_opportunity_sections = bool(show_opportunity_sections)
+        self.show_lp_entry_watchlist = bool(show_lp_entry_watchlist)
         self.show_source_confidence = show_source_confidence
         self.show_market_signals = show_market_signals
         self.message_prefix = (message_prefix or "").strip()
@@ -449,7 +451,7 @@ class TelegramNotifier:
             lines.append("- Actionable:")
             for item in actionable:
                 lines.append(self._format_entry_recommendation_line(item))
-        if watchlist:
+        if self.show_lp_entry_watchlist and watchlist:
             lines.append("- Watchlist:")
             for item in watchlist:
                 lines.append(self._format_entry_recommendation_line(item))

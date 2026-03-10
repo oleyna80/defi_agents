@@ -30,6 +30,7 @@ class ReportingConfig(BaseModel):
     telegram_report_mode: Literal["delta", "snapshot"] = "delta"
     telegram_top_n_per_section: int = Field(default=0, ge=0)
     telegram_opportunity_sections_enabled: bool = True
+    telegram_lp_entry_watchlist_enabled: bool = True
     telegram_turnover_section_enabled: bool = False
     telegram_turnover_top_n: int = Field(default=10, ge=0)
     telegram_turnover_min_tvl_usd: float = Field(default=100_000.0, ge=0.0)

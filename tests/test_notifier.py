@@ -886,6 +886,47 @@ def test_report_blocks_include_lp_entry_recommendations_section():
     assert "reason `INVALID_OR_MISSING_RANGE`" in joined
 
 
+def test_report_blocks_can_hide_lp_entry_watchlist() -> None:
+    notifier = TelegramNotifier(show_lp_entry_watchlist=False)
+    recs = [
+        EntryRecommendation(
+            chain="Base",
+            project="aerodrome-slipstream",
+            pair="WETH-USDC",
+            fee_tier=500,
+            suggested_range_lower_tick=-120,
+            suggested_range_upper_tick=120,
+            confidence=EntryConfidenceBand.HIGH,
+            reasons=["OK"],
+            watchlist_reason=None,
+            actionability=EntryActionability.ACTIONABLE,
+            rank_v1=6.125,
+            source_pool_id="pool-1",
+        ),
+        EntryRecommendation(
+            chain="Ethereum",
+            project="uniswap-v3",
+            pair="WETH-USDT",
+            fee_tier=3000,
+            suggested_range_lower_tick=None,
+            suggested_range_upper_tick=None,
+            confidence=EntryConfidenceBand.LOW,
+            reasons=["INVALID_OR_MISSING_RANGE"],
+            watchlist_reason="INVALID_OR_MISSING_RANGE",
+            actionability=EntryActionability.WATCHLIST,
+            rank_v1=0.0,
+            source_pool_id="pool-2",
+        ),
+    ]
+    blocks = notifier._format_report_blocks([], entry_recommendations=recs)
+    joined = "\n".join(blocks)
+    assert "LP Entry Recommendations" in joined
+    assert "- Actionable:" in joined
+    assert "- Watchlist:" not in joined
+    assert "reason `INVALID_OR_MISSING_RANGE`" not in joined
+    assert "LP Entry — Network/Protocol/Range Selector" in joined
+
+
 def test_report_blocks_can_hide_opportunity_sections_but_keep_lp_entry() -> None:
     notifier = TelegramNotifier(show_opportunity_sections=False)
     recs = [

@@ -1,0 +1,27 @@
+2026-03-09 17:10:19,704 - CRITICAL - Sentinel - AI init failed and fallback disabled. Stopping startup.
+2026-03-09 17:10:19,705 - CRITICAL - Sentinel - FATAL: Process crashed: Production AI Init Failure
+Traceback (most recent call last):
+  File "/home/dmitrii/projects/defi_agents/main.py", line 622, in run_sentinel_cycle
+    provider = DeepSeekProvider()
+               ^^^^^^^^^^^^^^^^^^
+  File "/home/dmitrii/projects/defi_agents/src/defi_agents/ai/provider.py", line 100, in __init__
+    raise ValueError("DEEPSEEK_API_KEY is not set")
+ValueError: DEEPSEEK_API_KEY is not set
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/dmitrii/projects/defi_agents/main.py", line 1862, in <module>
+    asyncio.run(run_sentinel_cycle())
+  File "/usr/lib/python3.12/asyncio/runners.py", line 194, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/dmitrii/projects/defi_agents/main.py", line 632, in run_sentinel_cycle
+    raise RuntimeError("Production AI Init Failure") from exc
+RuntimeError: Production AI Init Failure

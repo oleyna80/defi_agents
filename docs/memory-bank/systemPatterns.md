@@ -503,6 +503,18 @@
     `ALLOW_MOCK_FALLBACK=true` and hard-fails deployment.
   - Rationale: avoid accidental mock operation in production.
 
+- 2026-03-09: Startup AI fallback policy tightening for SHADOW runtime:
+  - Startup fallback with reason `MOCK_FALLBACK_SHADOW_DEEPSEEK_API_KEY_MISSING`
+    is allowed only when runtime mode is `config.execution.mode == "SHADOW"`.
+  - `reporting.telegram_shadow_mode_enabled` is notification/report routing only and
+    must not relax startup provider policy.
+  - Explicit env override remains supported: `ALLOW_MOCK_FALLBACK=true` keeps dev
+    mock fallback path in any mode.
+  - Outside SHADOW with `ALLOW_MOCK_FALLBACK=false` and missing `DEEPSEEK_API_KEY`,
+    startup remains fail-closed with `Production AI Init Failure`.
+  - Rationale: enforce deterministic startup safety boundaries by execution runtime
+    mode, not by reporting flags.
+
 - 2026-02-03: Single-scheduler runtime policy:
   - When VPS timer is primary runtime, GitHub workflow trigger remains manual-only (`workflow_dispatch`);
     periodic `schedule` is disabled to avoid duplicate cycles.
